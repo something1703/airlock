@@ -1,0 +1,127 @@
+{
+  "entries": [
+    {
+      "id": "v-me",
+      "canonical": "Maya Chen",
+      "aliases": [
+        "Maya"
+      ],
+      "category": "person",
+      "roleHint": "me",
+      "isUser": true
+    },
+    {
+      "id": "v-raj",
+      "canonical": "Raj Patel",
+      "aliases": [
+        "Raj",
+        "Mr. Patel"
+      ],
+      "category": "person",
+      "roleHint": "my landlord",
+      "isUser": false
+    },
+    {
+      "id": "v-org",
+      "canonical": "Mercy General Hospital",
+      "aliases": [
+        "Mercy General"
+      ],
+      "category": "org",
+      "roleHint": "my employer",
+      "isUser": false
+    },
+    {
+      "id": "v-jose",
+      "canonical": "José Álvarez",
+      "aliases": [],
+      "category": "person",
+      "roleHint": "my neighbour",
+      "isUser": false
+    }
+  ],
+  "cases": [
+    {
+      "name": "names",
+      "text": "Raj said Maya Chen owes rent.",
+      "expect": [
+        {
+          "text": "Raj",
+          "entryId": "v-raj"
+        },
+        {
+          "text": "Maya Chen",
+          "entryId": "v-me"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "possessive and boundary",
+      "text": "Rajesh is not Raj's brother.",
+      "expect": [
+        {
+          "text": "Raj",
+          "entryId": "v-raj"
+        }
+      ],
+      "absent": [
+        "Rajesh"
+      ]
+    },
+    {
+      "name": "upper case",
+      "text": "RAJ PATEL called twice.",
+      "expect": [
+        {
+          "text": "RAJ PATEL",
+          "entryId": "v-raj"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "diacritics",
+      "text": "Jose Alvarez emailed me.",
+      "expect": [
+        {
+          "text": "Jose Alvarez",
+          "entryId": "v-jose"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "longest term wins",
+      "text": "I work at Mercy General Hospital nights.",
+      "expect": [
+        {
+          "text": "Mercy General Hospital",
+          "entryId": "v-org"
+        }
+      ],
+      "absent": [
+        "Mercy General"
+      ]
+    },
+    {
+      "name": "title alias",
+      "text": "Mr. Patel never replied.",
+      "expect": [
+        {
+          "text": "Mr. Patel",
+          "entryId": "v-raj"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "no partial word",
+      "text": "Mayan ruins are old.",
+      "expect": [],
+      "absent": [
+        "Maya"
+      ]
+    }
+  ]
+}

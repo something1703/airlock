@@ -1,0 +1,40 @@
+{
+  "description": "input -> expected normalised text. Normalisation must be idempotent.",
+  "cases": [
+    {
+      "name": "zero-width removed",
+      "input": "Hi​Ra‍j﻿",
+      "expected": "HiRaj"
+    },
+    {
+      "name": "smart quotes",
+      "input": "“quoted” and ‘single’",
+      "expected": "\"quoted\" and 'single'"
+    },
+    {
+      "name": "full-width NFKC",
+      "input": "Ｒａｊ １２３",
+      "expected": "Raj 123"
+    },
+    {
+      "name": "ligature NFKC",
+      "input": "ﬁle",
+      "expected": "file"
+    },
+    {
+      "name": "whitespace runs",
+      "input": "a  \t b  c",
+      "expected": "a b c"
+    },
+    {
+      "name": "CRLF",
+      "input": "line1\r\nline2\rline3",
+      "expected": "line1\nline2\nline3"
+    },
+    {
+      "name": "bidi override removed",
+      "input": "pay‮evil",
+      "expected": "payevil"
+    }
+  ]
+}

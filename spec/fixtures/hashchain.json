@@ -1,0 +1,105 @@
+{
+  "description": "hash = sha256_hex(prevHash + canonicalJSON(fields)); fields exclude 'hash' and 'outboundText'; genesis prevHash = 64 zeros. Canonical JSON = sorted keys, no whitespace, minimal escaping (Python json.dumps sort_keys, separators=(',',':'), ensure_ascii=False).",
+  "genesis": "0000000000000000000000000000000000000000000000000000000000000000",
+  "chain": [
+    {
+      "receipt": {
+        "id": "rcpt_0001",
+        "seq": 1,
+        "createdAt": "2026-11-21T10:14:03Z",
+        "threadId": "thr_7f3",
+        "route": "cloudFirst",
+        "modelVersion": "gemini-3.8-flash",
+        "outboundSha256": "9c1e000000000000000000000000000000000000000000000000000000000000",
+        "outboundChars": 1840,
+        "counts": {
+          "person": 3,
+          "org": 1,
+          "location": 2,
+          "contact": 1,
+          "id": 1,
+          "secret": 0,
+          "generalised": 2,
+          "redteamApplied": 1
+        },
+        "gate": {
+          "passed": true,
+          "checks": [
+            "G1",
+            "G2",
+            "G3",
+            "G4",
+            "G5",
+            "G6",
+            "G7"
+          ]
+        },
+        "armor": "notConfigured",
+        "latencyMs": {
+          "seal": 3120,
+          "network": 2050
+        },
+        "prevHash": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "canonical": "{\"armor\":\"notConfigured\",\"counts\":{\"contact\":1,\"generalised\":2,\"id\":1,\"location\":2,\"org\":1,\"person\":3,\"redteamApplied\":1,\"secret\":0},\"createdAt\":\"2026-11-21T10:14:03Z\",\"gate\":{\"checks\":[\"G1\",\"G2\",\"G3\",\"G4\",\"G5\",\"G6\",\"G7\"],\"passed\":true},\"id\":\"rcpt_0001\",\"latencyMs\":{\"network\":2050,\"seal\":3120},\"modelVersion\":\"gemini-3.8-flash\",\"outboundChars\":1840,\"outboundSha256\":\"9c1e000000000000000000000000000000000000000000000000000000000000\",\"prevHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"route\":\"cloudFirst\",\"seq\":1,\"threadId\":\"thr_7f3\"}",
+      "hash": "5e59fdf82f44ccef8fcacebf0fb6635590f8e3caa39bd9834a5035f4bb6c3c41"
+    },
+    {
+      "receipt": {
+        "id": "rcpt_0002",
+        "seq": 2,
+        "createdAt": "2026-11-21T10:20:41Z",
+        "threadId": "thr_7f3",
+        "route": "phoneFirst",
+        "modelVersion": "gemini-3.5-flash-lite",
+        "outboundSha256": "abababababababababababababababababababababababababababababababab",
+        "outboundChars": 212,
+        "counts": {
+          "person": 1
+        },
+        "gate": {
+          "passed": true,
+          "checks": [
+            "G1",
+            "G2",
+            "G3",
+            "G4",
+            "G5",
+            "G6",
+            "G7"
+          ]
+        },
+        "armor": "pass",
+        "latencyMs": {
+          "seal": 900,
+          "network": 640
+        },
+        "prevHash": "5e59fdf82f44ccef8fcacebf0fb6635590f8e3caa39bd9834a5035f4bb6c3c41"
+      },
+      "canonical": "{\"armor\":\"pass\",\"counts\":{\"person\":1},\"createdAt\":\"2026-11-21T10:20:41Z\",\"gate\":{\"checks\":[\"G1\",\"G2\",\"G3\",\"G4\",\"G5\",\"G6\",\"G7\"],\"passed\":true},\"id\":\"rcpt_0002\",\"latencyMs\":{\"network\":640,\"seal\":900},\"modelVersion\":\"gemini-3.5-flash-lite\",\"outboundChars\":212,\"outboundSha256\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"5e59fdf82f44ccef8fcacebf0fb6635590f8e3caa39bd9834a5035f4bb6c3c41\",\"route\":\"phoneFirst\",\"seq\":2,\"threadId\":\"thr_7f3\"}",
+      "hash": "3ad792ed99ec0d5b5077b3c3aaa4b7302ff9808d25c6de1229b5ef62dc5cd342"
+    },
+    {
+      "receipt": {
+        "id": "rcpt_0003",
+        "seq": 3,
+        "createdAt": "2026-11-22T08:00:00Z",
+        "threadId": "thr_\"quoted\"\\é\n\u0001",
+        "route": "cloudOnly",
+        "modelVersion": "gemini-3.8-flash",
+        "outboundSha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "outboundChars": 99,
+        "counts": {},
+        "gate": {
+          "passed": true,
+          "checks": []
+        },
+        "armor": "blocked",
+        "latencyMs": {},
+        "prevHash": "3ad792ed99ec0d5b5077b3c3aaa4b7302ff9808d25c6de1229b5ef62dc5cd342"
+      },
+      "canonical": "{\"armor\":\"blocked\",\"counts\":{},\"createdAt\":\"2026-11-22T08:00:00Z\",\"gate\":{\"checks\":[],\"passed\":true},\"id\":\"rcpt_0003\",\"latencyMs\":{},\"modelVersion\":\"gemini-3.8-flash\",\"outboundChars\":99,\"outboundSha256\":\"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\",\"prevHash\":\"3ad792ed99ec0d5b5077b3c3aaa4b7302ff9808d25c6de1229b5ef62dc5cd342\",\"route\":\"cloudOnly\",\"seq\":3,\"threadId\":\"thr_\\\"quoted\\\"\\\\é\\n\\u0001\"}",
+      "hash": "aebe76dc9586455643c55203013300fa829f6f8c15ce54d2bb8c3591856dec63"
+    }
+  ]
+}

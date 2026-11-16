@@ -1,0 +1,500 @@
+{
+  "description": "Policy engine conformance: dial × category/subtype (+settings, overrides) -> action. 'generalise:N' = generalise(level N).",
+  "cases": [
+    {
+      "dial": "open",
+      "category": "person",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "balanced",
+      "category": "person",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "strict",
+      "category": "person",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "open",
+      "category": "org",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "keep"
+    },
+    {
+      "dial": "balanced",
+      "category": "org",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "generalise:2"
+    },
+    {
+      "dial": "strict",
+      "category": "org",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "generalise:3"
+    },
+    {
+      "dial": "open",
+      "category": "location",
+      "subtype": "address",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "balanced",
+      "category": "location",
+      "subtype": "address",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "strict",
+      "category": "location",
+      "subtype": "address",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "open",
+      "category": "location",
+      "subtype": "unit",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "balanced",
+      "category": "location",
+      "subtype": "unit",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "strict",
+      "category": "location",
+      "subtype": "unit",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "open",
+      "category": "location",
+      "subtype": "postcode",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "balanced",
+      "category": "location",
+      "subtype": "postcode",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "strict",
+      "category": "location",
+      "subtype": "postcode",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "open",
+      "category": "location",
+      "subtype": "place",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "keep"
+    },
+    {
+      "dial": "balanced",
+      "category": "location",
+      "subtype": "place",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "generalise:2"
+    },
+    {
+      "dial": "strict",
+      "category": "location",
+      "subtype": "place",
+      "canonical": "Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "generalise:3"
+    },
+    {
+      "dial": "open",
+      "category": "contact",
+      "subtype": "email",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "balanced",
+      "category": "contact",
+      "subtype": "email",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "strict",
+      "category": "contact",
+      "subtype": "email",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "open",
+      "category": "id",
+      "subtype": "card",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "balanced",
+      "category": "id",
+      "subtype": "card",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "strict",
+      "category": "id",
+      "subtype": "card",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "open",
+      "category": "date",
+      "subtype": "dob",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "generalise:2"
+    },
+    {
+      "dial": "balanced",
+      "category": "date",
+      "subtype": "dob",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "generalise:2"
+    },
+    {
+      "dial": "strict",
+      "category": "date",
+      "subtype": "dob",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "generalise:3"
+    },
+    {
+      "dial": "open",
+      "category": "date",
+      "subtype": "date",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "keep"
+    },
+    {
+      "dial": "balanced",
+      "category": "date",
+      "subtype": "date",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "keep"
+    },
+    {
+      "dial": "strict",
+      "category": "date",
+      "subtype": "date",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "generalise:1"
+    },
+    {
+      "dial": "open",
+      "category": "health",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "keep"
+    },
+    {
+      "dial": "balanced",
+      "category": "health",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "keep"
+    },
+    {
+      "dial": "strict",
+      "category": "health",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "generalise:2"
+    },
+    {
+      "dial": "open",
+      "category": "health",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": true,
+      "override": null,
+      "expected": "keep"
+    },
+    {
+      "dial": "balanced",
+      "category": "health",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": true,
+      "override": null,
+      "expected": "generalise:2"
+    },
+    {
+      "dial": "strict",
+      "category": "health",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": true,
+      "override": null,
+      "expected": "generalise:2"
+    },
+    {
+      "dial": "open",
+      "category": "secret",
+      "subtype": "otp",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "block"
+    },
+    {
+      "dial": "balanced",
+      "category": "secret",
+      "subtype": "otp",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "block"
+    },
+    {
+      "dial": "strict",
+      "category": "secret",
+      "subtype": "otp",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "block"
+    },
+    {
+      "dial": "open",
+      "category": "org",
+      "subtype": null,
+      "canonical": "x",
+      "vault": true,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "balanced",
+      "category": "org",
+      "subtype": null,
+      "canonical": "x",
+      "vault": true,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "strict",
+      "category": "org",
+      "subtype": null,
+      "canonical": "x",
+      "vault": true,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    },
+    {
+      "dial": "balanced",
+      "category": "person",
+      "subtype": null,
+      "canonical": "x",
+      "vault": true,
+      "protectHealth": false,
+      "override": {
+        "action": "keep",
+        "revealThisTime": false
+      },
+      "expected": "placeholder"
+    },
+    {
+      "dial": "balanced",
+      "category": "person",
+      "subtype": null,
+      "canonical": "x",
+      "vault": true,
+      "protectHealth": false,
+      "override": {
+        "action": "keep",
+        "revealThisTime": true
+      },
+      "expected": "keep"
+    },
+    {
+      "dial": "balanced",
+      "category": "secret",
+      "subtype": "otp",
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": {
+        "action": "keep",
+        "revealThisTime": true
+      },
+      "expected": "block"
+    },
+    {
+      "dial": "strict",
+      "category": "org",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": {
+        "action": "keep",
+        "revealThisTime": false
+      },
+      "expected": "keep"
+    },
+    {
+      "dial": "balanced",
+      "category": "person",
+      "subtype": null,
+      "canonical": "x",
+      "vault": false,
+      "protectHealth": false,
+      "override": {
+        "action": "generalise:2",
+        "revealThisTime": false
+      },
+      "expected": "placeholder"
+    },
+    {
+      "dial": "open",
+      "category": "location",
+      "subtype": "place",
+      "canonical": "Unit 4 Springfield",
+      "vault": false,
+      "protectHealth": false,
+      "override": null,
+      "expected": "placeholder"
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "known": [
+    "PERSON_1",
+    "PERSON_2",
+    "ORG_1",
+    "LOC_1",
+    "SECRET_1"
+  ],
+  "cases": [
+    {
+      "text": "Hi [[PERSON_1]],",
+      "expect": [
+        {
+          "original": "[[PERSON_1]]",
+          "id": "PERSON_1",
+          "canonical": true
+        }
+      ]
+    },
+    {
+      "text": "Hi [PERSON_1],",
+      "expect": [
+        {
+          "original": "[PERSON_1]",
+          "id": "PERSON_1",
+          "canonical": false
+        }
+      ]
+    },
+    {
+      "text": "PERSON_1 said no",
+      "expect": [
+        {
+          "original": "PERSON_1",
+          "id": "PERSON_1",
+          "canonical": false
+        }
+      ]
+    },
+    {
+      "text": "ask [[ PERSON_2 ]] now",
+      "expect": [
+        {
+          "original": "[[ PERSON_2 ]]",
+          "id": "PERSON_2",
+          "canonical": false
+        }
+      ]
+    },
+    {
+      "text": "at [[Org_1]]",
+      "expect": [
+        {
+          "original": "[[Org_1]]",
+          "id": "ORG_1",
+          "canonical": false
+        }
+      ]
+    },
+    {
+      "text": "at [[LOC 1]]",
+      "expect": [
+        {
+          "original": "[[LOC 1]]",
+          "id": "LOC_1",
+          "canonical": false
+        }
+      ]
+    },
+    {
+      "text": "to 【PERSON_1】",
+      "expect": [
+        {
+          "original": "【PERSON_1】",
+          "id": "PERSON_1",
+          "canonical": false
+        }
+      ]
+    },
+    {
+      "text": "and [[PERSON_ME]] too",
+      "expect": [
+        {
+          "original": "[[PERSON_ME]]",
+          "id": "PERSON_ME",
+          "canonical": true
+        }
+      ]
+    },
+    {
+      "text": "who is [[PERSON_9]]?",
+      "expect": [
+        {
+          "original": "[[PERSON_9]]",
+          "id": "PERSON_9",
+          "canonical": true
+        }
+      ]
+    },
+    {
+      "text": "who is [PERSON_9]?",
+      "expect": []
+    },
+    {
+      "text": "PERSON_12 and MYPERSON_1 and PERSON_1x",
+      "expect": []
+    },
+    {
+      "text": "[[ORG_ME]] is invalid",
+      "expect": []
+    }
+  ]
+}

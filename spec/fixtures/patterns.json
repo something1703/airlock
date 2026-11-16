@@ -1,0 +1,380 @@
+{
+  "description": "Pattern detector conformance (regex rules only, NSDataDetector off). 'expect': each item must be found with exactly this text/category/subtype. 'absent': no candidate with this text (and subtype, if given). Other extra candidates are allowed.",
+  "cases": [
+    {
+      "name": "email",
+      "text": "Email me at maya.chen@example.com tomorrow.",
+      "expect": [
+        {
+          "text": "maya.chen@example.com",
+          "category": "contact",
+          "subtype": "email"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "phones",
+      "text": "Call 312-555-0147 or +1 (312) 555-0199.",
+      "expect": [
+        {
+          "text": "312-555-0147",
+          "category": "contact",
+          "subtype": "phone"
+        },
+        {
+          "text": "+1 (312) 555-0199",
+          "category": "contact",
+          "subtype": "phone"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "card spaced",
+      "text": "My card 4111 1111 1111 1111 expires soon.",
+      "expect": [
+        {
+          "text": "4111 1111 1111 1111",
+          "category": "id",
+          "subtype": "card"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "card invalid luhn",
+      "text": "Number 4111 1111 1111 1112 is wrong.",
+      "expect": [],
+      "absent": [
+        {
+          "text": "4111 1111 1111 1112",
+          "subtype": "card"
+        }
+      ]
+    },
+    {
+      "name": "iban spaced",
+      "text": "Pay to GB82 WEST 1234 5698 7654 32 today.",
+      "expect": [
+        {
+          "text": "GB82 WEST 1234 5698 7654 32",
+          "category": "id",
+          "subtype": "iban"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "iban then capital word",
+      "text": "IBAN GB82WEST12345698765432 REF please",
+      "expect": [
+        {
+          "text": "GB82WEST12345698765432",
+          "category": "id",
+          "subtype": "iban"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "ssn",
+      "text": "SSN 123-45-6789 on file.",
+      "expect": [
+        {
+          "text": "123-45-6789",
+          "category": "id",
+          "subtype": "ssn"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "uk ni",
+      "text": "My NI number is AB 12 34 56 C.",
+      "expect": [
+        {
+          "text": "AB 12 34 56 C",
+          "category": "id",
+          "subtype": "national_id"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "passport",
+      "text": "My passport number is 533380006.",
+      "expect": [
+        {
+          "text": "533380006",
+          "category": "id",
+          "subtype": "passport"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "order ref",
+      "text": "Order #A1B2C3D4 shipped late.",
+      "expect": [
+        {
+          "text": "#A1B2C3D4",
+          "category": "id",
+          "subtype": "reference"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "otp",
+      "text": "Your verification code is 482913.",
+      "expect": [
+        {
+          "text": "482913",
+          "category": "secret",
+          "subtype": "otp"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "password",
+      "text": "The wifi password: hunter2!x works.",
+      "expect": [
+        {
+          "text": "hunter2!x",
+          "category": "secret",
+          "subtype": "password"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "openai-style key",
+      "text": "key sk-proj-abcdefghijklmnop1234 leaked",
+      "expect": [
+        {
+          "text": "sk-proj-abcdefghijklmnop1234",
+          "category": "secret",
+          "subtype": "api_key"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "google api key",
+      "text": "config AIzaSyD3x9Qk2mN7pL4vR8tW1zB6cF0hJ5gK2aE here",
+      "expect": [
+        {
+          "text": "AIzaSyD3x9Qk2mN7pL4vR8tW1zB6cF0hJ5gK2aE",
+          "category": "secret",
+          "subtype": "api_key"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "handle",
+      "text": "DM me @maya_c.design anytime",
+      "expect": [
+        {
+          "text": "@maya_c.design",
+          "category": "contact",
+          "subtype": "handle"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "email is not handle",
+      "text": "write to a.b@example.org",
+      "expect": [
+        {
+          "text": "a.b@example.org",
+          "category": "contact",
+          "subtype": "email"
+        }
+      ],
+      "absent": [
+        {
+          "text": "@example.org",
+          "subtype": "handle"
+        }
+      ]
+    },
+    {
+      "name": "url identifying",
+      "text": "See https://www.linkedin.com/in/maya-chen-123 for more.",
+      "expect": [
+        {
+          "text": "https://www.linkedin.com/in/maya-chen-123",
+          "category": "contact",
+          "subtype": "url"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "url generic",
+      "text": "Read https://www.irs.gov/help today.",
+      "expect": [],
+      "absent": [
+        {
+          "text": "https://www.irs.gov/help",
+          "subtype": "url"
+        }
+      ]
+    },
+    {
+      "name": "dob",
+      "text": "I was born on 4 Mar 1989 in a small town.",
+      "expect": [
+        {
+          "text": "4 Mar 1989",
+          "category": "date",
+          "subtype": "dob"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "other date",
+      "text": "Broken since Oct 28 and still not fixed.",
+      "expect": [
+        {
+          "text": "Oct 28",
+          "category": "date",
+          "subtype": "date"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "iso date not phone",
+      "text": "Due 2026-11-21 at noon.",
+      "expect": [
+        {
+          "text": "2026-11-21",
+          "category": "date",
+          "subtype": "date"
+        }
+      ],
+      "absent": [
+        {
+          "text": "2026-11-21",
+          "subtype": "phone"
+        }
+      ]
+    },
+    {
+      "name": "street address",
+      "text": "The heater at 14 Elm St, Apt 3B has been broken.",
+      "expect": [
+        {
+          "text": "14 Elm St, Apt 3B",
+          "category": "location",
+          "subtype": "address"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "unit",
+      "text": "Flat 12 is upstairs.",
+      "expect": [
+        {
+          "text": "Flat 12",
+          "category": "location",
+          "subtype": "unit"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "uk postcode",
+      "text": "Send it to SW1A 1AA please.",
+      "expect": [
+        {
+          "text": "SW1A 1AA",
+          "category": "location",
+          "subtype": "postcode"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "us zip",
+      "text": "Springfield, IL 62704 is home.",
+      "expect": [
+        {
+          "text": "IL 62704",
+          "category": "location",
+          "subtype": "postcode"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "aadhaar",
+      "text": "Aadhaar 2341 2341 2346 linked.",
+      "expect": [
+        {
+          "text": "2341 2341 2346",
+          "category": "id",
+          "subtype": "national_id"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "pan",
+      "text": "PAN ABCPE1234F on the form.",
+      "expect": [
+        {
+          "text": "ABCPE1234F",
+          "category": "id",
+          "subtype": "national_id"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "licence plate",
+      "text": "My plate is AB12 CDE now.",
+      "expect": [
+        {
+          "text": "AB12 CDE",
+          "category": "id",
+          "subtype": "plate"
+        }
+      ],
+      "absent": []
+    },
+    {
+      "name": "money kept",
+      "text": "Rent of $1,240 is due on the 1st.",
+      "expect": [],
+      "absent": [
+        {
+          "text": "1,240",
+          "subtype": null
+        },
+        {
+          "text": "$1,240",
+          "subtype": null
+        }
+      ]
+    },
+    {
+      "name": "times kept",
+      "text": "Free 3:00-4:00 pm on Tuesday.",
+      "expect": [],
+      "absent": [
+        {
+          "text": "3:00-4:00",
+          "subtype": null
+        }
+      ]
+    }
+  ]
+}

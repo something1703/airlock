@@ -1,0 +1,126 @@
+{
+  "description": "Model output -> restored text. Display rule: first mention canonical; later person mentions use the shortest surface form no other person shares; PERSON_ME -> 'you' (or first name when writing as the user); SECRET never restored; unknown canonical ids left as written.",
+  "secretDisplay": "(hidden code)",
+  "groups": [
+    {
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        },
+        {
+          "id": "ORG_1",
+          "category": "org",
+          "canonical": "Mercy General Hospital",
+          "surfaceForms": [
+            "Mercy General Hospital"
+          ],
+          "action": "placeholder"
+        },
+        {
+          "id": "LOC_1",
+          "category": "location",
+          "canonical": "14 Elm St, Apt 3B",
+          "surfaceForms": [
+            "14 Elm St, Apt 3B"
+          ],
+          "action": "placeholder"
+        },
+        {
+          "id": "SECRET_1",
+          "category": "secret",
+          "canonical": "482913",
+          "surfaceForms": [
+            "482913"
+          ],
+          "action": "block"
+        }
+      ],
+      "cases": [
+        {
+          "name": "first then short",
+          "output": "Tell [[PERSON_1]] that [[PERSON_1]]'s heater at [[LOC_1]] is broken.",
+          "expected": "Tell Raj Patel that Raj's heater at 14 Elm St, Apt 3B is broken."
+        },
+        {
+          "name": "org always canonical",
+          "output": "[[ORG_1]] and later [[ORG_1]].",
+          "expected": "Mercy General Hospital and later Mercy General Hospital."
+        },
+        {
+          "name": "secret never restored",
+          "output": "Never share [[SECRET_1]] with anyone.",
+          "expected": "Never share (hidden code) with anyone."
+        },
+        {
+          "name": "me as you",
+          "output": "[[PERSON_ME]] can ask [[PERSON_1]].",
+          "expected": "you can ask Raj Patel."
+        },
+        {
+          "name": "me as signer",
+          "output": "Thanks,\n[[PERSON_ME]]",
+          "writingAsUser": true,
+          "userFirstName": "Maya",
+          "expected": "Thanks,\nMaya"
+        },
+        {
+          "name": "unknown id kept",
+          "output": "Ask [[PERSON_9]] instead.",
+          "expected": "Ask [[PERSON_9]] instead.",
+          "unknown": [
+            "PERSON_9"
+          ]
+        },
+        {
+          "name": "variants",
+          "output": "[Person_1] and PERSON_1 and [[ PERSON_1 ]]",
+          "expected": "Raj Patel and Raj and Raj"
+        },
+        {
+          "name": "no placeholders",
+          "output": "Nothing to restore here.",
+          "expected": "Nothing to restore here."
+        }
+      ]
+    },
+    {
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj",
+            "Patel"
+          ],
+          "action": "placeholder"
+        },
+        {
+          "id": "PERSON_2",
+          "category": "person",
+          "canonical": "Raj Singh",
+          "surfaceForms": [
+            "Raj Singh",
+            "Singh"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "cases": [
+        {
+          "name": "shared first name avoided",
+          "output": "[[PERSON_1]], [[PERSON_2]], [[PERSON_1]], [[PERSON_2]]",
+          "expected": "Raj Patel, Raj Singh, Patel, Singh"
+        }
+      ]
+    }
+  ]
+}

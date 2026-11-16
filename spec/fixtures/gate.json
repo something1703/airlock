@@ -1,0 +1,719 @@
+{
+  "description": "Egress gate conformance. pass=true -> SealedText; else must block with at least the listed checks. Pattern detector with data detectors off.",
+  "cases": [
+    {
+      "name": "clean",
+      "text": "Hi [[PERSON_1]], see you soon.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": true,
+      "mustInclude": []
+    },
+    {
+      "name": "first name leak",
+      "text": "Hi [[PERSON_1]], Raj said hi.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G2"
+      ]
+    },
+    {
+      "name": "surname token leak",
+      "text": "Hi [[PERSON_1]], Mr Patel said hi.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G2"
+      ]
+    },
+    {
+      "name": "common-word first name not blocked",
+      "text": "[[PERSON_1]] said I will call.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Will Smith",
+          "surfaceForms": [
+            "Will Smith"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": true,
+      "mustInclude": []
+    },
+    {
+      "name": "generalised org leak",
+      "text": "Hi [[PERSON_1]], I work at Mercy General Hospital.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        },
+        {
+          "id": "ORG_1",
+          "category": "org",
+          "canonical": "Mercy General Hospital",
+          "surfaceForms": [
+            "Mercy General Hospital"
+          ],
+          "action": "generalise:2"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G2"
+      ]
+    },
+    {
+      "name": "vault alias any case",
+      "text": "Hi [[PERSON_1]], thanks, MAYA",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        }
+      ],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G1"
+      ]
+    },
+    {
+      "name": "vault revealed this time",
+      "text": "Hi [[PERSON_1]], thanks, Maya",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        }
+      ],
+      "revealed": [
+        "v-me"
+      ],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": true,
+      "mustInclude": []
+    },
+    {
+      "name": "email pattern",
+      "text": "Hi [[PERSON_1]], mail a.b@example.com",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G3"
+      ]
+    },
+    {
+      "name": "kept helpline allowed",
+      "text": "Hi [[PERSON_1]], call 800-555-0199 today.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [
+        "800-555-0199"
+      ],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": true,
+      "mustInclude": []
+    },
+    {
+      "name": "zero width",
+      "text": "Hi [[PERSON_1]], R​aj said hi.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G6"
+      ]
+    },
+    {
+      "name": "homoglyph mixed script",
+      "text": "Hi [[PERSON_1]], Rаj said hi.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G6",
+        "G2"
+      ]
+    },
+    {
+      "name": "all-cyrillic lookalike",
+      "text": "Hi [[PERSON_1]], Мауа wrote.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        }
+      ],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G1"
+      ]
+    },
+    {
+      "name": "smart quotes",
+      "text": "Hi [[PERSON_1]], “ok”.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G6"
+      ]
+    },
+    {
+      "name": "malformed placeholder",
+      "text": "Hi [PERSON_1], ok.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G4"
+      ]
+    },
+    {
+      "name": "unknown placeholder",
+      "text": "Hi [[PERSON_1]] and [[PERSON_2]].",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G4"
+      ]
+    },
+    {
+      "name": "unused legend line",
+      "text": "Hi [[PERSON_1]].",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ],
+        [
+          "ORG_1",
+          "the user's employer"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        },
+        {
+          "id": "ORG_1",
+          "category": "org",
+          "canonical": "Mercy General Hospital",
+          "surfaceForms": [
+            "Mercy General Hospital"
+          ],
+          "action": "generalise:2"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G4"
+      ]
+    },
+    {
+      "name": "legend leak",
+      "text": "Hi [[PERSON_1]].",
+      "legend": [
+        [
+          "PERSON_1",
+          "Raj, the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G5"
+      ]
+    },
+    {
+      "name": "legend pattern",
+      "text": "Hi [[PERSON_1]].",
+      "legend": [
+        [
+          "PERSON_1",
+          "reachable at a.b@example.com"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G5"
+      ]
+    },
+    {
+      "name": "too large",
+      "text": "Hi [[PERSON_1]], this is a long message.",
+      "legend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": false,
+      "maxUTF16": 30,
+      "pass": false,
+      "mustInclude": [
+        "G7"
+      ]
+    },
+    {
+      "name": "tool result clean",
+      "text": "{\"slots\":[\"Tue 24 Nov, 3:00-4:00 pm\",\"Thu 26 Nov, 10:00-11:00 am\"]}",
+      "legend": [],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": true,
+      "maxUTF16": null,
+      "pass": true,
+      "mustInclude": []
+    },
+    {
+      "name": "tool result leak",
+      "text": "{\"role\":\"Raj is the landlord\"}",
+      "legend": [],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": true,
+      "maxUTF16": null,
+      "pass": false,
+      "mustInclude": [
+        "G2"
+      ]
+    },
+    {
+      "name": "tool result with known placeholder",
+      "text": "{\"role\":\"[[PERSON_1]] is the landlord\"}",
+      "legend": [],
+      "entities": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "vault": [],
+      "revealed": [],
+      "kept": [],
+      "toolResult": true,
+      "maxUTF16": null,
+      "pass": true,
+      "mustInclude": []
+    }
+  ]
+}

@@ -1,0 +1,272 @@
+{
+  "description": "End-to-end deterministic seal: normalise -> vault + pattern detectors (data detectors off) + given LLM candidates -> merge -> policy -> sealer -> gate must pass. Ladder defaults used for generalisation (no model).",
+  "cases": [
+    {
+      "name": "balanced landlord",
+      "dial": "balanced",
+      "today": "2026-11-21",
+      "text": "Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I work nights at Mercy General Hospital. Call me on 312-555-0147. Rent is $1,240. Thanks, Maya Chen",
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        },
+        {
+          "id": "v-raj",
+          "canonical": "Raj Patel",
+          "aliases": [
+            "Raj"
+          ],
+          "category": "person",
+          "roleHint": "my landlord",
+          "isUser": false
+        }
+      ],
+      "llm": [
+        {
+          "start": 87,
+          "end": 109,
+          "text": "Mercy General Hospital",
+          "category": "org",
+          "detector": "llm",
+          "roleHint": "the writer's employer"
+        }
+      ],
+      "overrides": [],
+      "expectedText": "Hi [[PERSON_1]], the heater at [[LOC_1]] has been broken since Oct 28. I work nights at an organisation. Call me on [[CONTACT_1]]. Rent is $1,240. Thanks, [[PERSON_ME]]",
+      "expectedLegend": [
+        [
+          "CONTACT_1",
+          "contact details"
+        ],
+        [
+          "PERSON_ME",
+          "the user"
+        ],
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ],
+        [
+          "LOC_1",
+          "a place mentioned in the message"
+        ]
+      ]
+    },
+    {
+      "name": "strict landlord",
+      "dial": "strict",
+      "today": "2026-11-21",
+      "text": "Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I work nights at Mercy General Hospital. Call me on 312-555-0147. Rent is $1,240. Thanks, Maya Chen",
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        },
+        {
+          "id": "v-raj",
+          "canonical": "Raj Patel",
+          "aliases": [
+            "Raj"
+          ],
+          "category": "person",
+          "roleHint": "my landlord",
+          "isUser": false
+        }
+      ],
+      "llm": [
+        {
+          "start": 87,
+          "end": 109,
+          "text": "Mercy General Hospital",
+          "category": "org",
+          "detector": "llm",
+          "roleHint": "the writer's employer"
+        }
+      ],
+      "overrides": [],
+      "expectedText": "Hi [[PERSON_1]], the heater at [[LOC_1]] has been broken since 3 weeks ago. I work nights at an organisation. Call me on [[CONTACT_1]]. Rent is $1,000–1,500. Thanks, [[PERSON_ME]]",
+      "expectedLegend": [
+        [
+          "CONTACT_1",
+          "contact details"
+        ],
+        [
+          "PERSON_ME",
+          "the user"
+        ],
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ],
+        [
+          "LOC_1",
+          "a place mentioned in the message"
+        ]
+      ]
+    },
+    {
+      "name": "open keeps town and org",
+      "dial": "open",
+      "today": "2026-11-21",
+      "text": "I live in Springfield and work at Acme Corp.",
+      "vault": [],
+      "llm": [
+        {
+          "start": 10,
+          "end": 21,
+          "text": "Springfield",
+          "category": "location",
+          "detector": "llm",
+          "subtype": "place"
+        },
+        {
+          "start": 34,
+          "end": 43,
+          "text": "Acme Corp",
+          "category": "org",
+          "detector": "llm"
+        }
+      ],
+      "overrides": [],
+      "expectedText": "I live in Springfield and work at Acme Corp.",
+      "expectedLegend": []
+    },
+    {
+      "name": "balanced generalises town and org",
+      "dial": "balanced",
+      "today": "2026-11-21",
+      "text": "I live in Springfield and work at Acme Corp.",
+      "vault": [],
+      "llm": [
+        {
+          "start": 10,
+          "end": 21,
+          "text": "Springfield",
+          "category": "location",
+          "detector": "llm",
+          "subtype": "place"
+        },
+        {
+          "start": 34,
+          "end": 43,
+          "text": "Acme Corp",
+          "category": "org",
+          "detector": "llm"
+        }
+      ],
+      "overrides": [],
+      "expectedText": "I live in a city and work at an organisation.",
+      "expectedLegend": []
+    },
+    {
+      "name": "secret blocked",
+      "dial": "open",
+      "today": "2026-11-21",
+      "text": "My code is 482913, don't share it.",
+      "vault": [],
+      "llm": [],
+      "overrides": [],
+      "expectedText": "My code is [[SECRET_1]], don't share it.",
+      "expectedLegend": [
+        [
+          "SECRET_1",
+          "a secret the user should not share"
+        ]
+      ]
+    },
+    {
+      "name": "vault reveal needs explicit flag",
+      "dial": "balanced",
+      "today": "2026-11-21",
+      "text": "Ask Raj about it.",
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        },
+        {
+          "id": "v-raj",
+          "canonical": "Raj Patel",
+          "aliases": [
+            "Raj"
+          ],
+          "category": "person",
+          "roleHint": "my landlord",
+          "isUser": false
+        }
+      ],
+      "llm": [],
+      "overrides": [
+        {
+          "id": "PERSON_1",
+          "action": "keep",
+          "revealThisTime": false
+        }
+      ],
+      "expectedText": "Ask [[PERSON_1]] about it.",
+      "expectedLegend": [
+        [
+          "PERSON_1",
+          "the user's landlord"
+        ]
+      ]
+    },
+    {
+      "name": "vault reveal this time",
+      "dial": "balanced",
+      "today": "2026-11-21",
+      "text": "Ask Raj about it.",
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        },
+        {
+          "id": "v-raj",
+          "canonical": "Raj Patel",
+          "aliases": [
+            "Raj"
+          ],
+          "category": "person",
+          "roleHint": "my landlord",
+          "isUser": false
+        }
+      ],
+      "llm": [],
+      "overrides": [
+        {
+          "id": "PERSON_1",
+          "action": "keep",
+          "revealThisTime": true
+        }
+      ],
+      "expectedText": "Ask Raj about it.",
+      "expectedLegend": []
+    }
+  ]
+}

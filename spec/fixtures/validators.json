@@ -1,0 +1,197 @@
+{
+  "description": "validator name -> cases. Engines expose these by the same names (Validators.named).",
+  "card": [
+    {
+      "input": "4111111111111111",
+      "valid": true
+    },
+    {
+      "input": "5555 5555 5555 4444",
+      "valid": true
+    },
+    {
+      "input": "378282246310005",
+      "valid": true
+    },
+    {
+      "input": "6011-1111-1111-1117",
+      "valid": true
+    },
+    {
+      "input": "4111111111111112",
+      "valid": false
+    },
+    {
+      "input": "1111111111111111",
+      "valid": false
+    },
+    {
+      "input": "411111111111",
+      "valid": false
+    }
+  ],
+  "iban": [
+    {
+      "input": "GB82WEST12345698765432",
+      "valid": true
+    },
+    {
+      "input": "GB82 WEST 1234 5698 7654 32",
+      "valid": true
+    },
+    {
+      "input": "DE89370400440532013000",
+      "valid": true
+    },
+    {
+      "input": "FR1420041010050500013M02606",
+      "valid": true
+    },
+    {
+      "input": "GB82WEST12345698765433",
+      "valid": false
+    },
+    {
+      "input": "GB82",
+      "valid": false
+    }
+  ],
+  "ssn": [
+    {
+      "input": "123-45-6789",
+      "valid": true
+    },
+    {
+      "input": "000-12-3456",
+      "valid": false
+    },
+    {
+      "input": "666-12-3456",
+      "valid": false
+    },
+    {
+      "input": "900-12-3456",
+      "valid": false
+    },
+    {
+      "input": "123-00-6789",
+      "valid": false
+    },
+    {
+      "input": "123-45-0000",
+      "valid": false
+    }
+  ],
+  "uk_ni": [
+    {
+      "input": "AB123456C",
+      "valid": true
+    },
+    {
+      "input": "AB 12 34 56 C",
+      "valid": true
+    },
+    {
+      "input": "GB123456A",
+      "valid": false
+    },
+    {
+      "input": "AO123456A",
+      "valid": false
+    }
+  ],
+  "aadhaar": [
+    {
+      "input": "234123412346",
+      "valid": true
+    },
+    {
+      "input": "2341 2341 2346",
+      "valid": true
+    },
+    {
+      "input": "234123412347",
+      "valid": false
+    },
+    {
+      "input": "134123412346",
+      "valid": false
+    }
+  ],
+  "pan": [
+    {
+      "input": "ABCPE1234F",
+      "valid": true
+    },
+    {
+      "input": "ABCXE1234F",
+      "valid": false
+    }
+  ],
+  "phone": [
+    {
+      "input": "312-555-0147",
+      "valid": true
+    },
+    {
+      "input": "+1 (312) 555-0199",
+      "valid": true
+    },
+    {
+      "input": "555-0147",
+      "valid": true
+    },
+    {
+      "input": "12345",
+      "valid": false
+    },
+    {
+      "input": "2026-11-21",
+      "valid": false
+    },
+    {
+      "input": "21/11/2026",
+      "valid": false
+    }
+  ],
+  "url_identifying": [
+    {
+      "input": "https://www.linkedin.com/in/maya-chen-123",
+      "valid": true
+    },
+    {
+      "input": "https://bank.example/reset?user=mchen",
+      "valid": true
+    },
+    {
+      "input": "https://example.com/orders/8472619305",
+      "valid": true
+    },
+    {
+      "input": "https://www.irs.gov/help",
+      "valid": false
+    },
+    {
+      "input": "www.example.com",
+      "valid": false
+    },
+    {
+      "input": "https://instagram.com/",
+      "valid": false
+    }
+  ],
+  "entropy_secret": [
+    {
+      "input": "Xk29fQ7vLp3sWm8nZr4tYb6c",
+      "valid": true
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaa1",
+      "valid": false
+    },
+    {
+      "input": "short1x",
+      "valid": false
+    }
+  ]
+}

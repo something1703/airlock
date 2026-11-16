@@ -1,0 +1,428 @@
+{
+  "description": "Merger conformance. Candidate spans are UTF-16 offsets. formsInclude must be a subset of the entity's surfaceForms.",
+  "cases": [
+    {
+      "name": "coreference by token subset",
+      "text": "Dr. Patel called. Patel says Raj Patel will fix it.",
+      "vault": [],
+      "candidates": [
+        {
+          "start": 0,
+          "end": 9,
+          "text": "Dr. Patel",
+          "category": "person",
+          "detector": "llm"
+        },
+        {
+          "start": 18,
+          "end": 23,
+          "text": "Patel",
+          "category": "person",
+          "detector": "llm"
+        },
+        {
+          "start": 29,
+          "end": 38,
+          "text": "Raj Patel",
+          "category": "person",
+          "detector": "llm"
+        }
+      ],
+      "existing": [],
+      "expect": {
+        "entities": [
+          {
+            "id": "PERSON_1",
+            "canonical": "Raj Patel",
+            "formsInclude": [
+              "Dr. Patel",
+              "Patel",
+              "Raj Patel"
+            ]
+          }
+        ],
+        "mentions": [
+          [
+            "Dr. Patel",
+            "PERSON_1"
+          ],
+          [
+            "Patel",
+            "PERSON_1"
+          ],
+          [
+            "Raj Patel",
+            "PERSON_1"
+          ]
+        ],
+        "ambiguous": []
+      }
+    },
+    {
+      "name": "ambiguous short name stays separate",
+      "text": "Sam Lee and Sam Ortiz argued. Sam left.",
+      "vault": [],
+      "candidates": [
+        {
+          "start": 0,
+          "end": 7,
+          "text": "Sam Lee",
+          "category": "person",
+          "detector": "llm"
+        },
+        {
+          "start": 12,
+          "end": 21,
+          "text": "Sam Ortiz",
+          "category": "person",
+          "detector": "llm"
+        },
+        {
+          "start": 30,
+          "end": 33,
+          "text": "Sam",
+          "category": "person",
+          "detector": "llm"
+        }
+      ],
+      "existing": [],
+      "expect": {
+        "entities": [
+          {
+            "id": "PERSON_1",
+            "canonical": "Sam Lee"
+          },
+          {
+            "id": "PERSON_2",
+            "canonical": "Sam Ortiz"
+          },
+          {
+            "id": "PERSON_3",
+            "canonical": "Sam",
+            "confidence": "medium"
+          }
+        ],
+        "mentions": [
+          [
+            "Sam Lee",
+            "PERSON_1"
+          ],
+          [
+            "Sam Ortiz",
+            "PERSON_2"
+          ],
+          [
+            "Sam",
+            "PERSON_3"
+          ]
+        ],
+        "ambiguous": [
+          [
+            "PERSON_3",
+            "PERSON_1"
+          ],
+          [
+            "PERSON_3",
+            "PERSON_2"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "containment extends vault hit",
+      "text": "Raj Patel owns my flat.",
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        },
+        {
+          "id": "v-raj",
+          "canonical": "Raj Patel",
+          "aliases": [
+            "Raj"
+          ],
+          "category": "person",
+          "roleHint": "my landlord",
+          "isUser": false
+        },
+        {
+          "id": "v-org",
+          "canonical": "Mercy General",
+          "aliases": [],
+          "category": "org",
+          "roleHint": "my employer",
+          "isUser": false
+        }
+      ],
+      "candidates": [
+        {
+          "start": 0,
+          "end": 3,
+          "text": "Raj",
+          "category": "person",
+          "detector": "vault",
+          "vaultEntryId": "v-raj"
+        },
+        {
+          "start": 0,
+          "end": 9,
+          "text": "Raj Patel",
+          "category": "person",
+          "detector": "llm"
+        }
+      ],
+      "existing": [],
+      "expect": {
+        "entities": [
+          {
+            "id": "PERSON_1",
+            "canonical": "Raj Patel",
+            "vaultEntryId": "v-raj",
+            "formsInclude": [
+              "Raj",
+              "Raj Patel"
+            ]
+          }
+        ],
+        "mentions": [
+          [
+            "Raj Patel",
+            "PERSON_1"
+          ]
+        ],
+        "ambiguous": []
+      }
+    },
+    {
+      "name": "pattern beats llm",
+      "text": "Write to raj.patel@example.com today.",
+      "vault": [],
+      "candidates": [
+        {
+          "start": 9,
+          "end": 18,
+          "text": "raj.patel",
+          "category": "person",
+          "detector": "llm"
+        },
+        {
+          "start": 9,
+          "end": 30,
+          "text": "raj.patel@example.com",
+          "category": "contact",
+          "detector": "pattern",
+          "subtype": "email"
+        }
+      ],
+      "existing": [],
+      "expect": {
+        "entities": [
+          {
+            "id": "CONTACT_1",
+            "canonical": "raj.patel@example.com"
+          }
+        ],
+        "mentions": [
+          [
+            "raj.patel@example.com",
+            "CONTACT_1"
+          ]
+        ],
+        "ambiguous": []
+      }
+    },
+    {
+      "name": "vault user is PERSON_ME",
+      "text": "Maya Chen here.",
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        },
+        {
+          "id": "v-raj",
+          "canonical": "Raj Patel",
+          "aliases": [
+            "Raj"
+          ],
+          "category": "person",
+          "roleHint": "my landlord",
+          "isUser": false
+        },
+        {
+          "id": "v-org",
+          "canonical": "Mercy General",
+          "aliases": [],
+          "category": "org",
+          "roleHint": "my employer",
+          "isUser": false
+        }
+      ],
+      "candidates": [
+        {
+          "start": 0,
+          "end": 9,
+          "text": "Maya Chen",
+          "category": "person",
+          "detector": "vault",
+          "vaultEntryId": "v-me"
+        }
+      ],
+      "existing": [],
+      "expect": {
+        "entities": [
+          {
+            "id": "PERSON_ME",
+            "canonical": "Maya Chen"
+          }
+        ],
+        "mentions": [
+          [
+            "Maya Chen",
+            "PERSON_ME"
+          ]
+        ],
+        "ambiguous": []
+      }
+    },
+    {
+      "name": "follow-up reuses ids",
+      "text": "Raj replied and Lena agreed.",
+      "vault": [],
+      "candidates": [
+        {
+          "start": 0,
+          "end": 3,
+          "text": "Raj",
+          "category": "person",
+          "detector": "llm"
+        },
+        {
+          "start": 16,
+          "end": 20,
+          "text": "Lena",
+          "category": "person",
+          "detector": "llm"
+        }
+      ],
+      "existing": [
+        {
+          "id": "PERSON_1",
+          "category": "person",
+          "canonical": "Raj Patel",
+          "surfaceForms": [
+            "Raj Patel",
+            "Raj"
+          ],
+          "action": "placeholder"
+        }
+      ],
+      "expect": {
+        "entities": [
+          {
+            "id": "PERSON_1",
+            "canonical": "Raj Patel"
+          },
+          {
+            "id": "PERSON_2",
+            "canonical": "Lena"
+          }
+        ],
+        "mentions": [
+          [
+            "Raj",
+            "PERSON_1"
+          ],
+          [
+            "Lena",
+            "PERSON_2"
+          ]
+        ],
+        "ambiguous": []
+      }
+    },
+    {
+      "name": "partial-overlap loser becomes a surface form",
+      "text": "I work at Mercy General Hospital.",
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        },
+        {
+          "id": "v-raj",
+          "canonical": "Raj Patel",
+          "aliases": [
+            "Raj"
+          ],
+          "category": "person",
+          "roleHint": "my landlord",
+          "isUser": false
+        },
+        {
+          "id": "v-org",
+          "canonical": "Mercy General",
+          "aliases": [],
+          "category": "org",
+          "roleHint": "my employer",
+          "isUser": false
+        }
+      ],
+      "candidates": [
+        {
+          "start": 10,
+          "end": 23,
+          "text": "Mercy General",
+          "category": "org",
+          "detector": "vault",
+          "vaultEntryId": "v-org"
+        },
+        {
+          "start": 16,
+          "end": 32,
+          "text": "General Hospital",
+          "category": "org",
+          "detector": "nl"
+        }
+      ],
+      "existing": [],
+      "expect": {
+        "entities": [
+          {
+            "id": "ORG_1",
+            "canonical": "Mercy General",
+            "formsInclude": [
+              "General Hospital"
+            ]
+          }
+        ],
+        "mentions": [
+          [
+            "Mercy General",
+            "ORG_1"
+          ]
+        ],
+        "ambiguous": []
+      }
+    }
+  ]
+}
