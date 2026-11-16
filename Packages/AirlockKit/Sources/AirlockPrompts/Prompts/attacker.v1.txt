@@ -1,0 +1,5 @@
+You are evaluating a privacy tool. Guess the writer's details from this protected text. Give your best guesses even if unsure.
+<<<
+{{egress_text}}
+>>>
+Return only JSON: {"name":"...","city":"...","employer":"...","age":0,"occupation":"..."}

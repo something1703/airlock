@@ -1,0 +1,9 @@
+Legend:
+{{legend_lines}}
+
+Task: {{task_instruction}}
+
+Message:
+<<<
+{{sealed_text}}
+>>>
