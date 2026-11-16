@@ -1,0 +1,186 @@
+{
+  "parameters": {
+    "ai_backend": {
+      "defaultValue": {
+        "value": "googleAI"
+      },
+      "valueType": "STRING",
+      "description": "googleAI | agentPlatform \u2014 which Gemini backend Firebase AI Logic uses"
+    },
+    "ai_location": {
+      "defaultValue": {
+        "value": "global"
+      },
+      "valueType": "STRING",
+      "description": "Agent Platform location"
+    },
+    "armor_expected": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "valueType": "BOOLEAN",
+      "description": "true on airlock-hybrid-demo when the Model Armor floor setting is live"
+    },
+    "armor_force_unary": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "valueType": "BOOLEAN",
+      "description": "Non-streaming deep answers so Model Armor screens them"
+    },
+    "detect_chunk_tokens": {
+      "defaultValue": {
+        "value": "1400"
+      },
+      "valueType": "NUMBER",
+      "description": "On-device detector chunk budget, iOS/macOS (4,096-token window)"
+    },
+    "detect_chunk_tokens_android": {
+      "defaultValue": {
+        "value": "700"
+      },
+      "valueType": "NUMBER",
+      "description": "On-device detector chunk budget, Android Gemini Nano (4,000 tokens; outputs > 256 discouraged)"
+    },
+    "detect_chunk_tokens_web": {
+      "defaultValue": {
+        "value": "3000"
+      },
+      "valueType": "NUMBER",
+      "description": "On-device detector chunk budget, Chrome Gemini Nano (9,216-token window)"
+    },
+    "dial_default": {
+      "defaultValue": {
+        "value": "balanced"
+      },
+      "valueType": "STRING",
+      "description": "open | balanced | strict"
+    },
+    "evidence_json": {
+      "defaultValue": {
+        "value": "{}"
+      },
+      "valueType": "JSON",
+      "description": "Benchmark numbers for the Evidence screen (bundled fallback in app)"
+    },
+    "feature_infer_card": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "valueType": "BOOLEAN",
+      "description": "'What could Gemini still guess?' card"
+    },
+    "feature_proof": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "valueType": "BOOLEAN",
+      "description": "Proof mode"
+    },
+    "feature_sync": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "valueType": "BOOLEAN",
+      "description": "Firestore sync of sealed threads"
+    },
+    "feature_tools_calendar": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "valueType": "BOOLEAN",
+      "description": "Private calendar tool"
+    },
+    "llm_structured_output": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "valueType": "BOOLEAN",
+      "description": "Use SDK structured output for on-device JSON once verified"
+    },
+    "min_supported_build": {
+      "defaultValue": {
+        "value": "1"
+      },
+      "valueType": "NUMBER",
+      "description": "Force-update prompt below this build"
+    },
+    "model_cloud_deep": {
+      "defaultValue": {
+        "value": "gemini-3.8-flash"
+      },
+      "valueType": "STRING",
+      "description": "Deep answers, drafts, tool loop (stable model names only)"
+    },
+    "model_cloud_max": {
+      "defaultValue": {
+        "value": "gemini-4-hydrogen"
+      },
+      "valueType": "STRING",
+      "description": "'Best quality' setting (verify name in WP-01)"
+    },
+    "model_cloud_proof": {
+      "defaultValue": {
+        "value": "gemini-3.8-flash"
+      },
+      "valueType": "STRING",
+      "description": "Proof claim check with Google Search"
+    },
+    "model_cloud_quick": {
+      "defaultValue": {
+        "value": "gemini-3.5-flash-lite"
+      },
+      "valueType": "STRING",
+      "description": "Cloud fallback for quick tasks"
+    },
+    "nltagger_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "valueType": "BOOLEAN",
+      "description": "Rule-question flag Q-1: Apple NaturalLanguage tagger (D3)"
+    },
+    "pattern_packs_disabled": {
+      "defaultValue": {
+        "value": "[]"
+      },
+      "valueType": "JSON",
+      "description": "JSON array of pattern pack ids to disable"
+    },
+    "prompt_overrides_json": {
+      "defaultValue": {
+        "value": "{}"
+      },
+      "valueType": "JSON",
+      "description": "JSON object prompt id -> prompt text (hot-fix)"
+    },
+    "raw_purge_days": {
+      "defaultValue": {
+        "value": "30"
+      },
+      "valueType": "NUMBER",
+      "description": "Auto-delete raw captures after N days"
+    },
+    "redteam_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "valueType": "BOOLEAN",
+      "description": "On-device red-team loop"
+    },
+    "redteam_rounds": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "valueType": "NUMBER",
+      "description": "Max red-team rounds (0\u20132)"
+    },
+    "vision_ocr_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "valueType": "BOOLEAN",
+      "description": "Rule-question flag Q-1: on-device OCR"
+    }
+  }
+}

@@ -1,0 +1,69 @@
+# 11 — Risks, open questions and decisions
+
+## 1. Open questions for the organisers (ask in Discord `#hackathon-help` by Tue 17 Nov)
+
+| ID | Question | Why it matters | Default if no answer |
+|----|----------|----------------|---------------------|
+| Q-1 | "Does 'all AI inference must go through Firebase AI Logic' cover Apple's classic on-device frameworks — Vision text recognition (OCR), NaturalLanguage name tagging, NSDataDetector — used only for pre-processing, not generation?" | OCR (F-02) and NL tagger (D3) | Keep them behind flags, on in the build; disclose in README. If told no: turn the flags off (app works without them; photo capture removed) |
+| Q-2 | "Is a demo video plus public repo with build instructions enough for iOS testing, given we have no paid Apple Developer account for TestFlight?" | Testing requirement | Provide video + instructions + offer to register judges' debug tokens |
+| Q-3 | "Can a submission show a macOS build of the same SwiftUI app as a second Apple platform for the multi-platform consideration?" | Grand Prize framing | Mention Mac in the description; platform selected = iOS |
+| Q-4 | "Is using Google Cloud services alongside Firebase (Model Armor, Sensitive Data Protection, Cloud Run, BigQuery) fine?" | Backbone | Assume yes — rules list Firebase products as examples, not limits |
+
+Record answers here with date and link.
+
+## 2. Risk register
+
+| ID | Risk | Likelihood | Impact | Mitigation | Owner | Check date |
+|----|------|-----------|--------|-----------|-------|-----------|
+| R-01 | Apple's 3B model detects entities poorly | Med | High | Layered detectors (vault, patterns, NL), review, gate; measure on 18 Nov; pivot plan in build plan §5 | A | 18 Nov |
+| R-02 | iOS hybrid SDK undocumented bits (structured output, options) don't exist or differ | High | Med | WP-01 spike on day 1; JSON-in-prompt fallback; everything behind `AirlockEngines` | A | 16 Nov |
+| R-03 | SDK breaking change mid-hackathon (experimental) | Low | High | Pin exact version; don't upgrade after 22 Nov | A | — |
+| R-04 | Simulator can't run Apple model (version mismatch, Mac settings) | Med | High | Match macOS ↔ Simulator versions; restart; turn Apple Intelligence off/on; worst case borrow an Apple Intelligence Mac | A | 16 Nov |
+| R-05 | Apple guardrails refuse sensitive content (health, conflict) on device | Med | Med | Handle `refused` → rules + review for that chunk; test with demo-set early | A | 19 Nov |
+| R-06 | Gemini mangles placeholders | Med | Med | Double-bracket format, instructions, tolerant parser, fidelity metric | A | 22 Nov |
+| R-07 | Over-redaction makes answers worse | Med | High | Generalise not delete; role hints; amounts/dates kept; quality metric with `G_naive_redact` comparison | A/C | 22 Nov |
+| R-08 | Model Armor unavailable (billing, backend models, streaming coverage) | Med | Low | It's a second net; fallback to SDP button (F-45); `armor_force_unary` | C | 26 Nov |
+| R-09 | Apple acceptable-use concerns (regulated domains) | Low | High | Positioning: explain & prepare, not advise; copy rules; demo scenarios chosen carefully | D | ongoing |
+| R-10 | Judges can't run the iOS app | High | Med | Strong video; clear instructions; Mac build; debug-token offer | D | 29 Nov |
+| R-11 | Time: too many features | High | High | Cut lines (build plan §4); hero path first | All | daily |
+| R-12 | Secrets committed to public repo | Low | High | `.gitignore`, lint check, pre-commit hook, final audit | A | 29 Nov |
+| R-13 | PUPA dataset licence unclear | Med | Low | Use synthetic only; skip PUPA if unclear | C | 20 Nov |
+| R-14 | On-device latency too slow for a good demo | Med | Med | Chunk budget tuning, red-team only on Strict or on request, progressive UI | A | 23 Nov |
+| R-15 | Search grounding display requirements not met | Low | Med | Read and implement before Proof ships | B | 25 Nov |
+| R-16 | Firestore rules regex differs from expectations | Med | Low | Emulator tests | C | 21 Nov |
+| R-17 | Google sign-in needs the GoogleSignIn SDK (dependency rule) | Med | Low | Ship anonymous-only sync; Google sign-in becomes C | B | 19 Nov |
+| R-18 | Judge's Chrome can't run Gemini Nano (needs Chrome 148+ desktop, >4 GB VRAM or 16 GB RAM, 22 GB free disk) | Med | Med | `ONLY_ON_DEVICE` throws → rules + mandatory review (INV-9 on web); first-run check page explains how to enable it; video shows the full path | Web | 25 Nov |
+| R-19 | Swift and TypeScript engines drift apart | Med | High | Shared `spec/fixtures/` conformance suite runs in both CI jobs; any fixture change needs both to pass | A | ongoing |
+| R-20 | Dev Mac disk full (6.8 GB free on 16 Nov): Xcode + Simulator + Chrome's Nano model + Android Studio/SDK/emulator need ~90 GB | High | High | Owner frees space before WP-01 | Owner | 16 Nov |
+| R-21 | No supported Android phone: on-device Gemini Nano needs an AICore device on ML Kit's supported list; emulator support undocumented | High | High | Borrow a supported phone (recent Pixel or flagship Samsung) for testing and the video. Without one, the Android build can only demo the rules + review path. **16 Nov: team phone is a Galaxy S21 FE, which is NOT on ML Kit's Prompt API list** (Samsung support starts at Galaxy S25 / Z Fold7 / Z Flip7). The S21 FE is still useful for the cloud, rules-only and APK-install paths | Owner | 18 Nov |
+| R-22 | Android on-device limits are tighter: 4,000 tokens, outputs >256 tokens discouraged, only English/Korean validated, `BUSY` quotas | High | Med | Smaller detect chunks and compact JSON output on Android; backoff on `BUSY`; per-platform chunk budget in Remote Config | A | 20 Nov |
+
+## 3. Decision log
+
+| Date | Decision | Alternatives considered | Why |
+|------|----------|------------------------|-----|
+| 15 Nov | Idea: **Airlock** (privacy airlock for cloud AI) | Vani (AAC voice), Samvaad (conversation access), Kavach/Proof (scam shield), Relay (disaster mesh) | AAC has already won three Google competitions (Gaze Link, AAC Board AI, 3VA); offline trail companions won before (Trail); Airlock makes hybrid essential, is timely (AI asking for more personal data), measurable, and works fully in the Simulator |
+| 15 Nov | iOS primary + Mac from the same code | iOS only | Multi-platform gets strong Grand Prize consideration; near-zero cost |
+| 16 Nov | Proof mode folded in as a second mode | Separate app | Same engine; covers "what comes in" as well as "what goes out" |
+| 16 Nov | Model Armor as second net only | Primary filter | Fails open, `generateContent` only, blocks rather than rewrites |
+| 16 Nov | No on-device tool calling in v1 | Use it for vault lookups | iOS API undocumented |
+| 16 Nov | No Crashlytics | Use it | Crash logs could capture content |
+| 16 Nov | XcodeGen | Hand-maintained project, Tuist | Agent-friendly, simple |
+| 16 Nov | All eval generative calls via Firebase AI Logic in AirlockBench | Server-side Gemini calls in Cloud Run | Keeps every model call in the project on the required SDK |
+| 16 Nov | **No scope cuts.** Build every feature in `01-PRODUCT.md`; build-plan §4 cut lines are retired | Cut to an MVP | Human decision (owner): judged on a complete product |
+| 16 Nov | **Add a hosted web app** (Firebase Hosting, Firebase AI Logic web SDK, Gemini Nano in Chrome on-device + Gemini cloud). Devpost platforms: iOS + Web | Apple-only; Chrome extension | Team has no iPhone and no TestFlight, so judges need a link they can click. Real multi-platform for the Grand Prize. Web `InferenceMode` values map 1:1 to our routes (`ONLY_ON_DEVICE`=phoneOnly, `PREFER_ON_DEVICE`=phoneFirst, `PREFER_IN_CLOUD`=cloudFirst, `ONLY_IN_CLOUD`=cloudOnly) |
+| 16 Nov | **Add an Android app** (Kotlin + Jetpack Compose, Firebase AI Logic `firebase-ai` + `firebase-ai-ondevice`, Gemini Nano via ML Kit/AICore). Distributed as an APK on GitHub Releases. Devpost platforms: iOS + Web + Android | Apple + Web only | Owner request. All three hackathon platforms, eligible for every platform prize; APK sideload is judge-testable without a store. Android `InferenceMode` values match web 1:1. **Depends on access to a supported physical Android phone** (R-21) |
+| 16 Nov | Privacy engine implemented three times (Swift, TypeScript, Kotlin) against one shared JSON conformance suite (`spec/fixtures/`) | Shared code via WASM/JS bridge | Each platform stays native; shared fixtures keep behaviour identical and are a judge-visible proof |
+| 16 Nov | Google Cloud/Firebase owner account: the team's Google account. Projects created: **`airlock-hybrid-dev`** (no billing, Gemini Developer API) and **`airlock-hybrid-demo`** (billing to be linked only with owner approval). These replace the `airlock-dev` / `airlock-demo` names used elsewhere in the docs | Other team accounts (billing closed) | Only account with an open billing account |
+| 16 Nov | **Benchmark runs last, on a separate Google Cloud account, only with explicit owner permission.** Until then the bench harness and scorer are built and tested with mocks only | Run eval continuously from Day 3 | Cost control; owner decision. Sprint 3 quota account (request by Wed 25 Nov, 10:00 AM PT; arrives Fri 27 Nov) fits this timing |
+| 16 Nov | Core type renamed `Category` → **`PrivacyCategory`** | Qualify every use | Foundation's Objective-C runtime exports `Category`, making the bare name ambiguous in every module and test that imports Foundation |
+| 16 Nov | `SealedText` initializer behind `@_spi(EgressGate)` (lint + source-scan test) | `internal` init; move type to AirlockSeal | `internal` can't cross modules; moving the type creates a Seal → Engines → Seal cycle |
+| 16 Nov | Gate additions: homoglyph skeleton, mixed-script block, case-sensitive name tokens with a common-word list, placeholder masking, unused-legend block, 40k size limit | Spec checks only | Each closes a concrete bypass found while designing the 10,000-case property test (see `03-PRIVACY-ENGINE.md` §9) |
+| 16 Nov | **Pin Firebase iOS SDK 12.19.0** (not 13.x) | 13.2.0 with `GeminiLanguageModel` + Apple `LanguageModelSession` | 13.0.0 removed `HybridModel`/`SystemLanguageModel`/`generativeModelSession`, which the official hackathon docs still show; 12.19.0 matches the docs and our architecture (API-NOTES §7.6). Re-check if organisers say otherwise. Owner decision |
+| 16 Nov | Allow `import FoundationModels` **only in `AirlockEngines`**, for error types and `@Generable`; lint bans creating `LanguageModelSession` anywhere | Keep full ban; match errors by description | Apple's on-device errors pass through the SDK unwrapped (API-NOTES §7.8). Owner decision, recorded as a written override of AGENTS.md §3 |
+| 16 Nov | Cloud-first deep answers: `HybridModel` falls back to the phone on *any* first-turn cloud error (API-NOTES §7.7). Engines label every fallback from `modelVersion`; when `armor_expected` is true, deep answers use cloud-only so a Model Armor block is shown, not silently answered on device | Assume offline-only fallback | Matches real SDK behaviour; keeps the Armor second net visible |
+| 16 Nov | **Sensitive data is stored as AES-256-GCM encrypted files (`AirlockStore`), not in SwiftData.** Entity maps, Vault entries and raw captures each live in an encrypted record; the key is a random 256-bit Keychain item (`WhenUnlockedThisDeviceOnly`, non-synchronizable). SwiftData (with `.complete` protection) remains available for non-sensitive UI state only | SwiftData `CaptureRecord` per `02-ARCHITECTURE.md` §7 | Strictly stronger: no plaintext on disk at all, testable in `swift test` without a host app, and "Delete everything" destroys the key so leftover copies are unreadable. Record names are authenticated data, so records can't be swapped |
+| 16 Nov | **Web engine lives in `web/src/engine/` (TypeScript, zero runtime dependencies)**, a file-for-file port of AirlockCore/Detect/Seal/Restore/Ledger. Conformance = the same `spec/fixtures/*.json` plus ported property/fuzz tests (10,000-case gate test, split-at-every-boundary restore). Pattern packs are shared byte-for-byte (`npm run sync-packs`; a test fails on drift). Known platform differences: no Apple `NSDataDetector` boost on web (regex rules only, which is what fixtures pin); `Intl.Segmenter` for grapheme clusters; synchronous pure-TS SHA-256 (verified against `node:crypto`). Two shared pack regexes had a needless `\"` escape that JS's Unicode mode rejects — fixed in the shared pack, Swift re-verified | Port via WASM/bridge | Each platform stays native; fixtures keep behaviour identical |
+| 16 Nov | No paid Apple Developer Program. iOS shown in the Simulator; Mac app distributed unsigned (judges allow it in System Settings → Privacy & Security → Open Anyway) | $99 enrolment for TestFlight + notarisation | Owner decision |
+
+Add a row for every decision that changes scope, architecture, or an invariant.

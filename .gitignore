@@ -1,0 +1,60 @@
+# --- Secrets: never commit (AGENTS.md §3) ---
+GoogleService-Info.plist
+google-services.json
+**/firebase-config.local.*
+*.env
+.env*
+!.env.example
+*AppCheckDebugToken*
+*debug-token*
+service-account*.json
+*-sa.json
+*.p8
+*.p12
+*.mobileprovision
+
+# --- Apple / Xcode ---
+*.xcodeproj/
+*.xcworkspace/
+!Packages/**/*.xcworkspace/
+xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+*.xcscheme.user
+*.xcuserstate
+build/
+
+# --- Android ---
+.gradle/
+local.properties
+android/**/build/
+android/app/release/
+*.apk
+*.aab
+*.keystore
+*.jks
+.cxx/
+captures/
+
+# --- Web / Node ---
+node_modules/
+dist/
+.firebase/
+*.log
+.vite/
+coverage/
+
+# --- Python (eval) ---
+__pycache__/
+.venv/
+*.pyc
+
+# --- Eval outputs (raw runs stay local / in GCS) ---
+eval/runs/
+
+# --- OS / editors ---
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
