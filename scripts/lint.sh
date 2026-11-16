@@ -65,8 +65,10 @@ fi
 if git rev-parse --git-dir >/dev/null 2>&1; then
   hits=$(git ls-files | grep -E 'GoogleService-Info\.plist|google-services\.json|AppCheckDebugToken|debug-token|service-account|\.env$' || true)
   [[ -n "$hits" ]] && violation "Secret-bearing file tracked by git" "$hits"
-  hits=$(git grep -nE 'AIza[0-9A-Za-z_-]{35}' -- ':!spec/fixtures' ':!spec/tools' ':!Packages/AirlockKit/Tests' 2>/dev/null || true)
-  [[ -n "$hits" ]] && violation "Google API key literal in tracked files" "$hits"
+  # Provider-format secret literals anywhere — fixtures and tests included. Test values must be
+  # assembled from parts at run time (spec/fixtures/patterns.json "templates") so scanners never fire.
+  hits=$(git grep -nE 'AIza[0-9A-Za-z_-]{35}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{36}|xox[abprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY' 2>/dev/null || true)
+  [[ -n "$hits" ]] && violation "Secret-shaped literal in tracked files (assemble test values from parts)" "$hits"
 fi
 
 # Formatting (swift format ships with Swift 6 toolchains).

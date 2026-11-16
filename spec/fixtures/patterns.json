@@ -1,5 +1,15 @@
 {
-  "description": "Pattern detector conformance (regex rules only, NSDataDetector off). 'expect': each item must be found with exactly this text/category/subtype. 'absent': no candidate with this text (and subtype, if given). Other extra candidates are allowed.",
+  "description": "Pattern detector conformance (regex rules only, NSDataDetector off). 'expect': each item must be found with exactly this text/category/subtype. 'absent': no candidate with this text (and subtype, if given). Other extra candidates are allowed. Before use, replace every {{NAME}} in any string with the concatenation of templates[NAME] (fake secrets are stored in parts so no key-shaped string exists in the repo).",
+  "templates": {
+    "FAKE_GOOGLE_API_KEY": [
+      "AIza",
+      "FAKE_TEST_KEY_not_a_real_key_000000"
+    ],
+    "FAKE_OPENAI_KEY": [
+      "sk-",
+      "proj-FAKE-test-key-0000"
+    ]
+  },
   "cases": [
     {
       "name": "email",
@@ -151,10 +161,10 @@
     },
     {
       "name": "openai-style key",
-      "text": "key sk-proj-abcdefghijklmnop1234 leaked",
+      "text": "key {{FAKE_OPENAI_KEY}} leaked",
       "expect": [
         {
-          "text": "sk-proj-abcdefghijklmnop1234",
+          "text": "{{FAKE_OPENAI_KEY}}",
           "category": "secret",
           "subtype": "api_key"
         }
@@ -163,10 +173,10 @@
     },
     {
       "name": "google api key",
-      "text": "config AIzaSyD3x9Qk2mN7pL4vR8tW1zB6cF0hJ5gK2aE here",
+      "text": "config {{FAKE_GOOGLE_API_KEY}} here",
       "expect": [
         {
-          "text": "AIzaSyD3x9Qk2mN7pL4vR8tW1zB6cF0hJ5gK2aE",
+          "text": "{{FAKE_GOOGLE_API_KEY}}",
           "category": "secret",
           "subtype": "api_key"
         }

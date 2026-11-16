@@ -89,9 +89,14 @@ describe("folded search", () => {
 
 describe("pattern detector (spec/fixtures/patterns.json)", () => {
   const detector = new PatternDetector();
-  type Fx = { cases: { name: string; text: string; expect: { text: string; category: string; subtype: string }[]; absent: { text: string; subtype: string | null }[] }[] };
+  type Case = { name: string; text: string; expect: { text: string; category: string; subtype: string }[]; absent: { text: string; subtype: string | null }[] };
+  type Fx = { templates: Record<string, string[]>; cases: Case[] };
   it("matches every case", () => {
-    for (const c of fixture<Fx>("patterns.json").cases) {
+    const fx = fixture<Fx>("patterns.json");
+    // Fake secrets are stored in parts so no key-shaped string exists in the repo; join them here.
+    const expand = (s: string): string => Object.entries(fx.templates).reduce((acc, [k, parts]) => acc.replaceAll(`{{${k}}}`, parts.join("")), s);
+    for (const raw of fx.cases) {
+      const c: Case = { ...raw, text: expand(raw.text), expect: raw.expect.map((e) => ({ ...e, text: expand(e.text) })), absent: raw.absent.map((a) => ({ ...a, text: expand(a.text) })) };
       const found = detector.detect(c.text);
       for (const e of c.expect) {
         expect(found.some((f) => f.text === e.text && f.category === e.category && f.subtype === e.subtype), `[${c.name}] expected ${e.text}; got ${found.map((f) => `${f.text}=${f.category}/${f.subtype}`)}`).toBe(true);
@@ -116,7 +121,7 @@ describe("pattern detector (spec/fixtures/patterns.json)", () => {
     const secrets: [string, PrivacyCategory, string][] = [
       ["4111 1111 1111 1111", "id", "card"], ["5555555555554444", "id", "card"], ["GB82WEST12345698765432", "id", "iban"],
       ["maya.chen@example.com", "contact", "email"], ["r.patel+rent@mail.example.org", "contact", "email"], ["123-45-6789", "id", "ssn"],
-      ["+44 20 7946 0958", "contact", "phone"], ["312-555-0147", "contact", "phone"], ["sk-abcdefghijklmnopqrstuv12", "secret", "api_key"],
+      ["+44 20 7946 0958", "contact", "phone"], ["312-555-0147", "contact", "phone"], ["sk-" + "abcdefghijklmnopqrstuv12", "secret", "api_key"],
     ];
     for (let i = 0; i < 1000; i++) {
       const words = Array.from({ length: int(r, 3, 25) }, () => pick(r, filler));

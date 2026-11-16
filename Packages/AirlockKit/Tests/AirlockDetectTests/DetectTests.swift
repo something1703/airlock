@@ -15,7 +15,13 @@ struct PatternFixture: Decodable {
     struct Expect: Decodable { let text: String; let category: String; let subtype: String }
     struct Absent: Decodable { let text: String; let subtype: String? }
     struct Case: Decodable { let name: String; let text: String; let expect: [Expect]; let absent: [Absent] }
+    let templates: [String: [String]]
     let cases: [Case]
+
+    /// Fake secrets are stored in parts so no key-shaped string exists in the repo; join them here.
+    func expand(_ s: String) -> String {
+        templates.reduce(s) { acc, t in acc.replacingOccurrences(of: "{{\(t.key)}}", with: t.value.joined()) }
+    }
 }
 struct VaultFixture: Decodable {
     struct Entry: Decodable {
@@ -100,7 +106,12 @@ struct VaultFixture: Decodable {
     }
 
     @Test func sharedFixture() throws {
-        for c in try fixture("patterns.json", as: PatternFixture.self).cases {
+        let fx = try fixture("patterns.json", as: PatternFixture.self)
+        for raw in fx.cases {
+            let c = PatternFixture.Case(
+                name: raw.name, text: fx.expand(raw.text),
+                expect: raw.expect.map { .init(text: fx.expand($0.text), category: $0.category, subtype: $0.subtype) },
+                absent: raw.absent.map { .init(text: fx.expand($0.text), subtype: $0.subtype) })
             let found = detector.detect(in: c.text)
             for e in c.expect {
                 #expect(
@@ -134,7 +145,7 @@ struct VaultFixture: Decodable {
             ("4111 1111 1111 1111", .id, "card"), ("5555555555554444", .id, "card"), ("GB82WEST12345698765432", .id, "iban"),
             ("maya.chen@example.com", .contact, "email"), ("r.patel+rent@mail.example.org", .contact, "email"),
             ("123-45-6789", .id, "ssn"), ("+44 20 7946 0958", .contact, "phone"), ("312-555-0147", .contact, "phone"),
-            ("sk-abcdefghijklmnopqrstuv12", .secret, "api_key"),
+            ("sk-" + "abcdefghijklmnopqrstuv12", .secret, "api_key"),
         ]
         for _ in 0..<1000 {
             var words = (0..<Int.random(in: 3...25, using: &rng)).map { _ in filler.randomElement(using: &rng)! }

@@ -45,8 +45,14 @@ aadhaar_spaced = f"{aadhaar[:4]} {aadhaar[4:8]} {aadhaar[8:]}"
 for c in ["4111111111111111", "5555555555554444", "378282246310005", "6011111111111117"]: assert luhn_ok(c)
 for i in ["GB82WEST12345698765432", "DE89370400440532013000", "FR1420041010050500013M02606"]: assert iban_ok(i)
 assert not iban_ok("GB82WEST12345698765433")
-aiza = "AIza" + "SyD3x9Qk2mN7pL4vR8tW1zB6cF0hJ5gK2aE"[:35]
-assert len(aiza) == 39
+# Provider-shaped fake secrets are stored ONLY as parts and joined by each test at load time,
+# so no complete key-shaped string ever exists in the repo (GitHub secret scanning, lint rule).
+TEMPLATES = {
+    "FAKE_GOOGLE_API_KEY": ["AIza", "FAKE_TEST_KEY_not_a_real_key_000000"],
+    "FAKE_OPENAI_KEY": ["sk-", "proj-FAKE-test-key-0000"],
+}
+assert len("".join(TEMPLATES["FAKE_GOOGLE_API_KEY"])) == 39
+aiza = "{{FAKE_GOOGLE_API_KEY}}"
 
 def w(name, obj):
     with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:
@@ -93,7 +99,7 @@ P_CASES = [
   ("order ref", "Order #A1B2C3D4 shipped late.", [("#A1B2C3D4", "id", "reference")], []),
   ("otp", "Your verification code is 482913.", [("482913", "secret", "otp")], []),
   ("password", "The wifi password: hunter2!x works.", [("hunter2!x", "secret", "password")], []),
-  ("openai-style key", "key sk-proj-abcdefghijklmnop1234 leaked", [("sk-proj-abcdefghijklmnop1234", "secret", "api_key")], []),
+  ("openai-style key", "key {{FAKE_OPENAI_KEY}} leaked", [("{{FAKE_OPENAI_KEY}}", "secret", "api_key")], []),
   ("google api key", f"config {aiza} here", [(aiza, "secret", "api_key")], []),
   ("handle", "DM me @maya_c.design anytime", [("@maya_c.design", "contact", "handle")], []),
   ("email is not handle", "write to a.b@example.org", [("a.b@example.org", "contact", "email")], [("@example.org", "handle")]),
@@ -113,7 +119,8 @@ P_CASES = [
   ("times kept", "Free 3:00-4:00 pm on Tuesday.", [], [("3:00-4:00", None)]),
 ]
 w("patterns.json", {
-  "description": "Pattern detector conformance (regex rules only, NSDataDetector off). 'expect': each item must be found with exactly this text/category/subtype. 'absent': no candidate with this text (and subtype, if given). Other extra candidates are allowed.",
+  "description": "Pattern detector conformance (regex rules only, NSDataDetector off). 'expect': each item must be found with exactly this text/category/subtype. 'absent': no candidate with this text (and subtype, if given). Other extra candidates are allowed. Before use, replace every {{NAME}} in any string with the concatenation of templates[NAME] (fake secrets are stored in parts so no key-shaped string exists in the repo).",
+  "templates": TEMPLATES,
   "cases": [{"name": n, "text": t, "expect": [{"text": a, "category": c, "subtype": s} for a, c, s in e], "absent": [{"text": a, "subtype": s} for a, s in ab]} for n, t, e, ab in P_CASES]})
 
 # ---------- vault ----------
