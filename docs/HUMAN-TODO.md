@@ -6,6 +6,17 @@ Google Cloud / Firebase account for Airlock: the team's Google account (decided 
 
 ---
 
+## ▶︎ Do these next, in this order (16 Nov)
+
+1. **Xcode setup** (unblocks the iOS/Mac app): in Terminal run
+   `sudo xcode-select -s /Applications/Xcode.app && sudo xcodebuild -license accept && sudo xcodebuild -runFirstLaunch`
+   then Xcode → Settings → Components → install the **iOS 27 Simulator**.
+2. **Firebase console** (unblocks every real AI call): H-02, H-03, then `firebase login` (H-04).
+3. **Chrome Gemini Nano** (unblocks web on-device): H-12. Check `chrome://on-device-internals` shows the model as ready.
+4. **Android Studio** (H-11): install the latest stable and let its setup wizard install the Android SDK.
+5. **A supported Android phone** (H-10).
+6. **Discord questions** (H-13) — Tue 17 Nov. **Sprint 3 quota form** (H-16) — by Wed 25 Nov.
+
 ## 🔴 Blocking coding work
 
 | # | Task | How | Unblocks | Status |
