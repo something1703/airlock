@@ -1,0 +1,54 @@
+{
+  "id": "national",
+  "description": "Country national-ID packs. Disable individually with Remote Config pattern_packs_disabled.",
+  "rules": [
+    {
+      "id": "in_aadhaar",
+      "category": "id",
+      "subtype": "national_id",
+      "confidence": "high",
+      "validator": "aadhaar",
+      "regex": "\\b[2-9]\\d{3} ?\\d{4} ?\\d{4}\\b"
+    },
+    {
+      "id": "in_pan",
+      "category": "id",
+      "subtype": "national_id",
+      "confidence": "high",
+      "validator": "pan",
+      "regex": "\\b[A-Z]{5}\\d{4}[A-Z]\\b"
+    },
+    {
+      "id": "ca_sin",
+      "category": "id",
+      "subtype": "national_id",
+      "confidence": "high",
+      "validator": "luhn",
+      "regex": "\\b\\d{3}[ -]?\\d{3}[ -]?\\d{3}\\b",
+      "context": {
+        "words": [
+          "sin",
+          "social insurance"
+        ],
+        "before": 5,
+        "after": 2,
+        "required": true
+      }
+    },
+    {
+      "id": "uk_nhs",
+      "category": "id",
+      "subtype": "health_id",
+      "confidence": "medium",
+      "regex": "\\b\\d{3} ?\\d{3} ?\\d{4}\\b",
+      "context": {
+        "words": [
+          "nhs"
+        ],
+        "before": 5,
+        "after": 2,
+        "required": true
+      }
+    }
+  ]
+}
