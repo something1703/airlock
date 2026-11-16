@@ -1,0 +1,93 @@
+# XcodeGen spec — the .xcodeproj is generated (./scripts/gen.sh), never hand-edited (ADR-07).
+name: Airlock
+options:
+  bundleIdPrefix: app.airlock
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+configs:
+  Debug-Dev: debug
+  Debug-Demo: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    CODE_SIGN_STYLE: Automatic
+  configs:
+    Debug-Dev:
+      AIRLOCK_FIREBASE_ENV: dev
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG AIRLOCK_DEV
+    Debug-Demo:
+      AIRLOCK_FIREBASE_ENV: demo
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG AIRLOCK_DEMO
+    Release:
+      AIRLOCK_FIREBASE_ENV: demo
+packages:
+  # Pinned exactly (AGENTS.md §4). Hybrid inference only works via SPM.
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    exactVersion: 12.19.0   # last release with the documented HybridModel API (API-NOTES §7.6)
+  AirlockKit:
+    path: Packages/AirlockKit
+targets:
+  Airlock:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: App
+        excludes:
+          - "Resources/Firebase/**"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.airlock.ios
+        "PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]": app.airlock.mac
+        PRODUCT_NAME: Airlock
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Airlock
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "Airlock reads your calendar on this device only to find free times when you ask it to. Event details never leave your phone."
+        INFOPLIST_KEY_NSFaceIDUsageDescription: "Face ID protects the names in your Vault."
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Airlock reads text from a photo on your device. The image is never sent."
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        ENABLE_PREVIEWS: YES
+        DEVELOPMENT_ASSET_PATHS: App/PreviewContent
+        ENABLE_HARDENED_RUNTIME: YES
+        "ENABLE_APP_SANDBOX[sdk=macosx*]": YES
+        "ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*]": YES
+        "ENABLE_USER_SELECTED_FILES[sdk=macosx*]": readonly
+    dependencies:
+      - package: AirlockKit
+        products: [AirlockCore, AirlockDetect, AirlockSeal, AirlockRestore, AirlockLedger, AirlockPrompts, AirlockEngines, AirlockEngineMocks]
+      - package: Firebase
+        products: [FirebaseCore, FirebaseAppCheck, FirebaseAuth, FirebaseFirestore, FirebaseRemoteConfig, FirebaseFunctions]
+    preBuildScripts:
+      - name: Copy GoogleService-Info.plist (gitignored)
+        basedOnDependencyAnalysis: false
+        script: |
+          SRC="${SRCROOT}/App/Resources/Firebase/${AIRLOCK_FIREBASE_ENV}/GoogleService-Info.plist"
+          DEST="${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          if [ -f "$SRC" ]; then
+            mkdir -p "$DEST" && cp "$SRC" "$DEST/GoogleService-Info.plist"
+          else
+            echo "warning: No GoogleService-Info.plist at $SRC — the app runs with Firebase disabled (see docs/HUMAN-TODO.md H-02..H-04)."
+          fi
+schemes:
+  Airlock (Dev):
+    build:
+      targets: { Airlock: all }
+    run: { config: Debug-Dev }
+    test: { config: Debug-Dev }
+    archive: { config: Release }
+  Airlock (Demo):
+    build:
+      targets: { Airlock: all }
+    run: { config: Debug-Demo }
+    archive: { config: Release }
