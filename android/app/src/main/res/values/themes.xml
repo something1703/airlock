@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Airlock" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@android:color/transparent</item>
+    <!-- Light: dark status/navigation bar icons. Compose draws the content edge to edge. -->
+    <style name="Theme.Airlock" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/airlock_bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>
