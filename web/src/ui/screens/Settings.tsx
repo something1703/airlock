@@ -19,6 +19,15 @@ export function SettingsScreen() {
         <div><h2>Where answers come from</h2><div className="segmented" role="group" aria-label="Answer preference">{prefsList.map((p) => <button key={p.id} aria-pressed={prefs.preference === p.id} onClick={() => s.setPrefs({ preference: p.id })}>{p.label}</button>)}</div>
           <p className="small">Automatic answers quick tasks on this device and sends harder ones, sealed, to Gemini.</p></div>
       </div>
+      {s.services.sync && (
+        <div className="card row" style={{ gap: 14, alignItems: "flex-start", flexWrap: "nowrap" }}>
+          <div style={{ flex: 1 }}>
+            <h2>Back up sealed history</h2>
+            <p className="small" style={{ margin: 0 }}>Only the sealed version of requests that already went to Gemini is backed up — placeholders and receipts, exactly what Gemini saw. Real names, your original words and on-device answers never leave this device.</p>
+          </div>
+          <button className="switch" role="switch" aria-checked={prefs.backup} aria-label="Back up sealed history" onClick={() => s.setPrefs({ backup: !prefs.backup })} />
+        </div>
+      )}
       <div className="card stack" style={{ gap: 8 }}>
         <h2>What Airlock does and doesn’t do</h2>
         <p className="small">Airlock hides who you are, not what happened. It finds names, places, contact details and IDs on your device and replaces them before anything is sent. Detection isn’t perfect, so you always see exactly what leaves. Airlock helps you understand and prepare; it doesn’t give legal, medical or financial advice.</p>

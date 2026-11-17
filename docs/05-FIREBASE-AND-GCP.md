@@ -109,7 +109,7 @@ users/{uid}/threads/{threadId}/turns/{turnId}
   createdAt: timestamp
   role: "user" | "assistant"
   sealedText: string               // placeholders only — never restored text
-  legend: [string]                 // role hints only
+  legend: string                   // the rendered legend exactly as sent (user turns); a string so the rules can check it
   route: string
   modelVersion: string
   receiptId: string | null
@@ -138,6 +138,10 @@ users/{uid}/stats/{isoWeek}        // written by Cloud Function only
 ```
 
 ### 6.2 Security rules (`firebase/firestore.rules`)
+
+**As built (17 Nov):** the shipped rules are stricter than the sketch below — every collection uses a field **allow-list**, receipts are synced **without `outboundText`** (the exact text stays local; the hash proves it), `legend` is a string, thread titles also pass `looksSealed`, and everything outside `users/{uid}` is denied. Tested in `functions/test/rules.test.ts` against the emulator using the real web pipeline's sealed output and the web's own DTO builders (`web/src/app/syncDto.ts`). Clients sync only turn pairs whose answer has a receipt (already sent to Gemini), so on-device answers never leave the device.
+
+Original sketch:
 
 Defense in depth: even if an app bug tried to upload raw text, the rules reject obvious identifiers and forbidden fields.
 
@@ -208,6 +212,8 @@ service cloud.firestore {
 Enable Firestore offline persistence (default on iOS). Sync is opportunistic; the app never waits for Firestore to show an answer.
 
 ## 7. Cloud Functions (`functions/`, TypeScript, v2)
+
+**Status (17 Nov):** implemented and tested in the emulator (`functions/test/`); **not deployed** — Functions need the Blaze plan, and Blaze would make the dev project's Gemini Developer API usage billable. They deploy to the demo project (Blaze anyway for Model Armor) after an explicit cost check with the owner. `aggregateStats` is idempotent (a `statsSeen/{receiptId}` marker in the same transaction).
 
 | Function | Trigger | What it does | App Check |
 |----------|---------|--------------|-----------|
