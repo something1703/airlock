@@ -9,8 +9,9 @@ import type { PromptLibrary } from "./prompts";
 import { applyRisks, RedTeam, type Risk } from "./redTeam";
 import { Sealer, type SealDraft } from "./sealer";
 import { ANALYSIS_OPTIONS } from "./engines";
-import { type DialPreset, type Entity, type PlaceholderId, type ReviewMode, EntityMap, confidenceRank, compareIds } from "./types";
+import { type Candidate, type DialPreset, type Entity, type PlaceholderId, type PrivacyCategory, type ReviewMode, EntityMap, PLACEHOLDER, confidenceRank, compareIds } from "./types";
 import { VaultMatcher, type VaultEntry } from "./vault";
+import { ranges } from "./foldedSearch";
 
 export interface SealSettings {
   dial: DialPreset;
@@ -57,6 +58,8 @@ export interface SealResult {
   redTeamUnavailable: boolean;
   /** Web staged mode: the red-team check is still running; sending must wait. */
   redTeamPending?: boolean;
+  /** Every detection before merging (kept so the user can add their own and re-merge). */
+  candidates: Candidate[];
 }
 
 export const pendingRisks = (r: Pick<SealResult, "risks" | "acceptedRisks">): Risk[] => {
@@ -109,7 +112,7 @@ export class SealPipeline {
     let accepted: Risk[] = [];
     let redTeamUnavailable = false;
     let later: Promise<SealResult> | null = null;
-    const base = (): SealResult => ({ normalised, merge: m, draft, reasons: [], requiresReview: false, detection: report, rewrites, sealMs: performance.now() - t0, risks, acceptedRisks: accepted, redTeamUnavailable });
+    const base = (): SealResult => ({ normalised, merge: m, draft, reasons: [], requiresReview: false, detection: report, rewrites, sealMs: performance.now() - t0, risks, acceptedRisks: accepted, redTeamUnavailable, candidates });
     if (this.settings.redTeamEnabled && policy.redTeamMode !== "off") {
       if (report.unavailable !== null) redTeamUnavailable = true;
       else if (staged && policy.redTeamMode === "suggest") {
@@ -142,6 +145,30 @@ export class SealPipeline {
    */
   runStaged(raw: string, existing = new EntityMap(), overrides = new Map<PlaceholderId, UserOverride>(), progress: (p: SealProgress) => void = () => {}): Promise<{ result: SealResult; later: Promise<SealResult> | null }> {
     return this.prepare(raw, existing, overrides, progress, true);
+  }
+
+  /**
+   * "Protect this": the user marks a phrase the detectors missed (essential when the on-device model is
+   * unavailable — INV-9). Every word-bounded occurrence becomes a `user` detection (highest merge priority),
+   * then we re-merge with the current entities as `existing`, so every placeholder keeps its number and the
+   * user's earlier toggles still point at the same details. No model call.
+   */
+  protect(result: SealResult, phrase: string, category: Exclude<PrivacyCategory, "quasi">, overrides: Map<PlaceholderId, UserOverride>, acceptedRisks: Risk[] = result.acceptedRisks): { result: SealResult; overrides: Map<PlaceholderId, UserOverride> } {
+    const text = result.normalised.text;
+    const needle = phrase.trim();
+    const spans = needle ? ranges(needle, text) : [];
+    if (!spans.length) return { result, overrides };
+    const added: Candidate[] = spans.map((span) => ({ span, text: text.slice(span.start, span.end), category, detector: "user", confidence: "high" }));
+    const candidates = [...result.candidates, ...added];
+    const m = merge(candidates, text, result.merge.entities.clone(), this.vault);
+    // What the user marked becomes a placeholder (restorable in the answer), not a generalisation.
+    const next = new Map(overrides);
+    for (const mention of m.mentions) {
+      if (added.some((a) => a.span.start === mention.span.start && a.span.end === mention.span.end) && !next.has(mention.entityId)) {
+        next.set(mention.entityId, { action: PLACEHOLDER, revealThisTime: false });
+      }
+    }
+    return { result: this.reseal({ ...result, merge: m, candidates }, next, acceptedRisks), overrides: next };
   }
 
   /** Re-applies Review edits without calling the model (chip toggles and "Use suggestion" are instant). */

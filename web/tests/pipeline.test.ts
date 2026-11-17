@@ -4,6 +4,7 @@ import {
   PromptLibrary, ReceiptLedger, RedTeam, SealPipeline, answer, applyRisks, chunks, estimateTokens, halve, isValidSuggestion, makeEntity, pendingRisks,
   route as routeOf, taskSpec, CHROME_ON_DEVICE_MODEL, type AnswerEvent, type AnswerOutcome, type Risk, type SealDraft, type SealedText, type VaultEntry,
 } from "../src/engine";
+import { KEEP } from "../src/engine/types";
 import { AppConfig } from "../src/core/appConfig";
 import { sealSettings } from "../src/engine/pipeline";
 import { readFileSync } from "node:fs";
@@ -155,6 +156,47 @@ describe("red-team loop", () => {
     const risks: Risk[] = [{ id: 1, attribute: "location", guess: "", evidence: "near the old mill", confidence: "high", suggestion: "in the area" }];
     const once = applyRisks(risks, draftOf(text));
     expect(applyRisks(risks, once).text).toBe(once.text);
+  });
+});
+
+describe("Protect this (user-marked details)", () => {
+  const vault: VaultEntry[] = [{ id: "v-raj", canonical: "Raj Patel", aliases: ["Raj"], category: "person", roleHint: "my landlord", isUser: false }];
+  const raw = "Hi Raj, I work nights at Mercy General Hospital. Mercy General Hospital is far from 14 Elm St.";
+  // Rules only: the on-device model is unavailable, so the org name is missed (INV-9 path).
+  const pl = () => new SealPipeline(MockPhoneEngine.answering("", "unavailable"), new PatternDetector(), vault, new PromptLibrary(), sealSettings(new AppConfig(), { dial: "balanced" }));
+
+  it("protects every occurrence, keeps existing placeholder numbers and the user's toggles, and passes the gate", async () => {
+    const p = pl();
+    const r = await p.run(raw);
+    expect(r.draft.text).toContain("Mercy General Hospital");
+    const raj = r.draft.entities.sorted().find((e) => e.canonical === "Raj Patel")!;
+    const overrides = new Map([[raj.id, { action: KEEP, revealThisTime: true }]]);
+    const kept = p.reseal(r, overrides);
+    expect(kept.draft.text).toContain("Raj");
+
+    const { result: protectedR, overrides: after } = p.protect(kept, "mercy general hospital", "org", overrides);
+    expect(after.get("ORG_1")?.action).toEqual({ kind: "placeholder" });
+    expect(after.get(raj.id)?.action).toEqual({ kind: "keep" });
+    expect(protectedR.draft.text).not.toContain("Mercy");
+    expect(protectedR.draft.text.match(/\[\[ORG_1\]\]/g)).toHaveLength(2);
+    expect(protectedR.draft.entities.get(raj.id)?.canonical).toBe("Raj Patel");
+    expect(protectedR.draft.text).toContain("Raj");
+    expect(protectedR.draft.entities.get("ORG_1")?.sources.has("user")).toBe(true);
+    expect(() => new EgressGate(new PatternDetector(), vault).seal(protectedR.draft)).not.toThrow();
+  });
+
+  it("is a no-op for text that isn't there or is only whitespace", async () => {
+    const p = pl();
+    const r = await p.run(raw);
+    expect(p.protect(r, "Nowhere Clinic", "org", new Map()).result).toBe(r);
+    expect(p.protect(r, "   ", "org", new Map()).result).toBe(r);
+  });
+
+  it("a user mark inside an existing detection wins (user > vault > pattern > llm)", async () => {
+    const p = pl();
+    const r = await p.run("Visit 14 Elm St tomorrow");
+    const out = p.protect(r, "Elm", "location", new Map()).result;
+    expect(out.draft.text).not.toContain("Elm");
   });
 });
 

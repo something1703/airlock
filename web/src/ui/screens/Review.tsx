@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from "react";
+import type { PrivacyCategory } from "../../engine/types";
 import { GATE_CHECK_NAMES } from "../../app/session";
 import { useAirlock, useSession } from "../../app/context";
 import type { ReviewReason, SealProgress } from "../../engine/pipeline";
@@ -57,11 +58,40 @@ function reasonText(r: ReviewReason): string {
 
 const reduceMotion = (): boolean => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+const PROTECT_AS: { id: Exclude<PrivacyCategory, "quasi">; label: string }[] = [
+  { id: "person", label: "Person" }, { id: "org", label: "Organisation" }, { id: "location", label: "Place" }, { id: "contact", label: "Contact" }, { id: "id", label: "Number / ID" },
+];
+
+/** Mark something the detectors missed. Selecting text above pre-fills it; works fully from the keyboard too. */
+function ProtectBar({ phrase, setPhrase }: { phrase: string; setPhrase: (s: string) => void }) {
+  const s = useSession();
+  const [note, setNote] = useState<string | null>(null);
+  const go = (category: Exclude<PrivacyCategory, "quasi">) => {
+    const ok = s.protect(phrase, category);
+    setNote(ok ? `Protected every “${phrase.trim()}”.` : `“${phrase.trim()}” isn't in your text.`);
+    if (ok) setPhrase("");
+  };
+  return (
+    <div className="card stack enter" style={{ gap: 10 }}>
+      <div>
+        <h2 style={{ marginBottom: 4 }}>Protect something Airlock missed</h2>
+        <p className="small" style={{ margin: 0 }}>Select a word above, or type it here. Every place it appears is replaced before sending, and the real words come back in the answer.</p>
+      </div>
+      <input className="field" value={phrase} onChange={(e) => { setPhrase(e.target.value); setNote(null); }} placeholder="e.g. Mercy General Hospital" aria-label="Word or phrase to protect" maxLength={120} />
+      <div className="row" role="group" aria-label="Protect it as">
+        {PROTECT_AS.map((c) => <button key={c.id} className="pill" disabled={!phrase.trim()} onClick={() => go(c.id)}>{c.label}</button>)}
+      </div>
+      {note && <div className="small" role="status">{note}</div>}
+    </div>
+  );
+}
+
 export function ReviewScreen() {
   const s = useSession();
   const { review } = useAirlock();
   const [view, setView] = useState<"sealed" | "raw">("sealed");
   const [sending, setSending] = useState(false);
+  const [phrase, setPhrase] = useState("");
   if (!review) return null;
   const { result } = review;
   const risks = s.pendingRisks();
@@ -107,7 +137,7 @@ export function ReviewScreen() {
         </Banner>
       )}
 
-      <div className="card sealed-card enter" key={view}>
+      <div className="card sealed-card enter" key={view} onMouseUp={() => { const sel = window.getSelection()?.toString().trim() ?? ""; if (sel && sel.length <= 120 && !sel.includes("\n")) setPhrase(sel); }}>
         {view === "sealed" ? <SealedPreview draft={result.draft} onChip={(e) => s.toggleEntity(e.id)} /> : <div className="prose">{result.normalised.text}</div>}
         <div className="summary-bar" style={{ marginTop: 14 }}>
           <span><b className="counter" key={`p${sealed.length}`}>{sealed.length}</b> protected</span>
@@ -146,6 +176,8 @@ export function ReviewScreen() {
           ))}
         </div>
       )}
+
+      <ProtectBar phrase={phrase} setPhrase={setPhrase} />
 
       {entities.length > 0 && (
         <div className="card enter" style={{ "--i": 2 } as CSSProperties}>
