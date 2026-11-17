@@ -1,60 +1,73 @@
 package app.airlock.android
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.google.firebase.Firebase
-import com.google.firebase.ai.InferenceMode
-import com.google.firebase.ai.OnDeviceConfig
-import com.google.firebase.ai.ai
-import com.google.firebase.ai.type.GenerativeBackend
-import com.google.firebase.ai.type.PublicPreviewAPI
+import app.airlock.android.session.AirlockSession
+import app.airlock.android.ui.AirlockLogo
+import app.airlock.android.ui.AppRoot
+import kotlinx.coroutines.flow.MutableStateFlow
 
+/**
+ * The single activity. `demo=true` (intent extra, or the "Try the demo" launcher shortcut) opens demo mode; text shared
+ * from another app (ACTION_SEND) lands in Ask's box — nothing is read until the user taps Seal.
+ */
 class MainActivity : ComponentActivity() {
+    private val shared = MutableStateFlow<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { AirlockTheme { Probe() } }
+        val demo = intent.getBooleanExtra(EXTRA_DEMO, false) || intent.extras?.getString(EXTRA_DEMO) == "true"
+        if (savedInstanceState == null) handleShare(intent)
+        setContent { AirlockTheme { Root(demo) } }
     }
-}
 
-/** Temporary first screen: brand + the on-device model status straight from the SDK. Replaced by the full app. */
-@OptIn(PublicPreviewAPI::class)
-@Composable
-private fun Probe() {
-    val c = LocalAirlock.current
-    var status by remember { mutableStateOf("Checking the on-device model…") }
-    LaunchedEffect(Unit) {
-        status = runCatching {
-            val model = Firebase.ai(backend = GenerativeBackend.googleAI())
-                .generativeModel(modelName = "unused-on-device-only", onDeviceConfig = OnDeviceConfig(mode = InferenceMode.ONLY_ON_DEVICE))
-            model.onDeviceExtension?.checkStatus()?.toString() ?: "On-device AI isn't available in this build"
-        }.getOrElse { "On-device AI unavailable on this phone (${it.javaClass.simpleName})" }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleShare(intent)
     }
-    Column(
-        Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("Airlock", color = c.text, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-        Text("AI is great. Oversharing isn’t.", color = c.text2, fontSize = 16.sp)
-        Text("On-device model: $status", color = c.seal, fontSize = 14.sp)
+
+    private fun handleShare(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {
+            intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }?.let { shared.value = it }
+        }
+    }
+
+    @Composable
+    private fun Root(demo: Boolean) {
+        val ctx = LocalContext.current
+        val session by produceState<AirlockSession?>(null, demo) { value = AirlockApp.session(ctx.applicationContext, demo) }
+        val pending by shared.collectAsState()
+        val s = session
+        if (s == null) {
+            Box(Modifier.fillMaxSize().background(LocalAirlock.current.bg), contentAlignment = Alignment.Center) { AirlockLogo(64.dp, animated = true) }
+            return
+        }
+        LaunchedEffect(pending) {
+            pending?.let {
+                s.receiveShared(it)
+                shared.value = null
+            }
+        }
+        AppRoot(s)
+    }
+
+    companion object {
+        const val EXTRA_DEMO = "demo"
     }
 }

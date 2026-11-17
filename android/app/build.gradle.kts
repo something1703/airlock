@@ -7,6 +7,8 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+val repoRoot: String = rootDir.resolve("..").canonicalPath
+
 android {
     namespace = "app.airlock.android"
     compileSdk = 37
@@ -33,6 +35,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     packaging { resources.excludes += setOf("META-INF/{AL2.0,LGPL2.1}") }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        unitTests.all {
+            it.useJUnitPlatform()
+            it.systemProperty("airlock.repoRoot", repoRoot)
+        }
+    }
 }
 
 kotlin { jvmToolchain(21) }
@@ -57,4 +66,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // JVM unit tests (no Robolectric): engines, store and session are Android-free.
+    testImplementation(kotlin("test-junit5"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
