@@ -1,0 +1,88 @@
+rules_version = '2';
+
+// Airlock Firestore rules (docs/05-FIREBASE-AND-GCP.md §6.2). Defense in depth for INV-1 / INV-7: only
+// SEALED data may sync. Every collection uses an allow-list of fields; raw-text field names are rejected
+// outright; sealed text must pass a cheap identifier tripwire. The device's egress gate remains the real
+// control — these rules catch app bugs, not adversaries with the user's own credentials.
+// Tested in functions/test/rules.test.ts against the emulator (RE2 regex semantics).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function data() { return request.resource.data; }
+
+    // Field names that must never exist in synced data.
+    function noForbiddenKeys() {
+      return !data().keys().hasAny(['raw', 'rawText', 'original', 'restored', 'restoredText', 'entityMap',
+        'entities', 'plaintext', 'surfaceForms', 'canonical', 'outboundText', 'vault']);
+    }
+
+    // Cheap server-side tripwire for sealed text. Not a substitute for the on-device gate.
+    function looksSealed(s) {
+      return s is string
+        && s.size() <= 40000
+        && !s.matches('(?s).*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}.*')     // email
+        && !s.matches('(?s).*[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{1,7}.*')   // card-like
+        && !s.matches('(?s).*[0-9]{3}-[0-9]{2}-[0-9]{4}.*');                          // SSN-like
+    }
+
+    function isRoute(r) { return r in ['phoneOnly', 'phoneFirst', 'cloudFirst', 'cloudOnly']; }
+    function isHex64(s) { return s is string && s.matches('[0-9a-f]{64}'); }
+    function shortString(s, n) { return s is string && s.size() <= n; }
+
+    match /users/{uid} {
+      allow read, delete: if owner(uid);
+      allow create, update: if owner(uid) && noForbiddenKeys()
+        && data().keys().hasOnly(['createdAt', 'dial', 'appVersion'])
+        && (!('dial' in data()) || data().dial in ['open', 'balanced', 'strict'])
+        && (!('appVersion' in data()) || shortString(data().appVersion, 40));
+
+      match /threads/{threadId} {
+        allow read, delete: if owner(uid);
+        allow create, update: if owner(uid) && noForbiddenKeys()
+          && data().keys().hasOnly(['createdAt', 'updatedAt', 'title', 'lastRoute', 'turnCount'])
+          && shortString(data().title, 80) && looksSealed(data().title)
+          && (!('lastRoute' in data()) || isRoute(data().lastRoute))
+          && (!('turnCount' in data()) || (data().turnCount is int && data().turnCount >= 0));
+
+        match /turns/{turnId} {
+          allow read, delete: if owner(uid);
+          allow create: if owner(uid) && noForbiddenKeys()
+            && data().keys().hasOnly(['createdAt', 'role', 'sealedText', 'legend', 'route', 'modelVersion', 'receiptId'])
+            && data().role in ['user', 'assistant']
+            && looksSealed(data().sealedText)
+            && (!('legend' in data()) || (looksSealed(data().legend) && data().legend.size() <= 10000))
+            && (!('route' in data()) || isRoute(data().route))
+            && (!('modelVersion' in data()) || shortString(data().modelVersion, 80))
+            && (!('receiptId' in data()) || data().receiptId == null || shortString(data().receiptId, 40));
+          allow update: if false;   // turns are immutable
+        }
+      }
+
+      match /receipts/{receiptId} {
+        allow read, delete: if owner(uid);
+        // The receipt as hashed on device, WITHOUT outboundText (the exact sealed text stays local; the hash proves it).
+        allow create: if owner(uid) && noForbiddenKeys()
+          && data().keys().hasOnly(['id', 'seq', 'createdAt', 'threadId', 'route', 'modelVersion', 'outboundSha256',
+               'outboundChars', 'counts', 'gate', 'armor', 'latencyMs', 'prevHash', 'hash'])
+          && data().seq is int && data().seq >= 1
+          && isHex64(data().hash) && isHex64(data().prevHash) && isHex64(data().outboundSha256)
+          && isRoute(data().route)
+          && data().counts is map && data().gate is map && data().latencyMs is map
+          && data().armor in ['pass', 'blocked', 'notConfigured', 'unknown'];
+        allow update: if false;     // receipts are append-only
+      }
+
+      match /stats/{week} {
+        allow read: if owner(uid);
+        allow write: if false;      // Cloud Function only (Admin SDK bypasses rules)
+      }
+    }
+
+    // Everything else: denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
