@@ -28,7 +28,9 @@ import java.io.IOException
  */
 @OptIn(PublicPreviewAPI::class)
 object ErrorMapper {
-    fun map(e: Throwable, online: () -> Boolean = { true }, depth: Int = 0): EngineError = when (e) {
+    fun map(e: Throwable, online: () -> Boolean = { true }): EngineError = map(e, 0, online)
+
+    private fun map(e: Throwable, depth: Int, online: () -> Boolean): EngineError = when (e) {
         is EngineError -> e
         is QuotaExceededException -> EngineError(EngineErrorCode.QUOTA)
         is PromptBlockedException ->
@@ -51,8 +53,8 @@ object ErrorMapper {
         is FirebaseAIOnDeviceUnknownException -> EngineError(EngineErrorCode.OTHER, "ondevice")
         is SerializationException -> EngineError(EngineErrorCode.PARSE)
         is IOException -> if (online()) EngineError(EngineErrorCode.SERVICE_UNAVAILABLE, "network") else EngineError(EngineErrorCode.OFFLINE)
-        is UnknownException -> e.cause?.takeIf { depth < 4 }?.let { map(it, online, depth + 1) } ?: EngineError(EngineErrorCode.OTHER, "unknown")
-        else -> e.cause?.takeIf { depth < 4 && it !== e }?.let { map(it, online, depth + 1) }
+        is UnknownException -> e.cause?.takeIf { depth < 4 }?.let { map(it, depth + 1, online) } ?: EngineError(EngineErrorCode.OTHER, "unknown")
+        else -> e.cause?.takeIf { depth < 4 && it !== e }?.let { map(it, depth + 1, online) }
             ?: if (!online()) EngineError(EngineErrorCode.OFFLINE) else EngineError(EngineErrorCode.OTHER, "unknown")
     }
 

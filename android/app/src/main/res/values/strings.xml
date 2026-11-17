@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copy rules: docs/06-UI-UX.md §9. Never "100% private" or "anonymous"; never legal, medical or financial advice. -->
+<!-- Copy rules: docs/06-UI-UX.md §9 (honest claims only; explain and prepare, never advise). -->
 <resources>
     <string name="app_name">Airlock</string>
     <string name="shortcut_demo_short">Try the demo</string>

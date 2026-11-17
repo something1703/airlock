@@ -85,7 +85,7 @@ import app.airlock.core.ON_DEVICE_MODEL
 import app.airlock.core.TaskKind
 import java.util.Locale
 
-/** "gemini-3.8-flash" → "3.8 Flash". */
+/** Model id → badge label, e.g. "gemini-n-flash" → "N Flash". */
 fun prettyModel(m: String): String =
     if (m == ON_DEVICE_MODEL) "Gemini Nano" else m.removePrefix("gemini-").replace('-', ' ').split(' ').joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
 
