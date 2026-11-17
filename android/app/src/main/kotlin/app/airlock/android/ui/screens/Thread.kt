@@ -199,7 +199,7 @@ private fun AssistantBubble(turn: Turn.Assistant, labels: Labels) {
         when {
             turn.status == Turn.Status.ERROR -> Banner(Tone.RISK, errorText(turn.error))
             turn.segments.isNotEmpty() -> Column {
-                FlowText(restoredSegs(turn.segments, labels))
+                FlowText(restoredSegs(turn.segments, labels), markdown = true)
                 if (streaming) Caret()
             }
             else -> TypingDots(stringResource(R.string.typing_a11y))

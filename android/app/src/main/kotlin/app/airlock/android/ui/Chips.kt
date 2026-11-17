@@ -221,16 +221,25 @@ fun restoredSegs(segments: List<RestoredSegment>, labels: Labels): List<Seg> = s
  * `.sealed-card .chip`; restored names always unseal once as they arrive.
  */
 @Composable
-fun FlowText(segs: List<Seg>, modifier: Modifier = Modifier, style: TextStyle = Type.body, color: Color = LocalAirlock.current.text, popIn: Boolean = false) {
+fun FlowText(
+    segs: List<Seg>,
+    modifier: Modifier = Modifier,
+    style: TextStyle = Type.body,
+    color: Color = LocalAirlock.current.text,
+    popIn: Boolean = false,
+    /** Model answers: render `**bold**`, `#` headings and `*`/`-` bullets (docs/06 §3 StreamingAnswer, "Markdown-lite"). */
+    markdown: Boolean = false,
+) {
     val measurer = rememberTextMeasurer(cacheSize = 64)
     val density = LocalDensity.current
     val chipStyle = style.copy(fontSize = style.fontSize * 0.9f, fontWeight = FontWeight.SemiBold, lineHeight = style.fontSize * 1.1f)
     val inline = HashMap<String, InlineTextContent>()
+    val md = MarkdownLite(style)
     val text: AnnotatedString = buildAnnotatedString {
         var chipIndex = 0
         segs.forEachIndexed { i, s ->
             when (s) {
-                is Seg.Txt -> append(s.text)
+                is Seg.Txt -> if (markdown) md.append(this, s.text) else append(s.text)
                 is Seg.Chip -> {
                     val spec = s.spec
                     val id = "t$i"
@@ -247,10 +256,12 @@ fun FlowText(segs: List<Seg>, modifier: Modifier = Modifier, style: TextStyle = 
                     inline[id] = InlineTextContent(Placeholder(w, h, PlaceholderVerticalAlign.TextCenter)) {
                         InlineToken(spec, labelStyle, if (popIn) index else -1)
                     }
+                    md.beforeInline()
                     appendInlineContent(id, spec.label)
                 }
             }
         }
+        if (markdown) md.close(this)
     }
     Text(text, modifier, style = style, color = color, inlineContent = inline)
 }
@@ -332,6 +343,75 @@ private fun InlineToken(spec: ChipSpec, labelStyle: TextStyle, popIndex: Int) {
         Icon(icon, null, Modifier.size(with(LocalDensity.current) { labelStyle.fontSize.toDp() }), tint = tint)
         Text(spec.label, style = labelStyle, color = tint, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
         if (spec.low) Box(Modifier.size(6.dp).clip(CircleShape).background(c.review))
+    }
+}
+
+/**
+ * Streaming-safe Markdown-lite for model answers: state carries across text segments (a restored name can sit in the
+ * middle of a bold run or a list item), so it works chunk by chunk. Only styles are applied — text is never dropped
+ * except the markup itself.
+ */
+private class MarkdownLite(private val base: TextStyle) {
+    private var bold = false
+    private var heading = false
+    private var lineStart = true
+    private var depth = 0
+
+    private val headingRe = Regex("^#{1,6} ")
+    private val bulletRe = Regex("^([ \\t]*)[*+-] ")
+
+    fun beforeInline() {
+        lineStart = false
+    }
+
+    fun append(b: AnnotatedString.Builder, text: String) {
+        var i = 0
+        while (i < text.length) {
+            if (lineStart) {
+                val rest = text.substring(i)
+                headingRe.find(rest)?.let { m ->
+                    b.pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, fontSize = base.fontSize * 1.08f)); depth++
+                    heading = true
+                    i += m.value.length
+                }
+                bulletRe.find(rest)?.let { m ->
+                    b.append(m.groupValues[1] + "•  ")
+                    i += m.value.length
+                }
+                lineStart = false
+                if (i >= text.length) break
+            }
+            val ch = text[i]
+            when {
+                ch == '\n' -> {
+                    if (heading) {
+                        b.pop(); depth--
+                        heading = false
+                    }
+                    b.append(ch)
+                    lineStart = true
+                    i++
+                }
+                text.startsWith("**", i) -> {
+                    if (bold) {
+                        b.pop(); depth--
+                    } else {
+                        b.pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.SemiBold)); depth++
+                    }
+                    bold = !bold
+                    i += 2
+                }
+                else -> {
+                    b.append(ch)
+                    i++
+                }
+            }
+        }
+    }
+
+    fun close(b: AnnotatedString.Builder) {
+        repeat(depth) { b.pop() }
+        depth = 0
     }
 }
 

@@ -167,13 +167,6 @@ private fun HeroAnimation(modifier: Modifier = Modifier) {
     val a11y = stringResource(R.string.hero_a11y)
     BoxWithConstraints(modifier.fillMaxWidth().height(156.dp).card(c, padding = 0.dp).clearAndSetSemantics { contentDescription = a11y }) {
         val w = maxWidth
-        // The gate: two seal-green rails fading downwards, the logo between them.
-        Box(Modifier.align(Alignment.TopCenter).padding(top = 14.dp).width(64.dp).height(118.dp)) {
-            val rail = Brush.verticalGradient(listOf(c.seal, Color.Transparent))
-            Box(Modifier.align(Alignment.CenterStart).padding(start = 6.dp).width(2.dp).fillMaxHeight().background(rail))
-            Box(Modifier.align(Alignment.CenterEnd).padding(end = 6.dp).width(2.dp).fillMaxHeight().background(rail))
-            AirlockLogo(40.dp, animated = true, modifier = Modifier.align(Alignment.Center))
-        }
         if (still) {
             Column(Modifier.align(Alignment.TopEnd).padding(top = 18.dp, end = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
                 lanes.forEach { (_, after, cat) -> StandaloneChip(cat, after) }
@@ -202,6 +195,15 @@ private fun HeroAnimation(modifier: Modifier = Modifier) {
                     )
                     if (afterA > 0f) StandaloneChip(cat, after, Modifier.graphicsLayer { alpha = afterA; val k = 0.7f + 0.3f * afterA; scaleX = k; scaleY = k })
                 }
+            }
+        }
+        // The gate, drawn over the lanes so details pass *through* it: two seal-green rails and the mark.
+        Box(Modifier.align(Alignment.TopCenter).padding(top = 14.dp).width(64.dp).height(118.dp)) {
+            val rail = Brush.verticalGradient(listOf(c.seal, Color.Transparent))
+            Box(Modifier.align(Alignment.CenterStart).padding(start = 6.dp).width(2.dp).fillMaxHeight().background(rail))
+            Box(Modifier.align(Alignment.CenterEnd).padding(end = 6.dp).width(2.dp).fillMaxHeight().background(rail))
+            Box(Modifier.align(Alignment.Center).size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.raised), contentAlignment = Alignment.Center) {
+                AirlockLogo(40.dp, animated = true)
             }
         }
         Row(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

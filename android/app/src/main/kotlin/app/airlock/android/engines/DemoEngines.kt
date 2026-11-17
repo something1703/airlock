@@ -30,6 +30,9 @@ object DemoEngines {
     const val REPLY = "Here's a firm, polite reply you can send to [[PERSON_1]]:\n\nHi [[PERSON_1]], the heater at [[LOC_1]] is still broken. " +
         "Please arrange a repair this week.\n\nThanks,\n[[PERSON_ME]]"
     const val SUMMARY = "- [[PERSON_1]] hasn't fixed the heater.\n- You've asked several times."
+    const val HELP = "Here's a calm way to handle it:\n\n1. Write to [[PERSON_1]] today. Say the heater at [[LOC_1]] has been broken since Oct 28 " +
+        "and ask for a repair date this week.\n2. Keep a note of every message and when you sent it.\n3. If nothing changes, ask what your lease " +
+        "says about repair times. A local tenants' group can explain what usually applies where you live."
 
     /** `pace` = false for tests (no artificial delays). */
     fun phone(pace: Boolean = true): MockPhoneEngine = MockPhoneEngine { id, text ->
@@ -67,7 +70,11 @@ class DemoSealedEngine(override val route: Route, private val pace: Boolean = tr
     val received: MutableList<SealedText> = Collections.synchronizedList(ArrayList())
     private val modelVersion = if (route == Route.PHONE_FIRST || route == Route.PHONE_ONLY) ON_DEVICE_MODEL else "gemini-demo"
 
-    private fun answer(task: TaskSpec): String = if (task.id == "task.summary.v1") DemoEngines.SUMMARY else DemoEngines.REPLY
+    private fun answer(task: TaskSpec): String = when (task.id) {
+        "task.summary.v1", "task.actions.v1" -> DemoEngines.SUMMARY
+        "task.reply.v1", "task.rewrite.v1" -> DemoEngines.REPLY
+        else -> DemoEngines.HELP
+    }
 
     override suspend fun respond(sealed: SealedText, task: TaskSpec, history: SealedHistory?): EngineResult {
         received.add(sealed)
