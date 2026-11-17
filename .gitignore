@@ -58,3 +58,6 @@ eval/runs/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Firebase Hosting deploy copy of web/dist (built by predeploy)
+firebase/hosting/
