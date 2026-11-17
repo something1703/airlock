@@ -37,6 +37,8 @@ object AirlockIcons {
     val Secret: ImageVector by lazy { icon("Secret", "M4.5,14.0a3.5,3.5 0 1,0 7.0,0a3.5,3.5 0 1,0 -7.0,0", "m10.5 11.5 8-8M15.5 6.5l2 2M13.5 8.5l1.5 1.5") }
     val Sparkle: ImageVector by lazy { icon("Sparkle", "M12 3.5c.6 4.2 2.3 5.9 6.5 6.5-4.2.6-5.9 2.3-6.5 6.5-.6-4.2-2.3-5.9-6.5-6.5 4.2-.6 5.9-2.3 6.5-6.5Z", "M18.5 16v4M16.5 18h4") }
     val Device: ImageVector by lazy { icon("Device", "M6.0,4.5h12.0a2.0,2.0 0 0,1 2.0,2.0v7.0a2.0,2.0 0 0,1 -2.0,2.0h-12.0a2.0,2.0 0 0,1 -2.0,-2.0v-7.0a2.0,2.0 0 0,1 2.0,-2.0z", "M2.5 19.5h19M9.5 15.5l-.5 4M14.5 15.5l.5 4") }
+    /** Android-only: a phone, same grid and stroke as the rest (the web's Device icon is a computer). */
+    val Phone: ImageVector by lazy { icon("Phone", "M9.0,3.0h6.0a2.5,2.5 0 0,1 2.5,2.5v13.0a2.5,2.5 0 0,1 -2.5,2.5h-6.0a2.5,2.5 0 0,1 -2.5,-2.5v-13.0a2.5,2.5 0 0,1 2.5,-2.5z", "M11 17.8h2") }
     val Cloud: ImageVector by lazy { icon("Cloud", "M7 18.5a4.5 4.5 0 0 1-.4-9 6 6 0 0 1 11.3 1.6A3.8 3.8 0 0 1 17.5 18.5Z") }
     val Check: ImageVector by lazy { icon("Check", "m5 12.5 4.5 4.5L19 7.5") }
     val Shield: ImageVector by lazy { icon("Shield", "M12 3 5 6v5.5c0 4.2 2.9 7.8 7 9.5 4.1-1.7 7-5.3 7-9.5V6Z", "m9 12 2 2 4-4") }

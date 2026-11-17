@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the Airlock icon → "Try the demo": scripted answers, separate encrypted storage. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="demo"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_demo_short"
+        android:shortcutLongLabel="@string/shortcut_demo_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="app.airlock.android"
+            android:targetClass="app.airlock.android.MainActivity">
+            <extra android:name="demo" android:value="true" />
+        </intent>
+    </shortcut>
+</shortcuts>
