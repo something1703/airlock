@@ -29,9 +29,17 @@ if [[ "$DEV_DIR" == *CommandLineTools* ]]; then
 fi
 (cd Packages/AirlockKit && swift test ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"})
 
-if [[ -d Airlock.xcodeproj ]] && xcodebuild -version >/dev/null 2>&1 && xcrun simctl list >/dev/null 2>&1; then
-  echo "▶ App (xcodebuild test, mock engines)"
-  xcodebuild -scheme Airlock -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test -quiet
+if [[ -f project.yml ]] && command -v xcodegen >/dev/null && xcodebuild -version >/dev/null 2>&1 && xcrun simctl list >/dev/null 2>&1; then
+  xcodegen generate --spec project.yml --quiet
+  DD="${TMPDIR:-/tmp}/airlock-derived-data"
+  if grep -q "AirlockUITests" project.yml; then
+    echo "▶ App (xcodebuild test, mock engines)"
+    xcodebuild -project Airlock.xcodeproj -scheme "Airlock (Dev)" -destination 'platform=iOS Simulator,OS=latest,name=iPhone 18 Pro' -derivedDataPath "$DD" test -quiet
+  else
+    echo "▶ App (build iOS Simulator + macOS; no UI test target yet)"
+    xcodebuild -project Airlock.xcodeproj -scheme "Airlock (Dev)" -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DD" build -quiet CODE_SIGNING_ALLOWED=NO
+    xcodebuild -project Airlock.xcodeproj -scheme "Airlock (Dev)" -destination 'platform=macOS' -derivedDataPath "$DD" build -quiet CODE_SIGNING_ALLOWED=NO
+  fi
 else
   echo "• Skipping app tests (no Xcode project or Xcode not selected)"
 fi

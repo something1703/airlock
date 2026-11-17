@@ -1,0 +1,5 @@
+This output was meant to be JSON with the shape {"items":[...]} but it is broken:
+<<<
+{{broken}}
+>>>
+Return only the corrected JSON. Do not add items that were not there.

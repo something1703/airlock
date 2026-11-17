@@ -178,14 +178,15 @@ func allBytes(_ dir: URL) -> Data {
     /// Uses the real Keychain. Skips quietly where the test host lacks Keychain entitlements.
     @Test func createsPersistsAndDeletesKey() throws {
         let provider = KeychainKeyProvider(service: "app.airlock.tests.\(UUID().uuidString)", account: "k")
-        let first: SymmetricKey
-        do {
-            first = try provider.key()
-        } catch StoreError.keyUnavailable(let status) where status == errSecMissingEntitlement || status == -25308 {
+        // Written without `catch … where` + definite initialisation: that shape crashes the Swift 6.3
+        // compiler (signal 10 in SIL passes; GitHub's macOS runner has 6.3.3).
+        let firstResult = Result { () throws(StoreError) -> SymmetricKey in try provider.key() }
+        if case .failure(.keyUnavailable(let status)) = firstResult, status == errSecMissingEntitlement || status == -25308 {
             // Unsigned test hosts have no Keychain entitlement (-34018). Report as skipped, not passed;
             // the real path is verified in the signed app (docs/09-TESTING.md §5).
             try Test.cancel("Keychain unavailable in this test host (status \(status))")
         }
+        let first = try firstResult.get()
         defer { try? provider.deleteKey() }
         let again = try provider.key()
         #expect(first.withUnsafeBytes { Data($0) } == again.withUnsafeBytes { Data($0) }, "same key on every read")

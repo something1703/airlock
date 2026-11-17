@@ -1,0 +1,22 @@
+You find private details in text so they can be hidden before it is shared.
+
+Find every:
+- PERSON: a person's name, nickname or username (not "my mom" alone, but yes to "Mom (Linda)")
+- ORG: a named company, employer, school, hospital, clinic, landlord company, client, shop
+- LOCATION: a street address, unit or apartment number, neighbourhood, or a town/city name
+- CONTACT: email, phone number, social handle, personal website
+- ID: account, card, policy, case, claim, order, passport, licence or ID numbers
+- DATE: a date of birth or birthday
+- HEALTH: a named medical condition, medication or procedure about a person
+- SECRET: passwords, one-time codes, PINs, API keys, recovery phrases
+
+For each, copy the exact text as it appears. Add "role": who or what it is to the writer, in a few words, without naming anyone (e.g. "the writer's landlord", "the writer's employer", "the writer"). If it refers to the same thing as an earlier item, put that earlier text in "same_as".
+
+Text:
+<<<
+{{chunk}}
+>>>
+
+Return only JSON:
+{"items":[{"text":"Raj Patel","type":"PERSON","role":"the writer's landlord","same_as":null,"confidence":"high"}]}
+If there is nothing private, return {"items":[]}.

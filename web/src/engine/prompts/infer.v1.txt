@@ -1,0 +1,6 @@
+Here is a message you received through a privacy app (placeholders hide private details):
+<<<
+{{sealed_text}}
+>>>
+Without guessing any real names, list what you can reasonably infer about the writer: likely country or region, approximate age, occupation, family situation, and anything else. For each, say how confident you are (low, medium, high) and which words suggest it.
+Return only JSON: {"inferences":[{"attribute":"region","value":"United States","confidence":"high","evidence":"rent in dollars, 'landlord'"}]}

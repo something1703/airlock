@@ -1,0 +1,1 @@
+You can call tools that run on the user's phone. They return only limited, privacy-safe information. If a tool returns {"error":"user_declined"}, continue without it and do not ask again in this answer.

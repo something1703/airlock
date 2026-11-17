@@ -1,0 +1,9 @@
+Rewrite the phrase so it no longer identifies a specific person, place or organisation, but keeps what matters for this task: {{task_summary}}.
+Use at most 8 words. Do not use any names.
+
+Sentence: {{sentence}}
+Phrase to rewrite: {{phrase}}
+Detail type: {{type}}
+How general: {{level_hint}}   (e.g. "region, not city")
+
+Return only JSON: {"rewrite":"a clinic in a rural area"}

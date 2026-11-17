@@ -1,0 +1,9 @@
+Two assistants answered the same request. Answer A saw the original private text. Answer B saw a privacy-protected version and had details restored afterwards.
+
+Request: {{task}}
+Original text: <<<{{raw}}>>>
+Answer A: <<<{{answer_raw}}>>>
+Answer B: <<<{{answer_airlock}}>>>
+
+Judge only usefulness and correctness for the person. Ignore small wording differences.
+Return only JSON: {"winner":"A|B|tie","b_quality":1-5,"missing_in_b":"short note or empty"}
