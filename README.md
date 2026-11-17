@@ -102,6 +102,16 @@ Firebase AI Logic iOS SDK **12.19.0** (the release with the documented `HybridMo
 | Which model answered | — | `response.rawResponse.modelVersion` | `AirlockCore/Route.swift` (`EngineResult.ranOnDevice`) |
 | Phone model availability | — | `FirebaseAI.SystemLanguageModel.default.availability` | `AirlockEngines/ErrorMapper.swift` |
 
+**Web app** (`web/`, `firebase@13.3.0`): every call is in `web/src/ai/firebaseEngines.ts`, the only web file that imports `firebase/ai` (lint-enforced).
+
+| Capability | Inference mode | Firebase AI Logic call | File |
+|-----------|----------------|------------------------|------|
+| Detection, generalising, red-team on raw text | `InferenceMode.ONLY_ON_DEVICE` (Chrome Gemini Nano) | `getGenerativeModel(ai, { mode })`, `generateContent` | `FirebasePhoneEngine` |
+| Preparing Chrome's model (user click) | `ONLY_ON_DEVICE` | `initializeDeviceModel(onProgress)` | `FirebaseEngines.initializeOnDevice` |
+| Quick tasks on sealed text | `PREFER_ON_DEVICE` | `generateContentStream` | `FirebaseSealedEngine` |
+| Deep answers on sealed text | `PREFER_IN_CLOUD` / `ONLY_IN_CLOUD`, model fallback chain | `generateContentStream(text, { signal, timeout })`, unary last resort | `FirebaseSealedEngine.stream` |
+| Which side answered | — | `response.inferenceSource` (`on_device` / `in_cloud`) | `FirebaseSealedEngine` |
+
 ---
 
 ## Quick start (developers)

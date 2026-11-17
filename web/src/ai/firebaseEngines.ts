@@ -126,54 +126,105 @@ class FirebaseSealedEngine implements SealedEngine {
     return { text: userTurn, system: instructions };
   }
 
+  /** The planned model, then the stable fallback (`model_cloud_fallback`) if they differ. */
+  private models(): string[] {
+    return [...new Set([this.plan.cloudModel, this.engines.config.modelCloudFallback])];
+  }
+
   async respond(sealed: SealedText, task: TaskSpec, history?: SealedHistory): Promise<EngineResult> {
     const { text, system } = this.turn(sealed, task, history);
     try {
-      return await withRetry(() => this.once(this.plan.mode, text, system, task.maxOutputTokens));
+      let last: EngineError | null = null;
+      for (const model of this.models()) {
+        try {
+          return await withRetry(() => this.once(this.plan.mode, model, text, system, task.maxOutputTokens));
+        } catch (e) {
+          last = mapError(e);
+          if (!last.isTransientCloud) throw last;
+        }
+      }
+      throw last ?? new EngineError("serviceUnavailable");
     } catch (e) {
       const err = mapError(e);
-      if (err.code === "offline" && this.plan.manualOfflineFallback) return this.once(InferenceMode.ONLY_ON_DEVICE, `${system ?? ""}\n\n${text}`, undefined, task.maxOutputTokens);
+      if (err.code === "offline" && this.plan.manualOfflineFallback) return this.once(InferenceMode.ONLY_ON_DEVICE, this.plan.cloudModel, `${system ?? ""}\n\n${text}`, undefined, task.maxOutputTokens);
       throw err;
     }
   }
 
-  private async once(mode: Mode, text: string, system: string | undefined, maxOutputTokens: number | undefined): Promise<EngineResult> {
+  private async once(mode: Mode, model: string, text: string, system: string | undefined, maxOutputTokens: number | undefined): Promise<EngineResult> {
     const t0 = performance.now();
     try {
-      const { response } = await this.engines.model(mode, this.plan.cloudModel, system, maxOutputTokens).generateContent(text);
+      const { response } = await this.engines.model(mode, model, system, maxOutputTokens).generateContent(text, { timeout: this.engines.config.cloudTimeoutMs });
       const onDevice = response.inferenceSource === InferenceSource.ON_DEVICE;
-      return { text: response.text(), modelVersion: onDevice ? CHROME_ON_DEVICE_MODEL : this.plan.cloudModel, ranOnDevice: onDevice, latencyMs: performance.now() - t0 };
+      return { text: response.text(), modelVersion: onDevice ? CHROME_ON_DEVICE_MODEL : model, ranOnDevice: onDevice, latencyMs: performance.now() - t0 };
     } catch (e) {
       throw mapError(e);
     }
   }
 
+  /**
+   * Streams with a fallback chain: planned model → `model_cloud_fallback` → one unary call to the fallback.
+   * A model is skipped only if it fails *before its first chunk* with a stall or a transient error
+   * (503/429); once text has streamed, errors surface (no silent replays). The answer's modelVersion is
+   * whichever model actually answered, so the route badge and receipt stay truthful.
+   */
   async *stream(sealed: SealedText, task: TaskSpec, history?: SealedHistory): AsyncIterable<EngineChunk> {
     const { text, system } = this.turn(sealed, task, history);
     try {
-      yield* this.streamOnce(this.plan.mode, text, system, task.maxOutputTokens);
+      const models = this.models();
+      for (const model of models) {
+        const outcome = yield* this.streamOnce(this.plan.mode, model, text, system, task.maxOutputTokens);
+        if (outcome === "done") return;
+      }
+      const r = await this.once(this.plan.mode, models[models.length - 1]!, text, system, task.maxOutputTokens);
+      yield { cumulativeText: r.text, modelVersion: r.modelVersion, ranOnDevice: r.ranOnDevice };
     } catch (e) {
       const err = mapError(e);
       if (err.code === "offline" && this.plan.manualOfflineFallback) {
-        yield* this.streamOnce(InferenceMode.ONLY_ON_DEVICE, `${system ?? ""}\n\n${text}`, undefined, task.maxOutputTokens);
+        const r = await this.once(InferenceMode.ONLY_ON_DEVICE, this.plan.cloudModel, `${system ?? ""}\n\n${text}`, undefined, task.maxOutputTokens);
+        yield { cumulativeText: r.text, modelVersion: r.modelVersion, ranOnDevice: r.ranOnDevice };
         return;
       }
       throw err;
     }
   }
 
-  private async *streamOnce(mode: Mode, text: string, system: string | undefined, maxOutputTokens: number | undefined): AsyncIterable<EngineChunk> {
+  /**
+   * One streamed attempt. Returns "done", or "skip" when the model produced nothing and either stalled
+   * (no first chunk within `cloud_first_chunk_ms`) or failed transiently. Throws otherwise. Aborts are
+   * DOMExceptions, which the SDK never treats as a reason to fall back on device (verified in 3.1.0 source).
+   */
+  private async *streamOnce(mode: Mode, model: string, text: string, system: string | undefined, maxOutputTokens: number | undefined): AsyncGenerator<EngineChunk, "done" | "skip", void> {
+    const cfg = this.engines.config;
+    const ctl = new AbortController();
+    let gotChunk = false;
+    let stalled = false;
+    let timedOut = false;
+    const firstTimer = setTimeout(() => {
+      if (!gotChunk) { stalled = true; ctl.abort(); }
+    }, cfg.cloudFirstChunkMs);
+    const totalTimer = setTimeout(() => { timedOut = true; ctl.abort(); }, cfg.cloudTimeoutMs);
     let acc = "";
     try {
-      const { stream } = await this.engines.model(mode, this.plan.cloudModel, system, maxOutputTokens).generateContentStream(text);
+      const { stream } = await this.engines.model(mode, model, system, maxOutputTokens).generateContentStream(text, { signal: ctl.signal, timeout: cfg.cloudTimeoutMs });
       for await (const chunk of stream) {
+        gotChunk = true;
         acc += chunk.text();
         const src = chunk.inferenceSource;
         const onDevice = src === undefined ? null : src === InferenceSource.ON_DEVICE;
-        yield { cumulativeText: acc, modelVersion: onDevice === null ? null : onDevice ? CHROME_ON_DEVICE_MODEL : this.plan.cloudModel, ranOnDevice: onDevice };
+        yield { cumulativeText: acc, modelVersion: onDevice === null ? null : onDevice ? CHROME_ON_DEVICE_MODEL : model, ranOnDevice: onDevice };
       }
+      return "done";
     } catch (e) {
-      throw mapError(e);
+      if (gotChunk) throw timedOut ? new EngineError("serviceUnavailable", "timeout") : mapError(e);
+      if (stalled) return "skip";
+      if (timedOut) throw new EngineError("serviceUnavailable", "timeout");
+      const err = mapError(e);
+      if (err.isTransientCloud) return "skip";
+      throw err;
+    } finally {
+      clearTimeout(firstTimer);
+      clearTimeout(totalTimer);
     }
   }
 }

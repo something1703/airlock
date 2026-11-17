@@ -48,3 +48,73 @@ describe("error mapping", () => {
     }
   });
 });
+
+describe("cloud stream guards", () => {
+  async function engineWith(fake: object, remote: Record<string, string> = {}) {
+    const { initializeApp } = await import("firebase/app");
+    const { FirebaseEngines } = await import("../src/ai/firebaseEngines");
+    const { PromptLibrary } = await import("../src/engine/prompts");
+    const app = initializeApp({ apiKey: "test", projectId: "test", appId: "1:1:web:1" }, `t-${Math.random()}`);
+    const engines = new FirebaseEngines(app, new AppConfig(remote), new PromptLibrary());
+    (engines as unknown as { model: (mode: string, model: string) => object }).model = (_mode, model) => (typeof fake === "function" ? (fake as (m: string) => object)(model) : fake);
+    const sealed = engines.sealed("cloudFirst", "auto") as unknown as { stream(s: unknown, t: unknown): AsyncIterable<{ cumulativeText: string; modelVersion: string | null }>; turn: unknown };
+    (sealed as { turn: unknown }).turn = () => ({ text: "sealed text", system: "sys" });
+    const out: { cumulativeText: string; modelVersion: string | null }[] = [];
+    return { run: async () => { for await (const c of sealed.stream({}, { id: "task.help.v1", instruction: "", maxOutputTokens: 100 })) out.push(c); return out; } };
+  }
+  const abortable = (o: { signal: AbortSignal }) => new Promise<never>((_r, rej) => o.signal.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError"))));
+  const okStream = (text: string) => ({ stream: (async function* () { yield { text: () => text, inferenceSource: "in_cloud" }; })() });
+  const c = new AppConfig();
+
+  it("a stalled deep model falls back to the stable model; the answer names the model that answered", async () => {
+    const calls: string[] = [];
+    const fake = (model: string) => ({
+      generateContentStream: (_t: string, o: { signal: AbortSignal }) => { calls.push(`stream:${model}`); return model === c.modelCloudDeep ? abortable(o) : Promise.resolve(okStream("fallback answer")); },
+      generateContent: async () => { calls.push(`unary:${model}`); return { response: { text: () => "x", inferenceSource: "in_cloud" } }; },
+    });
+    const out = await (await engineWith(fake, { cloud_first_chunk_ms: "1000" })).run();
+    expect(calls).toEqual([`stream:${c.modelCloudDeep}`, `stream:${c.modelCloudFallback}`]);
+    expect(out.at(-1)).toMatchObject({ cumulativeText: "fallback answer", modelVersion: c.modelCloudFallback });
+  });
+
+  it("an overloaded (503) model is skipped immediately; if every stream fails, one unary call to the fallback", async () => {
+    const calls: string[] = [];
+    const fake = (model: string) => ({
+      generateContentStream: async () => { calls.push(`stream:${model}`); throw new AIError("fetch-error" as never, "overloaded", { status: 503 } as never); },
+      generateContent: async () => { calls.push(`unary:${model}`); return { response: { text: () => "unary answer", inferenceSource: "in_cloud" } }; },
+    });
+    const out = await (await engineWith(fake)).run();
+    expect(calls).toEqual([`stream:${c.modelCloudDeep}`, `stream:${c.modelCloudFallback}`, `unary:${c.modelCloudFallback}`]);
+    expect(out.at(-1)).toMatchObject({ cumulativeText: "unary answer", modelVersion: c.modelCloudFallback });
+  });
+
+  it("non-transient errors are not retried on another model", async () => {
+    const calls: string[] = [];
+    const fake = (model: string) => ({
+      generateContentStream: async () => { calls.push(`stream:${model}`); throw new AIError("fetch-error" as never, "bad", { status: 400 } as never); },
+      generateContent: async () => { calls.push("unary"); return { response: { text: () => "x" } }; },
+    });
+    const e = await (await engineWith(fake)).run().catch((x: unknown) => x);
+    expect((e as EngineError).code).toBe("other");
+    expect(calls).toEqual([`stream:${c.modelCloudDeep}`]);
+  });
+
+  it("a stream that started is never replayed; the total timeout surfaces as serviceUnavailable", async () => {
+    const calls: string[] = [];
+    const fake = {
+      generateContentStream: async (_t: string, o: { signal: AbortSignal }) => {
+        calls.push("stream");
+        async function* gen() {
+          yield { text: () => "Hello", inferenceSource: "in_cloud" };
+          await new Promise((_r, rej) => o.signal.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError"))));
+        }
+        return { stream: gen() };
+      },
+      generateContent: async () => { calls.push("unary"); return { response: { text: () => "x", inferenceSource: "in_cloud" } }; },
+    };
+    const e = await (await engineWith(fake, { cloud_first_chunk_ms: "1000", cloud_timeout_ms: "5000" })).run().catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(EngineError);
+    expect((e as EngineError).code).toBe("serviceUnavailable");
+    expect(calls).toEqual(["stream"]);
+  }, 10_000);
+});

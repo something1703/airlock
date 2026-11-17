@@ -181,6 +181,27 @@
       },
       "valueType": "BOOLEAN",
       "description": "Rule-question flag Q-1: on-device OCR"
+    },
+    "cloud_first_chunk_ms": {
+      "defaultValue": {
+        "value": "15000"
+      },
+      "description": "Cloud stream: abort and retry once as a unary call if no chunk arrives within this many ms.",
+      "valueType": "NUMBER"
+    },
+    "cloud_timeout_ms": {
+      "defaultValue": {
+        "value": "90000"
+      },
+      "description": "Hard limit for one cloud answer, in ms.",
+      "valueType": "NUMBER"
+    },
+    "model_cloud_fallback": {
+      "defaultValue": {
+        "value": "gemini-3.5-flash-lite"
+      },
+      "description": "Stable cloud model used when the planned one stalls or is overloaded before answering",
+      "valueType": "STRING"
     }
   }
 }
