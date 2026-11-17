@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { useAirlock, useSession } from "../../app/context";
 import type { PrivacyCategory } from "../../engine/types";
 import type { VaultEntry } from "../../engine/vault";
+import { CATEGORY_ICON, IconPlus, IconVault } from "../icons";
 
 const KINDS: { id: PrivacyCategory; label: string }[] = [
   { id: "person", label: "Person" }, { id: "org", label: "Organisation" }, { id: "location", label: "Place" }, { id: "contact", label: "Contact" }, { id: "id", label: "ID number" },
@@ -28,7 +29,7 @@ export function VaultScreen() {
         <h1>Vault</h1>
         <p className="sub">Names and details Airlock always protects, even if the on-device model misses them. Encrypted and kept only in this browser — never synced.</p>
       </div>
-      <div className="card stack" style={{ gap: 10 }}>
+      <div className="card stack enter" style={{ gap: 10 }}>
         <div className="row">
           <select className="field" value={category} onChange={(e) => setCategory(e.target.value as PrivacyCategory)} aria-label="Kind">{KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</select>
           <input className="field" style={{ flex: 2, minWidth: 180 }} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Raj Patel" aria-label="Name or detail" />
@@ -36,21 +37,25 @@ export function VaultScreen() {
         </div>
         <div className="row">
           <input className="field" style={{ flex: 1 }} value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder="Other ways you write it, comma-separated (e.g. Raj, Mr Patel)" aria-label="Aliases" />
-          <button className="btn btn-primary" disabled={!name.trim()} onClick={() => void add()}>Add</button>
+          <button className="btn btn-primary" disabled={!name.trim()} onClick={() => void add()}><span className="row" style={{ gap: 6 }}><IconPlus size={16} /> Add</span></button>
         </div>
       </div>
       <div className="card">
-        {vault.length === 0 ? <p className="small">Nothing here yet.</p> : (
+        {vault.length === 0 ? <div className="empty"><IconVault size={36} /><div>Nothing here yet.</div><div className="small">Add the names you never want to share — Airlock will catch them even if the on-device model misses one.</div></div> : (
           <div className="entity-list">
-            {vault.map((v) => (
-              <div className="entity" key={v.id}>
+            {vault.map((v, i) => {
+              const Icon = CATEGORY_ICON[v.category];
+              return (
+              <div className="entity enter" key={v.id} style={{ "--i": i } as CSSProperties}>
+                <span className={`chip ${v.category}`} style={{ padding: 6 }}><Icon size={16} /></span>
                 <div style={{ flex: 1 }}>
                   <div className="name">{v.canonical}{v.isUser ? " (you)" : ""}</div>
                   <div className="role">{KINDS.find((k) => k.id === v.category)?.label ?? v.category}{v.roleHint ? ` · ${v.roleHint}` : ""}{v.aliases.length ? ` · also “${v.aliases.join("”, “")}”` : ""}</div>
                 </div>
                 <button className="btn btn-ghost btn-danger" aria-label={`Remove ${v.canonical}`} onClick={() => void s.saveVault(vault.filter((x) => x.id !== v.id))}>Remove</button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

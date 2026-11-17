@@ -2,14 +2,15 @@ import { useState } from "react";
 import { useAirlock, useSession } from "../../app/context";
 import type { AssistantTurn, UserTurn } from "../../app/session";
 import { Banner, RestoredAnswer, RouteBadge, SealedText } from "../components";
+import { IconEye, IconLedger, IconShield } from "../icons";
 
 function UserBubble({ turn, entities }: { turn: UserTurn; entities: { get(id: string): import("../../engine/types").Entity | undefined } }) {
   const [showRaw, setShowRaw] = useState(false);
   return (
     <div className="bubble user">
       <div className="row" style={{ marginBottom: 6 }}>
-        <span className="small" style={{ flex: 1 }}>{showRaw ? "You wrote (never sent)" : "What Gemini saw"}</span>
-        <button className="btn btn-ghost" style={{ minHeight: 32, padding: "4px 10px" }} onClick={() => setShowRaw(!showRaw)}>{showRaw ? "Show sealed" : "Show what I wrote"}</button>
+        <span className="small row" style={{ flex: 1, gap: 6 }}>{showRaw ? <><IconEye size={14} /> You wrote · never sent</> : <><IconShield size={14} /> What Gemini saw</>}</span>
+        <button className="btn btn-ghost" style={{ minHeight: 32, padding: "4px 10px" }} aria-pressed={showRaw} onClick={() => setShowRaw(!showRaw)}>{showRaw ? "Show sealed" : "Show what I wrote"}</button>
       </div>
       {showRaw ? <div className="prose">{turn.raw}</div> : <SealedText text={turn.sealed.value} entities={entities} />}
     </div>
@@ -21,10 +22,10 @@ function AssistantBubble({ turn }: { turn: AssistantTurn }) {
   return (
     <div className="bubble ai" aria-live="polite" aria-busy={turn.status === "streaming"}>
       <div style={{ marginBottom: 8 }}><RouteBadge outcome={o} streaming={turn.status === "streaming"} /></div>
-      {turn.status === "error" ? <Banner tone="risk" title={turn.error ?? "Something went wrong."} /> : turn.segments.length ? <RestoredAnswer segments={turn.segments} /> : <><div className="skeleton" style={{ width: "88%" }} /><div className="skeleton" style={{ width: "70%" }} /></>}
+      {turn.status === "error" ? <Banner tone="risk" title={turn.error ?? "Something went wrong."} /> : turn.segments.length ? <div className={turn.status === "streaming" ? "caret" : undefined}><RestoredAnswer segments={turn.segments} /></div> : <span className="typing" aria-label="Waiting for the answer"><i /><i /><i /></span>}
       {o && (
         <div className="receipt-line">
-          {o.receipt ? <><span>Receipt {o.receipt.id}</span><span className="mono">{o.receipt.outboundSha256.slice(0, 12)}…</span><span>{o.receipt.outboundChars} characters sent</span></> : <span>Nothing left this device — no receipt needed.</span>}
+          {o.receipt ? <><span className="row" style={{ gap: 4 }}><IconLedger size={14} /> Receipt {o.receipt.id}</span><span className="mono">{o.receipt.outboundSha256.slice(0, 12)}…</span><span>{o.receipt.outboundChars} characters sent</span></> : <span>Nothing left this device — no receipt needed.</span>}
           {o.fidelity.guessedEntities.length > 0 && <span>· Gemini wrote a real detail it guessed — check the answer.</span>}
           {o.fidelity.unknownIds.length > 0 && <span>· The answer mentioned a placeholder Airlock doesn’t know.</span>}
         </div>

@@ -54,6 +54,8 @@ export interface Review {
   dismissed: Set<number>;
   blocked: GateHit[] | null;
   error: string | null;
+  /** performance.now() when sealing started (for the elapsed timer). */
+  startedAt: number;
 }
 
 export interface State {
@@ -68,12 +70,12 @@ export interface State {
   chain: ChainVerification | null;
 }
 
-const PREFS_KEY = "airlock.prefs.v1";
+const prefsKey = (mode: string): string => (mode === "demo" ? "airlock.prefs.demo.v1" : "airlock.prefs.v1");
 const defaultPrefs: Prefs = { dial: "balanced", preference: "auto", onboarded: false };
 
-function loadPrefs(): Prefs {
+function loadPrefs(mode: string): Prefs {
   try {
-    const raw = localStorage.getItem(PREFS_KEY);
+    const raw = localStorage.getItem(prefsKey(mode));
     return raw ? { ...defaultPrefs, ...(JSON.parse(raw) as Partial<Prefs>) } : defaultPrefs;
   } catch {
     return defaultPrefs;
@@ -110,7 +112,7 @@ export class AirlockSession {
   private readonly listeners = new Set<() => void>();
   readonly ledger: ReceiptLedger;
 
-  constructor(readonly services: Services, prefs: Prefs = loadPrefs()) {
+  constructor(readonly services: Services, prefs: Prefs = loadPrefs(services.mode)) {
     this.state = { screen: prefs.onboarded ? "ask" : "onboarding", prefs, availability: "checking", downloadProgress: null, vault: [], threads: [], currentThreadId: null, review: null, chain: null };
     this.ledger = new ReceiptLedger([], (r) => services.stores.saveReceipt(r));
   }
@@ -121,9 +123,19 @@ export class AirlockSession {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   };
-  private set(patch: Partial<State>): void {
-    this.state = { ...this.state, ...patch };
+  private transition: (render: () => void) => void = (render) => render();
+  /** The UI can animate screen changes (View Transitions). State always updates synchronously; only the re-render is wrapped. */
+  setTransitionRunner(run: (render: () => void) => void): void {
+    this.transition = run;
+  }
+  private notify = (): void => {
     for (const fn of this.listeners) fn();
+  };
+  private set(patch: Partial<State>): void {
+    const screenChanged = patch.screen !== undefined && patch.screen !== this.state.screen;
+    this.state = { ...this.state, ...patch };
+    if (screenChanged) this.transition(this.notify);
+    else this.notify();
   }
   private setReview(patch: Partial<Review>): void {
     if (this.state.review) this.set({ review: { ...this.state.review, ...patch } });
@@ -167,7 +179,7 @@ export class AirlockSession {
   setPrefs(patch: Partial<Prefs>): void {
     const prefs = { ...this.state.prefs, ...patch };
     try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+      localStorage.setItem(prefsKey(this.services.mode), JSON.stringify(prefs));
     } catch {
       // Preferences are a convenience; the app works without storage.
     }
@@ -195,7 +207,7 @@ export class AirlockSession {
   async startReview(raw: string, task: TaskKind, threadId: string | null = null): Promise<void> {
     const text = raw.trim();
     if (!text) return;
-    this.set({ screen: "review", review: { raw: text, task, threadId, progress: null, result: null, overrides: new Map(), accepted: [], dismissed: new Set(), blocked: null, error: null } });
+    this.set({ screen: "review", review: { raw: text, task, threadId, progress: null, result: null, overrides: new Map(), accepted: [], dismissed: new Set(), blocked: null, error: null, startedAt: performance.now() } });
     await this.services.stores.saveCapture(text, threadId ? "followUp" : "paste", threadId);
     const existing = threadId ? this.state.threads.find((t) => t.id === threadId)?.entities : undefined;
     try {
@@ -307,7 +319,7 @@ export class AirlockSession {
     await this.services.stores.deleteEverything();
     this.ledger.receipts.length = 0;
     try {
-      localStorage.removeItem(PREFS_KEY);
+      localStorage.removeItem(prefsKey(this.services.mode));
     } catch {
       // ignore
     }

@@ -14,7 +14,7 @@ export function SettingsScreen() {
     <div className="stack">
       <h1>Settings</h1>
       <OnDeviceStatus />
-      <div className="card stack" style={{ gap: 12 }}>
+      <div className="card stack enter" style={{ gap: 12 }}>
         <div><h2>Privacy dial</h2><div className="segmented" role="group" aria-label="Privacy dial">{dials.map((d) => <button key={d} aria-pressed={prefs.dial === d} onClick={() => s.setPrefs({ dial: d })}>{d[0]!.toUpperCase() + d.slice(1)}</button>)}</div></div>
         <div><h2>Where answers come from</h2><div className="segmented" role="group" aria-label="Answer preference">{prefsList.map((p) => <button key={p.id} aria-pressed={prefs.preference === p.id} onClick={() => s.setPrefs({ preference: p.id })}>{p.label}</button>)}</div>
           <p className="small">Automatic answers quick tasks on this device and sends harder ones, sealed, to Gemini.</p></div>

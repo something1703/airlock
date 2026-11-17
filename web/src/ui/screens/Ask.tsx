@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAirlock, useSession } from "../../app/context";
 import type { TaskKind } from "../../engine/answer";
 import { OnDeviceStatus } from "./OnDeviceStatus";
+import { IconArrow, IconCloud, IconDevice, IconSparkle } from "../icons";
 
 export const TASKS: { label: string; task: TaskKind }[] = [
   { label: "Help me with this", task: { kind: "help" } },
@@ -27,18 +28,18 @@ export function Ask() {
         <p className="sub">Paste anything. Your device reads it first and seals what identifies you.</p>
       </div>
       <OnDeviceStatus />
-      <textarea className="compose" value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste a tense text thread, a lease clause, a strange message…" aria-label="Your message" />
+      <textarea className="compose enter" value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste a tense text thread, a lease clause, a strange message…" aria-label="Your message" />
       <div className="row" role="group" aria-label="What do you want?">
         {TASKS.map((t) => (
           <button key={t.label} className="pill" aria-pressed={JSON.stringify(t.task) === JSON.stringify(task)} onClick={() => setTask(t.task)}>{t.label}</button>
         ))}
       </div>
       <div className="row">
-        <button className="btn btn-primary" disabled={!text.trim()} onClick={() => void s.startReview(text, task)}>Continue</button>
-        <button className="btn btn-ghost" onClick={() => setText(SAMPLE)}>Try a sample (fictional)</button>
+        <button className="btn btn-primary" disabled={!text.trim()} onClick={() => void s.startReview(text, task)}><span className="row" style={{ gap: 8 }}>Seal on this device <IconArrow size={16} /></span></button>
+        <button className="btn btn-ghost" onClick={() => setText(SAMPLE)}><span className="row" style={{ gap: 6 }}><IconSparkle size={16} /> Try a sample (fictional)</span></button>
       </div>
       {threads.length > 0 && (
-        <div className="card">
+        <div className="card enter">
           <h2>Recent</h2>
           {threads.map((t) => {
             const last = [...t.turns].reverse().find((x) => x.kind === "assistant");
@@ -46,7 +47,7 @@ export function Ask() {
             return (
               <button key={t.id} className="nav-btn" style={{ width: "100%" }} onClick={() => s.openThread(t.id)}>
                 <span style={{ flex: 1 }}>{t.title}</span>
-                <span className="small">{onDevice ? "📱 on device" : "☁︎ Gemini"}</span>
+                <span className="small row" style={{ gap: 4 }}>{onDevice ? <><IconDevice size={14} /> on device</> : <><IconCloud size={14} /> Gemini</>}</span>
               </button>
             );
           })}

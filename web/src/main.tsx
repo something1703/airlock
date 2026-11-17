@@ -1,4 +1,5 @@
 import { StrictMode } from "react";
+import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { SessionContext } from "./app/context";
 import { createServices } from "./app/services";
@@ -11,6 +12,11 @@ async function start(): Promise<void> {
   if (!root) return;
   const services = await createServices(location.search);
   const session = new AirlockSession(services);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  session.setTransitionRunner((render) => {
+    if (typeof document.startViewTransition !== "function" || reduced.matches) return render();
+    document.startViewTransition(() => flushSync(render));
+  });
   createRoot(root).render(
     <StrictMode>
       <SessionContext.Provider value={session}>
