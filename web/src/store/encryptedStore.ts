@@ -1,7 +1,8 @@
 // On-device encrypted storage for the web app (INV-6) — port of AirlockStore (Swift).
 // AES-256-GCM via WebCrypto; the key is generated NON-EXTRACTABLE and kept in IndexedDB, so no script can
 // export it. Each record's name is authenticated data, so records can't be swapped between slots.
-import { EntityMap, type Entity } from "../engine/types";
+import { EntityMap, type Entity, type LegendLine, type Route } from "../engine/types";
+import type { TaskKind } from "../engine/answer";
 import type { Receipt } from "../engine/hashchain";
 import type { VaultEntry } from "../engine/vault";
 
@@ -133,6 +134,34 @@ export interface CaptureRecord {
   text: string;
 }
 
+/** The sealed side of a user turn, kept so it can be re-checked by the gate on reload (never trusted as-is). */
+export interface StoredSealed {
+  text: string;
+  legend: LegendLine[];
+  revealedVaultIds: string[];
+  keptValues: string[];
+}
+export interface StoredOutcome {
+  route: Route;
+  modelVersion: string;
+  ranOnDevice: boolean;
+  fellBackToPhone: boolean;
+  latencyMs: number;
+  receiptId: string | null;
+}
+export type StoredTurn =
+  | { kind: "user"; raw: string; sealed: StoredSealed }
+  | { kind: "assistant"; task: TaskKind; status: "done" | "error"; modelText: string; error: string | null; outcome: StoredOutcome | null };
+export interface ThreadRecord {
+  v: 1;
+  id: string;
+  title: string;
+  task: TaskKind;
+  createdAt: number;
+  updatedAt: number;
+  turns: StoredTurn[];
+}
+
 /** All sensitive persistence. Nothing here ever syncs (INV-6, ADR-09). */
 export class AirlockStores {
   constructor(readonly store: EncryptedStore) {}
@@ -195,7 +224,25 @@ export class AirlockStores {
     }
     return removed;
   }
+  /** One conversation (raw turns, sealed turns, model text). Local only, encrypted; never synced (INV-7). */
+  saveThread(rec: ThreadRecord): Promise<void> {
+    return this.store.writeJson(`thread-${safe(rec.id)}`, rec);
+  }
+  async threads(): Promise<ThreadRecord[]> {
+    const out: ThreadRecord[] = [];
+    for (const n of await this.store.list("thread-")) {
+      try {
+        const rec = await this.store.readJson<ThreadRecord>(n);
+        if (rec.v === 1) out.push(rec);
+      } catch {
+        // Unreadable records are skipped (wrong key / tampered).
+      }
+    }
+    return out.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
   async deleteThread(thread: string): Promise<void> {
+    await this.store.delete(`thread-${safe(thread)}`);
     await this.store.delete(`entities-${safe(thread)}`);
     for (const c of await this.captures()) if (c.threadId === thread) await this.store.delete(`capture-${safe(c.id)}`);
   }

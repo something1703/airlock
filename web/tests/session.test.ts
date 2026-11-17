@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import { createServices } from "../src/app/services";
-import { AirlockSession, titleFrom } from "../src/app/session";
+import { AirlockSession, cleanTitle, titleFrom } from "../src/app/session";
 
 const SAMPLE = "Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I work nights at Mercy General Hospital. You can reach me on 312-555-0147. Thanks, Maya Chen";
 
@@ -70,6 +70,74 @@ describe("AirlockSession (demo engines, end to end)", () => {
     await s.deleteEverything();
     expect(s.getState().screen).toBe("onboarding");
     expect(s.getState().vault).toEqual([]);
+  });
+
+  it("conversations survive a reload: restored names come back and sealed turns are re-checked by the gate", async () => {
+    const s = await demoSession();
+    await s.startReview(SAMPLE, { kind: "reply", tone: "firm but polite" });
+    await s.send();
+    const id = s.getState().currentThreadId!;
+
+    const again = new AirlockSession(s.services, { dial: "balanced", preference: "best", onboarded: true });
+    await again.load();
+    const t = again.getState().threads.find((x) => x.id === id)!;
+    expect(t.turns).toHaveLength(2);
+    const [user, answer] = t.turns;
+    expect(user?.kind === "user" && user.sealed !== null && user.display === user.sealed.value).toBe(true);
+    expect(answer?.kind === "assistant" && answer.text).toContain("Raj");
+    expect(answer?.kind === "assistant" && answer.outcome?.receipt?.id).toBe(s.ledger.receipts.at(-1)!.id);
+
+    await again.startReview("What if Raj ignores me again?", { kind: "help" }, id);
+    await again.send();
+    expect(again.getState().threads.find((x) => x.id === id)!.turns).toHaveLength(4);
+  });
+
+  it("a saved turn that no longer passes the gate is shown but kept out of follow-up history", async () => {
+    const s = await demoSession();
+    await s.startReview("The heater is broken at Willowbrook Court.", { kind: "help" });
+    // Send "Willowbrook" as written, then add it to the Vault: the old sealed turn now contains a Vault name.
+    const loc = s.getState().review!.result!.draft.entities.sorted().find((e) => e.canonical.includes("Willowbrook"));
+    if (loc) s.toggleEntity(loc.id);
+    await s.send();
+    await s.saveVault([...s.getState().vault, { id: "w", canonical: "Willowbrook Court", aliases: ["Willowbrook"], category: "location", isUser: false }]);
+    const again = new AirlockSession(s.services, { dial: "balanced", preference: "best", onboarded: true });
+    await again.load();
+    const user = again.getState().threads[0]!.turns[0]!;
+    expect(user.kind === "user" && user.sealed).toBeNull();
+    expect(user.kind === "user" && user.display).toContain("Willowbrook");
+  });
+
+  it("deleting a conversation removes it from storage but keeps the receipt chain", async () => {
+    const s = await demoSession();
+    await s.startReview(SAMPLE, { kind: "help" });
+    await s.send();
+    const id = s.getState().currentThreadId!;
+    const receipts = s.ledger.receipts.length;
+    await s.deleteThread(id);
+    expect(s.getState().threads).toHaveLength(0);
+    expect(s.getState().screen).toBe("ask");
+    const again = new AirlockSession(s.services);
+    await again.load();
+    expect(again.getState().threads).toHaveLength(0);
+    expect(again.ledger.receipts).toHaveLength(receipts);
+    expect(again.verifyChain().valid).toBe(true);
+  });
+
+  it("sending is impossible while the red-team check is still pending", async () => {
+    const s = await demoSession();
+    await s.startReview(SAMPLE, { kind: "help" });
+    const r = s.getState().review!;
+    // Simulate the staged state the UI sees before the check completes.
+    (s as unknown as { state: { review: typeof r } }).state.review = { ...r, result: { ...r.result!, redTeamPending: true } };
+    await s.send();
+    expect(s.getState().screen).toBe("review");
+    expect(s.ledger.receipts).toHaveLength(0);
+  });
+
+  it("model titles are accepted only when short, plain and placeholder-free", () => {
+    expect(cleanTitle('"Broken heater, landlord unresponsive."\n')).toBe("Broken heater, landlord unresponsive");
+    expect(cleanTitle("Title: rent increase question")).toBe("Rent increase question");
+    for (const bad of ["", "{}", "Heater for [[PERSON_1]]", "Heater for PERSON_1", "a ".repeat(40), "one two three four five six seven eight"]) expect(cleanTitle(bad)).toBeNull();
   });
 
   it("titles never contain placeholder tokens", () => {

@@ -1,6 +1,6 @@
 // All app state and actions, independent of React (the UI subscribes via useSyncExternalStore).
 import { answer, type AnswerOutcome, type AnswerPreference, type TaskKind } from "../engine/answer";
-import { EngineError, type PhoneAvailability, type SealedHistory } from "../engine/engines";
+import { ANALYSIS_OPTIONS, EngineError, type PhoneAvailability, type SealedHistory } from "../engine/engines";
 import { EgressGate, GateBlocked, type GateHit } from "../engine/gate";
 import { ReceiptLedger, type LedgerStats } from "../engine/ledger";
 import { pendingRisks, SealPipeline, sealSettings, type SealProgress, type SealResult } from "../engine/pipeline";
@@ -11,6 +11,10 @@ import { type DialPreset, type EntityMap, type PlaceholderId, type SealedText, E
 import type { VaultEntry } from "../engine/vault";
 import type { ChainVerification } from "../engine/hashchain";
 import type { Services } from "./services";
+import { restore, fidelityCheck } from "../engine/restore";
+import { writesAsUser } from "../engine/answer";
+import type { StoredSealed, StoredTurn, ThreadRecord } from "../store/encryptedStore";
+import type { SealDraft } from "../engine/sealer";
 
 export type Screen = "onboarding" | "ask" | "review" | "thread" | "ledger" | "vault" | "settings";
 
@@ -24,10 +28,15 @@ export interface UserTurn {
   kind: "user";
   /** What the user wrote — shown locally only. */
   raw: string;
-  sealed: SealedText;
+  /** The sealed text as it left (for display). */
+  display: string;
+  /** Gate-checked sealed text for follow-up history; null if a reloaded turn no longer passes the gate. */
+  sealed: SealedText | null;
+  stored: StoredSealed;
 }
 export interface AssistantTurn {
   kind: "assistant";
+  task: TaskKind;
   status: "streaming" | "done" | "error";
   text: string;
   segments: RestoredSegment[];
@@ -147,7 +156,7 @@ export class AirlockSession {
   async load(): Promise<void> {
     const [vault, receipts] = await Promise.all([this.services.stores.loadVault(), this.services.stores.receipts()]);
     this.ledger.receipts.push(...receipts);
-    this.set({ vault });
+    this.set({ vault, threads: await this.loadThreads(vault) });
     await this.services.stores.purgeCaptures(this.services.config.rawPurgeDays);
     await this.refreshAvailability();
   }
@@ -210,12 +219,33 @@ export class AirlockSession {
     this.set({ screen: "review", review: { raw: text, task, threadId, progress: null, result: null, overrides: new Map(), accepted: [], dismissed: new Set(), blocked: null, error: null, startedAt: performance.now() } });
     await this.services.stores.saveCapture(text, threadId ? "followUp" : "paste", threadId);
     const existing = threadId ? this.state.threads.find((t) => t.id === threadId)?.entities : undefined;
+    let staged: Awaited<ReturnType<SealPipeline["runStaged"]>>;
     try {
-      const result = await this.pipeline().run(text, existing ?? new EntityMapClass(), new Map(), (p) => this.setReview({ progress: p }));
-      this.setReview({ result, accepted: result.acceptedRisks });
+      staged = await this.pipeline().runStaged(text, existing ?? new EntityMapClass(), new Map(), (p) => this.setReview({ progress: p }));
     } catch {
       this.setReview({ error: "Airlock couldn't read this on your device. Nothing was sent." });
+      return;
     }
+    const { result, later } = staged;
+    this.setReview({ result, accepted: result.acceptedRisks });
+    if (!later) return;
+    // Balanced: the red-team finishes while the user reads the draft. Their chip edits are re-applied on top.
+    const full = await later.catch(() => ({ ...result, redTeamPending: false, redTeamUnavailable: true }));
+    const r = this.state.review;
+    if (!r?.result || r.result.normalised !== result.normalised) return;
+    this.setReview({ result: this.pipeline().reseal(full, r.overrides, r.accepted) });
+  }
+
+  private warmed = false;
+  /**
+   * Loads Chrome's on-device model ahead of the first seal (the first long prompt after page load is ~2×
+   * slower). Uses a fixed, fictional sentence — never user text. Once per page; errors are ignored.
+   */
+  warmUp(): void {
+    if (this.warmed || this.state.availability !== "available" || this.services.mode !== "live") return;
+    this.warmed = true;
+    const text = this.services.prompts.render("detect.v1", { chunk: "The weekly meeting moved to the small room upstairs. Bring the printed agenda and a pen." });
+    void this.services.engines.phone.respond({ promptId: "detect.v1", text }, ANALYSIS_OPTIONS).catch(() => {});
   }
 
   private reseal(overrides: Map<PlaceholderId, UserOverride>, accepted: Risk[]): void {
@@ -256,11 +286,12 @@ export class AirlockSession {
   /** Seal & send: the egress gate is the only way out. */
   async send(): Promise<void> {
     const r = this.state.review;
-    if (!r?.result) return;
+    if (!r?.result || r.result.redTeamPending) return;
     const gate = new EgressGate(this.services.patterns, this.state.vault);
+    const draft = applyRisks(r.accepted, r.result.draft);
     let sealed: SealedText;
     try {
-      sealed = gate.seal(applyRisks(r.accepted, r.result.draft));
+      sealed = gate.seal(draft);
     } catch (e) {
       if (e instanceof GateBlocked) {
         this.setReview({ blocked: [...e.hits] });
@@ -270,6 +301,7 @@ export class AirlockSession {
     }
     const entities = r.result.draft.entities;
     let threadId = r.threadId;
+    const isNew = !threadId;
     if (!threadId) {
       threadId = crypto.randomUUID();
       const title = titleFrom(sealed.value);
@@ -277,9 +309,89 @@ export class AirlockSession {
     }
     await this.services.stores.saveEntities(threadId, entities);
     const history = historyOf(this.state.threads.find((t) => t.id === threadId));
-    this.setThread(threadId, (t) => ({ ...t, entities, turns: [...t.turns, { kind: "user", raw: r.raw, sealed }, { kind: "assistant", status: "streaming", text: "", segments: [], outcome: null, error: null }] }));
+    const stored: StoredSealed = { text: draft.text, legend: [...draft.legend], revealedVaultIds: [...draft.revealedVaultIds], keptValues: [...draft.keptValues] };
+    this.setThread(threadId, (t) => ({ ...t, entities, turns: [...t.turns, { kind: "user", raw: r.raw, display: sealed.value, sealed, stored }, { kind: "assistant", task: r.task, status: "streaming", text: "", segments: [], outcome: null, error: null }] }));
     this.set({ review: null, currentThreadId: threadId, screen: "thread" });
     await this.stream(threadId, sealed, r.task, entities, history, r.result.sealMs);
+    if (isNew) await this.nameThread(threadId, sealed);
+    await this.persistThread(threadId);
+  }
+
+  /** On-device title from the *sealed* first message (`title.v1`), so a title can't contain a real name. */
+  private async nameThread(id: string, sealed: SealedText): Promise<void> {
+    if (this.state.availability !== "available") return;
+    try {
+      const prompt = this.services.prompts.render("title.v1", { sealed_first_message: sealed.value.slice(0, 2000) });
+      const out = (await this.services.engines.phone.respond({ promptId: "title.v1", text: prompt }, ANALYSIS_OPTIONS)).text;
+      const title = cleanTitle(out);
+      if (title) this.setThread(id, (t) => ({ ...t, title }));
+    } catch {
+      // Keep the rule-based title.
+    }
+  }
+
+  // MARK: Saved conversations (encrypted, local only)
+
+  private async persistThread(id: string): Promise<void> {
+    const t = this.state.threads.find((x) => x.id === id);
+    if (!t) return;
+    const turns: StoredTurn[] = [];
+    for (const turn of t.turns) {
+      if (turn.kind === "user") turns.push({ kind: "user", raw: turn.raw, sealed: turn.stored });
+      else if (turn.status !== "streaming")
+        turns.push({
+          kind: "assistant", task: turn.task, status: turn.status, modelText: turn.outcome?.modelText ?? "", error: turn.error,
+          outcome: turn.outcome ? { route: turn.outcome.route, modelVersion: turn.outcome.modelVersion, ranOnDevice: turn.outcome.ranOnDevice, fellBackToPhone: turn.outcome.fellBackToPhone, latencyMs: turn.outcome.latencyMs, receiptId: turn.outcome.receipt?.id ?? null } : null,
+        });
+    }
+    try {
+      await this.services.stores.saveThread({ v: 1, id: t.id, title: t.title, task: t.task, createdAt: t.createdAt, updatedAt: Date.now(), turns });
+    } catch {
+      // Saving is best-effort; the conversation stays usable in memory.
+    }
+  }
+
+  /**
+   * Rebuilds saved conversations. Sealed turns are never trusted from storage: each goes back through
+   * `EgressGate.seal` (INV-2). A turn that no longer passes (e.g. the Vault changed) is still shown, but it
+   * and its answer are left out of the history sent with follow-ups.
+   */
+  private async loadThreads(vault: VaultEntry[]): Promise<Thread[]> {
+    const gate = new EgressGate(this.services.patterns, vault);
+    const me = vault.find((v) => v.isUser);
+    const out: Thread[] = [];
+    for (const rec of await this.services.stores.threads()) {
+      const entities = await this.services.stores.loadEntities(rec.id);
+      const turns: (UserTurn | AssistantTurn)[] = [];
+      for (const st of rec.turns) {
+        if (st.kind === "user") {
+          const draft: SealDraft = { text: st.sealed.text, legend: st.sealed.legend, replacements: [], entities, secretWarnings: [], revealedVaultIds: new Set(st.sealed.revealedVaultIds), keptValues: new Set(st.sealed.keptValues) };
+          let sealed: SealedText | null = null;
+          try {
+            sealed = gate.seal(draft);
+          } catch {
+            sealed = null;
+          }
+          turns.push({ kind: "user", raw: st.raw, display: st.sealed.text, sealed, stored: st.sealed });
+        } else {
+          const ctx = { entities, userFirstName: me?.canonical.split(" ")[0] ?? null, writingAsUser: writesAsUser(st.task) };
+          const restored = restore(st.modelText, ctx);
+          const o = st.outcome;
+          turns.push({
+            kind: "assistant", task: st.task, status: st.status, text: restored.text, segments: restored.segments, error: st.error,
+            outcome: o ? { modelText: st.modelText, restored, fidelity: fidelityCheck(st.modelText, ctx), route: o.route, modelVersion: o.modelVersion, ranOnDevice: o.ranOnDevice, fellBackToPhone: o.fellBackToPhone, latencyMs: o.latencyMs, receipt: this.ledger.receipts.find((x) => x.id === o.receiptId) ?? null } : null,
+          });
+        }
+      }
+      out.push({ id: rec.id, title: rec.title, task: rec.task, entities, turns, createdAt: rec.createdAt });
+    }
+    return out;
+  }
+
+  /** Deletes a conversation, its entity map and captures. Its receipts stay: the chain must stay verifiable. */
+  async deleteThread(id: string): Promise<void> {
+    await this.services.stores.deleteThread(id);
+    this.set({ threads: this.state.threads.filter((t) => t.id !== id), ...(this.state.currentThreadId === id ? { currentThreadId: null, screen: "ask" as Screen } : {}) });
   }
 
   private async stream(threadId: string, sealed: SealedText, task: TaskKind, entities: EntityMap, history: SealedHistory, sealMs: number): Promise<void> {
@@ -327,6 +439,14 @@ export class AirlockSession {
   }
 }
 
+/** Accepts a model title only if it is short, plain words, and free of placeholders. */
+export function cleanTitle(out: string): string | null {
+  const line = out.trim().split("\n")[0]?.replace(/^(title:\s*)/i, "").replace(/^["'*#\s]+|["'*.\s]+$/g, "").trim() ?? "";
+  if (!line || line.length > 60 || /\[\[|_\d|\bME\b|[{}<>]/.test(line) || !/\p{L}/u.test(line)) return null;
+  if (line.split(/\s+/).length > 7) return null;
+  return line[0]!.toUpperCase() + line.slice(1);
+}
+
 /** First few words of the sealed text, placeholders removed (title.v1 on device is a later refinement). */
 export function titleFrom(sealed: string): string {
   const nouns: Record<string, string> = { PERSON: "someone", ORG: "an organisation", LOC: "a place", CONTACT: "a contact", ID: "an ID", DATE: "a date", HEALTH: "a health detail", SECRET: "a code" };
@@ -339,9 +459,12 @@ export function titleFrom(sealed: string): string {
 
 function historyOf(thread: Thread | undefined): SealedHistory {
   const turns: SealedHistory["turns"] = [];
+  let skipAnswer = false;
   for (const t of thread?.turns ?? []) {
-    if (t.kind === "user") turns.push({ role: "user", sealed: t.sealed });
-    else if (t.outcome) turns.push({ role: "assistant", modelText: t.outcome.modelText });
+    if (t.kind === "user") {
+      skipAnswer = t.sealed === null;
+      if (t.sealed) turns.push({ role: "user", sealed: t.sealed });
+    } else if (t.outcome && !skipAnswer) turns.push({ role: "assistant", modelText: t.outcome.modelText });
   }
   return { turns };
 }

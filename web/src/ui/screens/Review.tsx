@@ -118,6 +118,13 @@ export function ReviewScreen() {
         </div>
       </div>
 
+      {result.redTeamPending && (
+        <div className="card row enter" role="status" style={{ gap: 12 }}>
+          <span className="dot-pulse" aria-hidden="true" />
+          <div><b>Checking what someone could still guess…</b><div className="small">Still on your device. You can review and change details meanwhile; sending unlocks when the check is done.</div></div>
+        </div>
+      )}
+
       {risks.length > 0 && (
         <div className="stack" style={{ gap: 10 }}>
           <h2>What someone could still guess</h2>
@@ -168,7 +175,7 @@ export function ReviewScreen() {
         {TASKS.map((t) => <button key={t.label} className="pill" aria-pressed={JSON.stringify(t.task) === JSON.stringify(review.task)} onClick={() => s.setReviewTask(t.task)}>{t.label}</button>)}
       </div>
       <div className="row">
-        <button className="btn btn-primary" disabled={sending} onClick={() => void send()}><span className="row" style={{ gap: 8 }}><IconShield size={16} /> Seal &amp; send</span></button>
+        <button className="btn btn-primary" disabled={sending || result.redTeamPending === true} onClick={() => void send()}><span className="row" style={{ gap: 8 }}><IconShield size={16} /> {result.redTeamPending ? "Finishing the check…" : "Seal & send"}</span></button>
         <button className="btn btn-ghost" onClick={() => s.go(review.threadId ? "thread" : "ask")}>Cancel</button>
         <span className="small">Gemini sees only the left-hand version. Real names come back on your device.</span>
       </div>
