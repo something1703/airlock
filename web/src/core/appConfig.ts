@@ -10,6 +10,7 @@ export const DEFAULTS: Record<string, ConfigValue> = {
   model_cloud_quick: { type: "STRING", value: "gemini-3.5-flash-lite" },
   model_cloud_max: { type: "STRING", value: "gemini-4-hydrogen" },
   model_cloud_proof: { type: "STRING", value: "gemini-3.8-flash" },
+  model_cloud_fallback: { type: "STRING", value: "gemini-3.5-flash-lite" },
   dial_default: { type: "STRING", value: "balanced" },
   detect_chunk_tokens: { type: "NUMBER", value: 1400 },
   detect_chunk_tokens_web: { type: "NUMBER", value: 3000 },
@@ -30,6 +31,8 @@ export const DEFAULTS: Record<string, ConfigValue> = {
   raw_purge_days: { type: "NUMBER", value: 30 },
   armor_expected: { type: "BOOLEAN", value: false },
   armor_force_unary: { type: "BOOLEAN", value: false },
+  cloud_first_chunk_ms: { type: "NUMBER", value: 15000 },
+  cloud_timeout_ms: { type: "NUMBER", value: 90000 },
 };
 
 /** Remote Config's string form of a value. */
@@ -77,6 +80,12 @@ export class AppConfig {
   get redTeamRounds(): number { return Math.min(Math.max(0, this.int("redteam_rounds")), 2); }
   get rawPurgeDays(): number { return Math.max(0, this.int("raw_purge_days")); }
   get armorExpected(): boolean { return this.bool("armor_expected"); }
+  /** Used when the planned cloud model stalls or is overloaded (503/429) before answering. */
+  get modelCloudFallback(): string { return this.string("model_cloud_fallback"); }
+  /** No first streamed chunk within this → abort and retry once as a unary call. */
+  get cloudFirstChunkMs(): number { return Math.max(1000, this.int("cloud_first_chunk_ms")); }
+  /** Hard limit for one cloud answer. */
+  get cloudTimeoutMs(): number { return Math.max(5000, this.int("cloud_timeout_ms")); }
   get disabledPatternPacks(): Set<string> {
     try {
       const arr: unknown = JSON.parse(this.string("pattern_packs_disabled"));

@@ -42,6 +42,8 @@ Record answers here with date and link.
 
 | Date | Decision | Alternatives considered | Why |
 |------|----------|------------------------|-----|
+| 17 Nov | **Cloud answers use a model fallback chain** (web now, Swift/Android to match): planned model → `model_cloud_fallback` (`gemini-3.5-flash-lite`) → one unary call. A model is skipped only if it fails *before its first chunk* (no chunk in `cloud_first_chunk_ms` = 15 s, or 503/429); once text streams, errors surface. Hard limit `cloud_timeout_ms` = 90 s. The answer's `modelVersion` is the model that actually answered, so the badge/receipt stay truthful. Only `SealedText` is involved (INV-1 unchanged) | Retry the same model; on-device fallback | First live run: `gemini-3.8-flash` streaming stalled/503'd while lite answered in 5 s; an app that hangs for 3 min (SDK default) fails the Design criterion |
+| 17 Nov | **Demo mode (`?demo=1`) uses a separate encrypted database (`airlock-demo`)** | Shared store | Scripted receipts must never mix into the real chain |
 | 15 Nov | Idea: **Airlock** (privacy airlock for cloud AI) | Vani (AAC voice), Samvaad (conversation access), Kavach/Proof (scam shield), Relay (disaster mesh) | AAC has already won three Google competitions (Gaze Link, AAC Board AI, 3VA); offline trail companions won before (Trail); Airlock makes hybrid essential, is timely (AI asking for more personal data), measurable, and works fully in the Simulator |
 | 15 Nov | iOS primary + Mac from the same code | iOS only | Multi-platform gets strong Grand Prize consideration; near-zero cost |
 | 16 Nov | Proof mode folded in as a second mode | Separate app | Same engine; covers "what comes in" as well as "what goes out" |

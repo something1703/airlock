@@ -42,6 +42,7 @@ public struct AppConfig: Sendable, Hashable {
         "model_cloud_quick": .string("gemini-3.5-flash-lite"),
         "model_cloud_max": .string("gemini-4-hydrogen"),
         "model_cloud_proof": .string("gemini-3.8-flash"),
+        "model_cloud_fallback": .string("gemini-3.5-flash-lite"),
         "dial_default": .string("balanced"),
         "detect_chunk_tokens": .number(1400),
         "detect_chunk_tokens_web": .number(3000),
@@ -62,6 +63,8 @@ public struct AppConfig: Sendable, Hashable {
         "raw_purge_days": .number(30),
         "armor_expected": .bool(false),
         "armor_force_unary": .bool(false),
+        "cloud_first_chunk_ms": .number(15000),
+        "cloud_timeout_ms": .number(90000),
     ]
 
     private let values: [String: ConfigValue]
