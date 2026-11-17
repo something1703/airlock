@@ -100,6 +100,17 @@ Model availability on the **Agent Platform (formerly Vertex AI) backend** under 
 | Free Apple ID can run on a physical device for 7 days. TestFlight requires the paid program. | ✅ |
 | Sign in with Apple capability requires the paid program. | 🔍 believed true — we use Anonymous + Google sign-in instead |
 
+## 6b. Web SDK facts (verified 17 Nov in `firebase@13.3.0` / `@firebase/ai@3.1.0` typings)
+
+| Fact | Status |
+|------|--------|
+| Unlike iOS, the **web hybrid API was NOT removed in 13.x**: `getGenerativeModel(ai, { mode, onDeviceParams?, inCloudParams? })` with `mode` ∈ `InferenceMode.PREFER_ON_DEVICE / ONLY_ON_DEVICE / PREFER_IN_CLOUD / ONLY_IN_CLOUD` (string values `prefer_on_device` …). `HybridParams.inCloudParams: ModelParams` carries the cloud model name. | ✅ |
+| `model.initializeDeviceModel(onDownloadProgress?)` triggers the on-device download; **must run after a user gesture** (click/keypress) or a needed download errors. Calling inference before it's ready → cloud fallback under `PREFER_ON_DEVICE`, **throws** under `ONLY_ON_DEVICE`. | ✅ |
+| Responses carry `inferenceSource: InferenceSource.ON_DEVICE \| IN_CLOUD` (`"on_device"` / `"in_cloud"`). There is **no `modelVersion`** field on the enhanced response — web `ranOnDevice` comes from `inferenceSource`; the cloud model name is what we configured. | ✅ |
+| `OnDeviceParams = { createOptions?: LanguageModelCreateOptions, promptOptions?: LanguageModelPromptOptions }` — Chrome Prompt API options (expectedInputs/outputs default to English text + image input; download `monitor`). | ✅ |
+| Backends: `new GoogleAIBackend()` (Gemini Developer API) and `new AgentPlatformBackend()` (Agent Platform / Vertex), `getAI(app, { backend })`. `useLimitedUseAppCheckTokens` option exists. | ✅ |
+| This Mac's Chrome 155: `chrome://on-device-internals` → performance class High, `prompt_api: Available`, Nano v3 GPU component Ready (4 GB), 12 GB VRAM. Chrome also lists `prompt_api_gemma4` / `_4b` / `_12b` use-cases as *Pending Usage* (fetched on first use). | ✅ observed |
+
 ## 7. Corrections log (vs. earlier planning chats)
 
 1. Model Armor needs the **Agent Platform** backend (billing). It does not work with the free Gemini Developer API backend.
