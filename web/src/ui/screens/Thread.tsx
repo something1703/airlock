@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAirlock, useSession } from "../../app/context";
 import type { AssistantTurn, UserTurn } from "../../app/session";
 import { Banner, RestoredAnswer, RouteBadge, SealedText } from "../components";
-import { IconEye, IconLedger, IconShield } from "../icons";
+import { IconEye, IconLedger, IconShield, IconTrash } from "../icons";
 
 function UserBubble({ turn, entities }: { turn: UserTurn; entities: { get(id: string): import("../../engine/types").Entity | undefined } }) {
   const [showRaw, setShowRaw] = useState(false);
@@ -12,7 +12,7 @@ function UserBubble({ turn, entities }: { turn: UserTurn; entities: { get(id: st
         <span className="small row" style={{ flex: 1, gap: 6 }}>{showRaw ? <><IconEye size={14} /> You wrote · never sent</> : <><IconShield size={14} /> What Gemini saw</>}</span>
         <button className="btn btn-ghost" style={{ minHeight: 32, padding: "4px 10px" }} aria-pressed={showRaw} onClick={() => setShowRaw(!showRaw)}>{showRaw ? "Show sealed" : "Show what I wrote"}</button>
       </div>
-      {showRaw ? <div className="prose">{turn.raw}</div> : <SealedText text={turn.sealed.value} entities={entities} />}
+      {showRaw ? <div className="prose">{turn.raw}</div> : <SealedText text={turn.display} entities={entities} />}
     </div>
   );
 }
@@ -38,6 +38,7 @@ export function ThreadScreen() {
   const s = useSession();
   const { threads, currentThreadId } = useAirlock();
   const [text, setText] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const thread = threads.find((t) => t.id === currentThreadId);
   if (!thread) return <div className="stack"><h1>Not found</h1><button className="btn" onClick={() => s.go("ask")}>Back to Ask</button></div>;
   const busy = thread.turns.some((t) => t.kind === "assistant" && t.status === "streaming");
@@ -47,7 +48,13 @@ export function ThreadScreen() {
       <div className="row">
         <h1 style={{ flex: 1 }}>{thread.title}</h1>
         <button className="btn btn-ghost" onClick={() => s.go("ask")}>New question</button>
+        <button className="btn btn-ghost btn-danger" aria-label="Delete this conversation" onClick={() => setConfirmDelete(true)}><IconTrash size={16} /></button>
       </div>
+      {confirmDelete && (
+        <Banner tone="risk" title="Delete this conversation from this browser?" action={<div className="row"><button className="btn btn-danger" onClick={() => void s.deleteThread(thread.id)}>Delete</button><button className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>Cancel</button></div>}>
+          Your words, the answers and the real names for this conversation are removed. Its receipts stay in the Ledger so the chain can still be verified — they only ever held the sealed text.
+        </Banner>
+      )}
       {thread.turns.map((t, i) => (t.kind === "user" ? <UserBubble key={i} turn={t} entities={thread.entities} /> : <AssistantBubble key={i} turn={t} />))}
       <div className="card stack" style={{ gap: 10 }}>
         <textarea className="compose" style={{ minHeight: 90 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask a follow-up — it gets sealed too" aria-label="Follow-up question" />

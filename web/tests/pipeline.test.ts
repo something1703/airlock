@@ -190,6 +190,29 @@ describe("seal pipeline", () => {
     expect(r.draft.text).toContain("[[PERSON_1]]");
     expect(() => new EgressGate(patterns, vault).seal(r.draft)).not.toThrow();
   });
+  it("staged (web): balanced shows the draft before the red-team finishes; strict waits", async () => {
+    const townRaw = "Hi Raj, I work nights at Mercy General Hospital near the old mill. Thanks, Maya Chen";
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    const p = new MockPhoneEngine((id, prompt) => (id === "attack.v1" ? guesses([["location", "near the old mill", "medium"]]) : id === "gen.v1" ? JSON.stringify({ rewrite: prompt.includes("Phrase to rewrite: Mercy General Hospital") ? "a large hospital" : "in the area" }) : detectAnswer));
+    const slow = { availability: () => p.availability(), respond: async (q: Parameters<MockPhoneEngine["respond"]>[0], o: Parameters<MockPhoneEngine["respond"]>[1]) => { if (q.promptId === "attack.v1") await gate; return p.respond(q, o); } };
+    const pl = new SealPipeline(slow, patterns, vault, prompts, sealSettings(new AppConfig(), { dial: "balanced", today: utc("2026-11-21") }));
+    const { result, later } = await pl.runStaged(townRaw);
+    expect(result.redTeamPending).toBe(true);
+    expect(result.risks).toEqual([]);
+    expect(result.draft.text).toContain("a large hospital");
+    expect(later).not.toBeNull();
+    release();
+    const full = await later!;
+    expect(full.redTeamPending).toBe(false);
+    expect(full.risks).toHaveLength(1);
+    expect(full.draft.text).toBe(result.draft.text);
+    expect(full.reasons).toContainEqual({ kind: "risks", count: 1 });
+
+    const strict = await pipe(new MockPhoneEngine((id, prompt) => (id === "attack.v1" ? guesses([["location", "near the old mill", "medium"]]) : id === "gen.v1" ? JSON.stringify({ rewrite: prompt.includes("Phrase to rewrite: Mercy General Hospital") ? "a large hospital" : "in the area" }) : detectAnswer)), "strict").runStaged(townRaw);
+    expect(strict.later).toBeNull();
+    expect(strict.result.redTeamPending).toBeUndefined();
+  });
   it("balanced returns risk cards; accepting them reseals without new model calls", async () => {
     const townRaw = "Hi Raj, I work nights at Mercy General Hospital near the old mill. Thanks, Maya Chen";
     const p = new MockPhoneEngine((id, prompt) => (id === "attack.v1" ? guesses([["location", "near the old mill", "medium"]]) : id === "gen.v1" ? JSON.stringify({ rewrite: prompt.includes("Phrase to rewrite: Mercy General Hospital") ? "a large hospital" : "in the area" }) : detectAnswer));

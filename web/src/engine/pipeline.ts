@@ -55,6 +55,8 @@ export interface SealResult {
   risks: Risk[];
   acceptedRisks: Risk[];
   redTeamUnavailable: boolean;
+  /** Web staged mode: the red-team check is still running; sending must wait. */
+  redTeamPending?: boolean;
 }
 
 export const pendingRisks = (r: Pick<SealResult, "risks" | "acceptedRisks">): Risk[] => {
@@ -77,7 +79,7 @@ export class SealPipeline {
     private readonly settings: SealSettings,
   ) {}
 
-  async run(raw: string, existing = new EntityMap(), overrides = new Map<PlaceholderId, UserOverride>(), progress: (p: SealProgress) => void = () => {}): Promise<SealResult> {
+  private async prepare(raw: string, existing: EntityMap, overrides: Map<PlaceholderId, UserOverride>, progress: (p: SealProgress) => void, staged: boolean): Promise<{ result: SealResult; later: Promise<SealResult> | null }> {
     const t0 = performance.now();
     const normalised = normalise(raw.slice(0, MAX_INPUT_UTF16));
     const text = normalised.text;
@@ -106,20 +108,40 @@ export class SealPipeline {
     let risks: Risk[] = [];
     let accepted: Risk[] = [];
     let redTeamUnavailable = false;
+    let later: Promise<SealResult> | null = null;
+    const base = (): SealResult => ({ normalised, merge: m, draft, reasons: [], requiresReview: false, detection: report, rewrites, sealMs: performance.now() - t0, risks, acceptedRisks: accepted, redTeamUnavailable });
     if (this.settings.redTeamEnabled && policy.redTeamMode !== "off") {
-      if (report.unavailable === null) {
+      if (report.unavailable !== null) redTeamUnavailable = true;
+      else if (staged && policy.redTeamMode === "suggest") {
+        // Suggestions don't change the draft, so the user can start reviewing now; risk cards arrive later.
+        const early = { ...base(), redTeamPending: true };
+        progress({ kind: "checkingRisks" });
+        later = new RedTeam(this.phone, this.prompts, this.patterns).run(draft, "suggest", this.settings.redTeamRounds, this.settings.taskSummary)
+          .then((rt) => finalise({ ...early, redTeamPending: false, risks: rt.risks, redTeamUnavailable: rt.unavailable, sealMs: performance.now() - t0 }, policy.reviewMode));
+        return { result: finalise(early, policy.reviewMode), later };
+      } else {
         progress({ kind: "checkingRisks" });
         const rt = await new RedTeam(this.phone, this.prompts, this.patterns).run(draft, policy.redTeamMode, this.settings.redTeamRounds, this.settings.taskSummary);
         ({ risks, applied: accepted, draft } = rt);
         redTeamUnavailable = rt.unavailable;
-      } else redTeamUnavailable = true;
+      }
     }
-    const result = finalise(
-      { normalised, merge: m, draft, reasons: [], requiresReview: false, detection: report, rewrites, sealMs: performance.now() - t0, risks, acceptedRisks: accepted, redTeamUnavailable },
-      policy.reviewMode,
-    );
+    const result = finalise(base(), policy.reviewMode);
     progress({ kind: "done" });
-    return result;
+    return { result, later };
+  }
+
+  async run(raw: string, existing = new EntityMap(), overrides = new Map<PlaceholderId, UserOverride>(), progress: (p: SealProgress) => void = () => {}): Promise<SealResult> {
+    return (await this.prepare(raw, existing, overrides, progress, false)).result;
+  }
+
+  /**
+   * Like `run`, but when the red-team only *suggests* (Balanced), returns the draft as soon as it is sealed
+   * (`redTeamPending: true`) and the full result — with risk cards — via `later`. Strict still waits, because
+   * there the red-team rewrites the draft itself. Nothing may be sent while `redTeamPending` is true.
+   */
+  runStaged(raw: string, existing = new EntityMap(), overrides = new Map<PlaceholderId, UserOverride>(), progress: (p: SealProgress) => void = () => {}): Promise<{ result: SealResult; later: Promise<SealResult> | null }> {
+    return this.prepare(raw, existing, overrides, progress, true);
   }
 
   /** Re-applies Review edits without calling the model (chip toggles and "Use suggestion" are instant). */
