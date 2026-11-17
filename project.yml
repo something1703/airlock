@@ -72,7 +72,9 @@ targets:
       - name: Copy GoogleService-Info.plist (gitignored)
         basedOnDependencyAnalysis: false
         script: |
-          SRC="${SRCROOT}/App/Resources/Firebase/${AIRLOCK_FIREBASE_ENV}/GoogleService-Info.plist"
+          # iOS and Mac are separate Firebase apps (bundle ids differ): mac/ holds the Mac config.
+          BASE="${SRCROOT}/App/Resources/Firebase/${AIRLOCK_FIREBASE_ENV}"
+          if [ "${PLATFORM_NAME}" = "macosx" ]; then SRC="${BASE}/mac/GoogleService-Info.plist"; else SRC="${BASE}/GoogleService-Info.plist"; fi
           DEST="${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
           if [ -f "$SRC" ]; then
             mkdir -p "$DEST" && cp "$SRC" "$DEST/GoogleService-Info.plist"
