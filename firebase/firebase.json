@@ -3,9 +3,10 @@
     "template": "remoteconfig.template.json"
   },
   "hosting": {
-    "public": "../web/dist",
+    "public": "hosting",
     "predeploy": [
-      "npm --prefix \"$RESOURCE_DIR/../web\" run build"
+      "npm --prefix \"$PROJECT_DIR/../web\" run build",
+      "rm -rf \"$PROJECT_DIR/hosting\" && cp -R \"$PROJECT_DIR/../web/dist\" \"$PROJECT_DIR/hosting\""
     ],
     "ignore": [
       "**/.*",
