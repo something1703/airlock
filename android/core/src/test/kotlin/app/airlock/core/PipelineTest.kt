@@ -21,6 +21,14 @@ class PipelineTest {
 
     // MARK: prompt library
 
+    @Test fun redTeamLocateFindsLowerCaseEvidence() {
+        // Regression (web #8): the case-insensitive pass must lower-case the needle even when the text already is.
+        assertEquals(listOf(TextSpan(8, 25)), RedTeam.locate("Near the old mill", "we live near the old mill."))
+        assertEquals(listOf(TextSpan(8, 25)), RedTeam.locate("near the old mill", "We live Near The Old Mill."))
+        assertEquals(emptyList(), RedTeam.locate("old mill", "the old miller"))
+        assertEquals(listOf(TextSpan(2, 6)), RedTeam.locate("Mill", "a Mill and a mill"))
+    }
+
     @Test fun bundlesEveryPromptByteIdenticalToSwift() {
         assertEquals(23, PromptLibrary.BUNDLED_IDS.size)
         val dir = Fixtures.repoFile("Packages/AirlockKit/Sources/AirlockPrompts/Prompts")

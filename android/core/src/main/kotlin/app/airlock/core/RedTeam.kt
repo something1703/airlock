@@ -115,10 +115,9 @@ class RedTeam(val phone: PhoneOnlyEngine, val prompts: PromptLibrary, val patter
         fun locate(needle: String, text: String): List<TextSpan> {
             val n = Js.trim(needle)
             if (n.isEmpty()) return emptyList()
-            val lowerText = text.lowercase()
-            for (hay in listOf(text, lowerText)) {
-                if (hay.length != text.length) continue
-                val nn = if (hay == text) n else n.lowercase()
+            // Pass 1 exact, pass 2 case-insensitive; the (haystack, needle) pairs are explicit (web fix #8).
+            for ((hay, nn) in listOf(text to n, text.lowercase() to n.lowercase())) {
+                if (hay.length != text.length || nn.length != n.length) continue
                 val found = ArrayList<TextSpan>()
                 var from = 0
                 while (from < hay.length) {
