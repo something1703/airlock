@@ -45,9 +45,10 @@ const isWordChar = (c: string | undefined): boolean => c !== undefined && /[\p{L
 export function locate(needle: string, text: string): TextSpan[] {
   const n = needle.trim();
   if (!n) return [];
-  for (const hay of [text, text.toLowerCase()]) {
-    if (hay.length !== text.length) continue;
-    const nn = hay === text ? n : n.toLowerCase();
+  // Pass 1 exact, pass 2 case-insensitive (like Swift's `.caseInsensitive`). The pair is explicit: comparing
+  // `hay === text` misfired when the text was already lower-case and reused the original-case needle.
+  for (const [hay, nn] of [[text, n], [text.toLowerCase(), n.toLowerCase()]] as const) {
+    if (hay.length !== text.length || nn.length !== n.length) continue;
     const found: TextSpan[] = [];
     let from = 0;
     while (from < hay.length) {

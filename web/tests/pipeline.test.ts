@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  locate,
   BUNDLED_PROMPT_IDS, EgressGate, EngineError, EntityMap, LLMDetector, MockEngines, MockPhoneEngine, MockSealedEngine, PatternDetector, PromptError,
   PromptLibrary, ReceiptLedger, RedTeam, SealPipeline, answer, applyRisks, chunks, estimateTokens, halve, isValidSuggestion, makeEntity, pendingRisks,
   route as routeOf, taskSpec, CHROME_ON_DEVICE_MODEL, type AnswerEvent, type AnswerOutcome, type Risk, type SealDraft, type SealedText, type VaultEntry,
@@ -155,6 +156,15 @@ describe("red-team loop", () => {
     const risks: Risk[] = [{ id: 1, attribute: "location", guess: "", evidence: "near the old mill", confidence: "high", suggestion: "in the area" }];
     const once = applyRisks(risks, draftOf(text));
     expect(applyRisks(risks, once).text).toBe(once.text);
+  });
+});
+
+describe("red-team locate", () => {
+  it("finds evidence case-insensitively even when the draft is already lower-case (regression)", () => {
+    expect(locate("Near the old mill", "we live near the old mill.")).toEqual([{ start: 8, end: 25 }]);
+    expect(locate("near the old mill", "We live Near The Old Mill.")).toEqual([{ start: 8, end: 25 }]);
+    expect(locate("old mill", "the old miller")).toEqual([]);
+    expect(locate("Mill", "a Mill and a mill")).toEqual([{ start: 2, end: 6 }]);
   });
 });
 
