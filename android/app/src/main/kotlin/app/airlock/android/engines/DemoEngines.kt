@@ -26,6 +26,7 @@ import java.util.Collections
 object DemoEngines {
     private val ORG = Regex("\\bMercy General Hospital\\b")
     private val PERSON = Regex("\\bRaj Patel\\b|\\bRaj\\b")
+    private const val RISKY = "I work nights at a large hospital"
 
     const val REPLY = "Here's a firm, polite reply you can send to [[PERSON_1]]:\n\nHi [[PERSON_1]], the heater at [[LOC_1]] is still broken. " +
         "Please arrange a repair this week.\n\nThanks,\n[[PERSON_ME]]"
@@ -46,11 +47,13 @@ object DemoEngines {
             }
             "gen.v1" -> {
                 if (pace) delay(350)
-                "{\"rewrite\":\"a large hospital\"}"
+                if (text.contains("Phrase to rewrite: $RISKY")) "{\"rewrite\":\"I work night shifts\"}" else "{\"rewrite\":\"a large hospital\"}"
             }
             "attack.v1" -> {
                 if (pace) delay(1400)
-                "{\"guesses\":[]}"
+                // One scripted re-identification risk, so the demo shows a risk card with a suggestion.
+                if (text.contains(RISKY)) "{\"guesses\":[{\"attribute\":\"occupation\",\"guess\":\"a night-shift hospital worker living at LOC_1\",\"evidence\":\"$RISKY\",\"confidence\":\"medium\"}]}"
+                else "{\"guesses\":[]}"
             }
             "title.v1" -> "Heater repair request"
             else -> "{}"

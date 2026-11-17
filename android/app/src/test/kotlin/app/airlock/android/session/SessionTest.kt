@@ -104,6 +104,21 @@ class SessionTest {
         assertFalse(s.current.review!!.result!!.draft.text.contains("14 Elm St"))
     }
 
+    @Test fun aRiskCardSuggestionIsAppliedOnlyWhenAccepted() = runTest {
+        val (svc, rec) = services()
+        val s = session(svc, backgroundScope)
+        s.startReview(SAMPLE, TaskKind.Help)
+        val risk = s.pendingRisks().single()
+        assertEquals("I work night shifts", risk.suggestion)
+        assertTrue(s.current.review!!.result!!.reasons.any { it is ReviewReason.Risks })
+        assertFalse(s.current.review!!.result!!.draft.text.contains("night shifts"), "suggestions never change the draft by themselves")
+        s.acceptRisk(risk)
+        assertTrue(s.current.review!!.result!!.draft.text.contains("I work night shifts"))
+        assertTrue(s.pendingRisks().isEmpty())
+        assertTrue(s.send())
+        assertTrue(rec.sent.single().contains("I work night shifts"))
+    }
+
     @Test fun aFollowUpReusesTheThreadsPlaceholders() = runTest {
         val (svc, rec) = services()
         val s = session(svc, backgroundScope)
