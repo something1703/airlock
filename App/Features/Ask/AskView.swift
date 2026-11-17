@@ -25,9 +25,7 @@ struct AskView: View {
             recent.enter(2)
         }
         .navigationTitle(Text("Ask"))
-        #if os(iOS)
-            .toolbar(.hidden, for: .navigationBar)
-        #endif
+        .hidesNavigationBarOnPhone()
     }
 
     private var sealButton: some View {

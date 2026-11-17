@@ -32,6 +32,7 @@ struct VaultView: View {
             .card()
         }
         .navigationTitle(Text("Vault"))
+        .hidesNavigationBarOnPhone()
     }
 
     private var addCard: some View {

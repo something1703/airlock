@@ -26,6 +26,18 @@ struct ThreadView: View {
             }
         }
         .navigationTitle(Text(verbatim: session.thread(threadID)?.title ?? ""))
+        .toolbar {
+            if session.thread(threadID) != nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        confirmDelete = true
+                    } label: {
+                        Icon(.trash, size: 18).foregroundStyle(Palette.risk)
+                    }
+                    .accessibilityLabel(Text("Delete this conversation"))
+                }
+            }
+        }
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -34,32 +46,6 @@ struct ThreadView: View {
     private func content(_ thread: ChatThread) -> some View {
         ScrollViewReader { proxy in
             ScreenScroll {
-                HStack(alignment: .top) {
-                    Text(verbatim: thread.title).font(.airlockTitle).foregroundStyle(Palette.text).accessibilityAddTraits(.isHeader)
-                    Spacer(minLength: 8)
-                    Button {
-                        confirmDelete = true
-                    } label: {
-                        Icon(.trash, size: 18)
-                    }
-                    .buttonStyle(AirlockButtonStyle(kind: .danger, compact: true))
-                    .accessibilityLabel(Text("Delete this conversation"))
-                }
-                if confirmDelete {
-                    Banner(
-                        tone: .risk, title: String(localized: "Delete this conversation from this device?"),
-                        message: String(
-                            localized:
-                                "Your words, the answers and the real names for this conversation are removed. Its receipts stay in the Ledger so the chain can still be verified. They only ever held the sealed text."
-                        )
-                    ) {
-                        HStack {
-                            Button("Delete") { Task { await session.deleteThread(thread.id) } }.buttonStyle(.danger)
-                            Button("Cancel") { confirmDelete = false }.buttonStyle(.ghost)
-                        }
-                        .padding(.top, 6)
-                    }
-                }
                 ForEach(thread.turns) { turn in
                     switch turn {
                     case .user(let u): UserBubble(turn: u, entities: thread.entities)
@@ -68,6 +54,14 @@ struct ThreadView: View {
                     }
                 }
                 followUpBox(thread).id("followUp")
+            }
+            .confirmationDialog(Text("Delete this conversation from this device?"), isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Delete", role: .destructive) { Task { await session.deleteThread(thread.id) } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "Your words, the answers and the real names for this conversation are removed. Its receipts stay in the Ledger so the chain can still be verified. They only ever held the sealed text."
+                )
             }
             .onChange(of: thread.turns.count) { _, _ in
                 withAnimation { proxy.scrollTo("followUp", anchor: .bottom) }
@@ -111,10 +105,11 @@ struct UserBubble: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Icon(showRaw ? .eye : .shield, size: 14)
-                Text(showRaw ? "You wrote · never sent" : "What Gemini saw")
+                Text(showRaw ? "You wrote · never sent" : "What Gemini saw").lineLimit(1).minimumScaleFactor(0.85)
                 Spacer(minLength: 8)
                 Button(showRaw ? "Show sealed" : "Show what I wrote") { showRaw.toggle() }
                     .buttonStyle(AirlockButtonStyle(kind: .ghost, compact: true))
+                    .fixedSize()
                     .accessibilityAddTraits(showRaw ? .isSelected : [])
             }
             .font(.footnote).foregroundStyle(Palette.text2)

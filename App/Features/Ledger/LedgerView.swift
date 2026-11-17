@@ -30,6 +30,7 @@ struct LedgerView: View {
             .enter(1)
         }
         .navigationTitle(Text("Ledger"))
+        .hidesNavigationBarOnPhone()
         .task { await session.refreshStats() }
     }
 
@@ -53,7 +54,7 @@ struct LedgerView: View {
 
     private func heroDetail(_ stats: LedgerStats?) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("**\(stats?.requests ?? 0)** requests sent to Gemini").foregroundStyle(Palette.text)
+            Text("**^[\(stats?.requests ?? 0) request](inflect: true)** sent to Gemini").foregroundStyle(Palette.text)
             Text("**\(stats?.onDeviceAnswers ?? 0)** answered on this device").foregroundStyle(Palette.text)
             Text(verbatim: breakdown(stats)).font(.footnote).foregroundStyle(Palette.text2)
         }
@@ -61,12 +62,19 @@ struct LedgerView: View {
     }
 
     private func breakdown(_ stats: LedgerStats?) -> String {
-        let names: [String: String] = [
-            "person": String(localized: "people"), "org": String(localized: "organisations"), "location": String(localized: "places"),
-            "contact": String(localized: "contact details"), "id": String(localized: "IDs"), "date": String(localized: "dates"),
-            "health": String(localized: "health details"), "secret": String(localized: "secrets"), "quasi": String(localized: "other details"),
+        let names: [String: (one: String, many: String)] = [
+            "person": (String(localized: "person"), String(localized: "people")),
+            "org": (String(localized: "organisation"), String(localized: "organisations")),
+            "location": (String(localized: "place"), String(localized: "places")),
+            "contact": (String(localized: "contact detail"), String(localized: "contact details")),
+            "id": (String(localized: "ID"), String(localized: "IDs")), "date": (String(localized: "date"), String(localized: "dates")),
+            "health": (String(localized: "health detail"), String(localized: "health details")),
+            "secret": (String(localized: "secret"), String(localized: "secrets")),
+            "quasi": (String(localized: "other detail"), String(localized: "other details")),
         ]
-        let parts = (stats?.byCategory ?? [:]).filter { $0.value > 0 }.sorted { $0.key < $1.key }.map { "\($0.value) \(names[$0.key] ?? $0.key)" }
+        let parts = (stats?.byCategory ?? [:]).filter { $0.value > 0 }.sorted { $0.key < $1.key }.map { k, v in
+            "\(v) \(names[k].map { v == 1 ? $0.one : $0.many } ?? k)"
+        }
         return parts.isEmpty ? String(localized: "No details sealed yet.") : parts.joined(separator: " · ")
     }
 
@@ -81,7 +89,8 @@ struct LedgerView: View {
             .accessibilityHint(Text("Recomputes every receipt's hash from the first one"))
             switch session.chain {
             case .valid(let count)?:
-                Banner(tone: .ok, title: String(localized: "Chain intact · \(count) receipts")).id(session.chainRun)
+                Banner(tone: .ok, title: String(AttributedString(localized: "Chain intact · ^[\(count) receipt](inflect: true)").characters))
+                    .id(session.chainRun)
             case .broken(_, let seq, let reason)?:
                 Banner(tone: .risk, title: String(localized: "Receipt #\(seq) doesn't match. Something changed it."), message: reasonText(reason))
             case nil:
@@ -130,12 +139,15 @@ struct ReceiptRow: View {
                         Text(verbatim: "#\(receipt.seq)").font(.airlockMono)
                     }
                     .frame(minWidth: 56, alignment: .leading)
-                    HStack(spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Icon(onDevice ? .device : .cloud, size: 14)
-                        Text(verbatim: "\(Pieces.prettyModel(receipt.modelVersion)) · \(receipt.outboundChars) · \(date)")
-                            .lineLimit(2).multilineTextAlignment(.leading)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(modelName) · \(receipt.outboundChars) characters").foregroundStyle(Palette.text)
+                            Text(verbatim: date).font(.footnote).foregroundStyle(Palette.text2)
+                        }
+                        .multilineTextAlignment(.leading)
                     }
-                    .font(.subheadline).foregroundStyle(Palette.text)
+                    .font(.subheadline)
                     Spacer(minLength: 6)
                     Circle().fill(receipt.gate.passed ? Palette.seal : Palette.risk).frame(width: 10, height: 10)
                     Icon(.chevron, size: 14).foregroundStyle(Palette.text2).rotationEffect(.degrees(open ? 90 : 0))
@@ -147,7 +159,7 @@ struct ReceiptRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(
                 Text(
-                    "Receipt \(receipt.seq), \(Pieces.prettyModel(receipt.modelVersion)), \(receipt.outboundChars) characters, \(date). \(receipt.gate.passed ? String(localized: "Gate passed") : String(localized: "Gate bypassed"))"
+                    "Receipt \(receipt.seq), \(modelName), \(receipt.outboundChars) characters, \(date). \(receipt.gate.passed ? String(localized: "Gate passed") : String(localized: "Gate bypassed"))"
                 )
             )
             .accessibilityValue(Text(open ? "Expanded" : "Collapsed"))
@@ -158,6 +170,10 @@ struct ReceiptRow: View {
             RoundedRectangle(cornerRadius: 8).fill(broken ? Palette.riskTint : lit ? Palette.sealTint : .clear)
         )
         .onChange(of: run) { _, _ in light() }
+    }
+
+    private var modelName: String {
+        onDevice ? Pieces.prettyModel(receipt.modelVersion) : "Gemini \(Pieces.prettyModel(receipt.modelVersion))"
     }
 
     private var date: String {

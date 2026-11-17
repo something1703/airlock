@@ -146,9 +146,10 @@ struct InlineText: View {
             case .text(let s):
                 out = Text("\(out)\(Text(verbatim: s))")
             case .chip(let label, _, let style, let id):
-                // Leading em space holds the icon; non-breaking spaces keep a chip on one line.
-                let trailing = if case .protected(_, true) = style { "\u{2009}\u{2002}" } else { "\u{2009}" }
-                var a = AttributedString("\u{2003}" + label.replacingOccurrences(of: " ", with: "\u{00A0}") + trailing)
+                // Two figure spaces hold the icon. Every space in a chip is non-breaking, so a chip
+                // never splits across lines.
+                let trailing = if case .protected(_, true) = style { "\u{202F}\u{2007}" } else { "\u{202F}" }
+                var a = AttributedString("\u{2007}\u{2007}" + label.replacingOccurrences(of: " ", with: "\u{00A0}") + trailing)
                 if let id, onChip != nil { a.link = URL(string: "airlock-chip://\(id.description)") }
                 let chip = Text(a).font(.callout.weight(.semibold)).customAttribute(ChipMark(index: chipIndex, style: style))
                 out = Text("\(out)\(chip)")

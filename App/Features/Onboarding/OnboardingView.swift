@@ -250,9 +250,12 @@ struct HeroAnimation: View {
                 gate.position(x: w / 2, y: 75)
                 TimelineView(.animation(paused: reduceMotion)) { tl in
                     let t = tl.date.timeIntervalSinceReferenceDate
-                    ForEach(Array(lanes.enumerated()), id: \.element.id) { i, lane in
-                        token(lane, t: t, width: w, y: 34 + CGFloat(i) * 34)
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(lanes) { lane in
+                            token(lane, t: t, width: w).frame(width: w, height: 30, alignment: .leading)
+                        }
                     }
+                    .padding(.top, 18)
                 }
                 HStack {
                     HStack(spacing: 6) { Icon(.device, size: 14); Text("Your device") }
@@ -286,7 +289,7 @@ struct HeroAnimation: View {
     }
 
     @ViewBuilder
-    private func token(_ lane: Lane, t: Double, width: CGFloat, y: CGFloat) -> some View {
+    private func token(_ lane: Lane, t: Double, width: CGFloat) -> some View {
         if reduceMotion {
             HStack {
                 before(lane)
@@ -294,20 +297,18 @@ struct HeroAnimation: View {
                 ChipView(label: lane.after, style: .protected(lane.category, lowConfidence: false))
             }
             .padding(.horizontal, 14)
-            .frame(width: width)
-            .position(x: width / 2, y: y)
         } else {
             let phase = ((t + lane.offset).truncatingRemainder(dividingBy: period)) / period
-            let x = -140 + (width + 160) * phase
-            let swapped = phase > 0.5
+            let x = -150 + (width + 170) * phase
+            // The token crosses the gate (centre) at phase ≈ 0.5 and comes out as a chip.
             let k = min(1, max(0, (phase - 0.46) / 0.06))
             ZStack(alignment: .leading) {
                 before(lane).opacity(1 - k).blur(radius: 4 * k)
                 ChipView(label: lane.after, style: .protected(lane.category, lowConfidence: false))
-                    .opacity(swapped ? 1 : 0).scaleEffect(swapped ? 1 : 0.7, anchor: .leading)
+                    .opacity(k).scaleEffect(0.7 + 0.3 * k, anchor: .leading)
             }
             .fixedSize()
-            .position(x: x + 60, y: y)
+            .offset(x: x)
         }
     }
 

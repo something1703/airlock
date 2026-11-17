@@ -24,8 +24,25 @@ extension View {
         modifier(CardModifier(padding: padding, tint: tint, border: border))
     }
 
+    /// Top-level screens draw their own large header; hide the bar's title on iPhone.
+    func hidesNavigationBarOnPhone() -> some View { modifier(HidesBarOnPhone()) }
+
     /// Entrance: fade + rise 10 pt, staggered by `index` × 60 ms (web `.enter`).
     func enter(_ index: Int = 0) -> some View { modifier(EnterModifier(index: index)) }
+}
+
+struct HidesBarOnPhone: ViewModifier {
+    #if os(iOS)
+        @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+            content.toolbar(sizeClass == .compact ? .hidden : .automatic, for: .navigationBar)
+        #else
+            content
+        #endif
+    }
 }
 
 struct EnterModifier: ViewModifier {
@@ -57,7 +74,7 @@ struct AirlockButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.body.weight(.semibold))
+            .font(compact ? .subheadline.weight(.semibold) : .body.weight(.semibold))
             .lineLimit(2)
             .multilineTextAlignment(.center)
             .padding(.horizontal, compact ? 10 : 16)

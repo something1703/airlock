@@ -70,6 +70,7 @@ final class AirlockSession {
         await refreshAvailability()
         isLoaded = true
         await runDemoScript()
+        Self.log.notice("Session ready")
     }
 
     func refreshAvailability() async {
@@ -501,13 +502,19 @@ final class AirlockSession {
         switch script.screen {
         case "onboarding": setPrefs { $0.onboarded = false }
         case "review": await startReview(Self.sample, task: .reply)
-        case "thread", "ledger":
+        case "thread":
             await startReview(Self.sample, task: .reply)
             await send()
-            if script.screen == "ledger" {
-                go(.ledger)
-                await verifyChain()
-            }
+        case "ledger":
+            // Two sealed requests to Gemini (two chained receipts) and one quick task answered on device.
+            await startReview(Self.sample, task: .reply)
+            await send()
+            await startReview("Raj says he can only come next Tuesday. Is that reasonable?", task: .help, threadID: threads.first?.id)
+            await send()
+            await startReview(Self.sample, task: .summary)
+            await send()
+            go(.ledger)
+            await verifyChain()
         case "vault": go(.vault)
         case "settings": go(.settings)
         default: break

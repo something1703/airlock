@@ -59,6 +59,7 @@ struct SettingsView: View {
             .enter(2)
         }
         .navigationTitle(Text("Settings"))
+        .hidesNavigationBarOnPhone()
     }
 
     private var preferenceLine: String {
