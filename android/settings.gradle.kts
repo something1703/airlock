@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "airlock-android"
 include(":core")
+include(":app")

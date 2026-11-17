@@ -61,3 +61,6 @@ eval/runs/
 
 # Firebase Hosting deploy copy of web/dist (built by predeploy)
 firebase/hosting/
+
+# Agent worktrees (local only)
+.claude/worktrees/
