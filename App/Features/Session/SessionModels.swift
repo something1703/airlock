@@ -265,8 +265,8 @@ extension AnswerPreference {
     var title: String {
         switch self {
         case .auto: String(localized: "Automatic")
-        case .phoneOnly: String(localized: "Only on this device")
-        case .best: String(localized: "Best answer (Gemini)")
+        case .phoneOnly: String(localized: "This device")
+        case .best: String(localized: "Best (Gemini)")
         }
     }
 }
