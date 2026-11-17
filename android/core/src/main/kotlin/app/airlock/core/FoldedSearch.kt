@@ -25,7 +25,19 @@ object FoldedSearch {
         return sb.toString()
     }
 
+    // Per-code-unit memo for BMP characters (folding is a pure function of the character). Strings are immutable,
+    // so a racy fill is safe.
+    private val lowerCache = arrayOfNulls<String>(0x10000)
+    private val keepCache = arrayOfNulls<String>(0x10000)
+
     private fun foldChar(ch: String, keepCase: Boolean): String {
+        if (ch.length != 1) return foldUncached(ch, keepCase)
+        val cache = if (keepCase) keepCache else lowerCache
+        val code = ch[0].code
+        return cache[code] ?: foldUncached(ch, keepCase).also { cache[code] = it }
+    }
+
+    private fun foldUncached(ch: String, keepCase: Boolean): String {
         val nfkd = Normalizer.normalize(ch, Normalizer.Form.NFKD)
         val sb = StringBuilder(nfkd.length)
         var i = 0
@@ -39,7 +51,7 @@ object FoldedSearch {
         return if (keepCase) stripped else stripped.lowercase()
     }
 
-    private class Folded(val text: String, val starts: IntArray, val ends: IntArray)
+    internal class Folded(val text: String, val starts: IntArray, val ends: IntArray)
 
     private fun foldWithMap(s: String, keepCase: Boolean): Folded {
         val text = StringBuilder(s.length)
@@ -79,11 +91,23 @@ object FoldedSearch {
      * `caseSensitive` keeps diacritic/width folding but requires exact letter case (used by the gate's
      * name-token check so "Will" the name doesn't match "will" the verb).
      */
-    fun ranges(needle: String, haystack: String, caseSensitive: Boolean = false): List<TextSpan> {
+    fun ranges(needle: String, haystack: String, caseSensitive: Boolean = false): List<TextSpan> = ranges(needle, Haystack(haystack), caseSensitive)
+
+    /** A haystack whose folded forms are computed once, for searching many needles (the gate checks hundreds of terms). */
+    class Haystack(val text: String) {
+        private var lower: Folded? = null
+        private var keep: Folded? = null
+        internal fun folded(caseSensitive: Boolean): Folded =
+            if (caseSensitive) keep ?: foldWithMap(text, true).also { keep = it } else lower ?: foldWithMap(text, false).also { lower = it }
+    }
+
+    /** [ranges] over a prepared [Haystack]; results are identical. */
+    fun ranges(needle: String, hay: Haystack, caseSensitive: Boolean = false): List<TextSpan> {
+        val haystack = hay.text
         val tokens = Js.splitWhitespace(Js.trim(needle)).filter { it.isNotEmpty() }.map { fold(it, caseSensitive) }.filter { it.isNotEmpty() }
         if (tokens.isEmpty()) return emptyList()
         val re = Pattern.compile(tokens.joinToString(Js.WS + "+") { Pattern.quote(it) })
-        val f = foldWithMap(haystack, caseSensitive)
+        val f = hay.folded(caseSensitive)
         val results = ArrayList<TextSpan>()
         val m = re.matcher(f.text)
         var searchStart = 0

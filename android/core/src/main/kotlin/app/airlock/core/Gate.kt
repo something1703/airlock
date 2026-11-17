@@ -165,7 +165,7 @@ class EgressGate(
         /** Hits of every term on the text and (if different) its homoglyph skeleton; a span is reported once. */
         private fun termHits(text: String, terms: List<Term>, legendIndex: Int?): List<GateHit> {
             val sk = Homoglyphs.skeleton(text)
-            val haystacks = if (sk == text) listOf(text) else listOf(text, sk)
+            val haystacks = (if (sk == text) listOf(text) else listOf(text, sk)).map { FoldedSearch.Haystack(it) }
             val hits = ArrayList<GateHit>()
             val seen = HashSet<TextSpan>()
             for (term in terms) {

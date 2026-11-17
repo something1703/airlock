@@ -126,8 +126,9 @@ class Sealer(val policy: PolicyEngine, val patterns: PatternDetector, val today:
     /** A role hint is only used if it names nobody and matches no pattern. */
     fun passesMiniGate(hint: String, map: EntityMap): Boolean {
         if (hint.isEmpty() || Js.splitWhitespace(hint).size > 12 || hint.contains("[[")) return false
+        val hay = FoldedSearch.Haystack(hint)
         for (e in map.sorted()) {
-            for (form in e.surfaceForms) if (form.length >= 2 && FoldedSearch.contains(form, hint)) return false
+            for (form in e.surfaceForms) if (form.length >= 2 && FoldedSearch.ranges(form, hay).isNotEmpty()) return false
         }
         return patterns.detect(hint).none { it.category != PrivacyCategory.DATE }
     }

@@ -155,9 +155,10 @@ object Generaliser {
         if (r.isEmpty() || Js.splitWhitespace(r).size > MAX_WORDS) return false
         if (FoldedSearch.fold(r) == FoldedSearch.fold(phrase)) return false
         if (r.contains("[[")) return false
+        val hay = FoldedSearch.Haystack(r)
         for (e in entities.sorted()) {
             if (e.category == PrivacyCategory.DATE && !e.action.mustNotEgress) continue
-            for (term in Terms.entityTerms(e)) if (FoldedSearch.ranges(term.text, r, term.caseSensitive).isNotEmpty()) return false
+            for (term in Terms.entityTerms(e)) if (FoldedSearch.ranges(term.text, hay, term.caseSensitive).isNotEmpty()) return false
         }
         return patterns.detect(r).none { it.category != PrivacyCategory.DATE }
     }
