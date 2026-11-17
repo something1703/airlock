@@ -13,9 +13,9 @@ Google Cloud / Firebase account for Airlock: the team's Google account (decided 
    then Xcode → Settings → Components → install the **iOS 27 Simulator**.
 2. **Firebase console** (unblocks every real AI call): H-02, H-03, then `firebase login` (H-04).
 3. **Chrome Gemini Nano** (unblocks web on-device): H-12. Check `chrome://on-device-internals` shows the model as ready.
-4. **Android Studio** (H-11): install the latest stable and let its setup wizard install the Android SDK.
-5. **A supported Android phone** (H-10).
-6. **Discord questions** (H-13) — Tue 17 Nov. **Sprint 3 quota form** (H-16) — by Wed 25 Nov.
+4. **Android tools, no Android Studio needed** (H-11): `brew install --cask temurin@21 android-commandlinetools` (asks for your password). The agent installs the SDK packages with `sdkmanager` and builds the APK from the command line.
+5. **Android on-device testing** (H-10): no supported phone on the team. The plan is a real Pixel in **Firebase Test Lab** (free daily quota, runs on Spark), else **Samsung Remote Test Lab** (free with a Samsung account), else borrow a Pixel 9/10 or Galaxy S25+.
+6. **Discord questions** (H-13) — Tue 17 Nov. **Sprint 3 quota form only** (H-16): the window opens **Mon 23 Nov** and closes **Wed 25 Nov, 10:00 AM PT (11:30 PM IST)**. Skip Sprint 2.
 
 ## 🔴 Blocking coding work
 
