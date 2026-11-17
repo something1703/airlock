@@ -65,6 +65,15 @@ class PipelineTest {
         }
     }
 
+    /** Expected values are `Intl.Segmenter("en", {granularity: "sentence"})` output (ICU, UAX #29). */
+    @Test fun sentenceBoundariesMatchIntlSegmenter() {
+        val cases = listOf(
+            "a\nb" to listOf(2), "Hello. World" to listOf(7), "e.g. the cat" to emptyList(), "Mr. Smith went." to listOf(4),
+            "He said \"Stop.\" Then left." to listOf(16), "3.14 is pi" to emptyList(), "Wait!? Yes no" to listOf(7, 11), "U.S. Army" to listOf(5),
+        )
+        for ((text, want) in cases) assertEquals(want, SentenceBreaks.boundaries(text), text)
+    }
+
     @Test fun halvesNearTheMiddle() {
         val text = "one two three four five six seven eight"
         val halves = Chunker.halve(Chunker.chunks(text, 1000)[0], text)

@@ -1,7 +1,5 @@
 package app.airlock.core
 
-import java.text.BreakIterator
-import java.util.Locale
 import kotlin.math.ceil
 
 /** A piece of normalised text sized for the on-device window. `text` is exactly `fullText[span]`. */
@@ -10,8 +8,8 @@ data class Chunk(val index: Int, val span: TextSpan, val text: String)
 /**
  * Stage 2 — chunking for the on-device window (port of chunker.ts / Chunker.swift). Chunks cover the whole text
  * in order, consecutive chunks overlap by one sentence, and each stays within the token budget unless a single
- * unbreakable run is longer than it. Sentence boundaries come from `java.text.BreakIterator` (the web uses ICU's
- * `Intl.Segmenter`); boundaries can differ on unusual punctuation, which only moves chunk edges.
+ * unbreakable run is longer than it. Sentence boundaries are UAX #29 ([SentenceBreaks]), like ICU's `Intl.Segmenter`
+ * on the web.
  */
 object Chunker {
     private fun isDense(cp: Int): Boolean =
@@ -34,15 +32,12 @@ object Chunker {
     /** Contiguous sentence spans (trailing whitespace belongs to the sentence before it). */
     private fun sentenceSpans(text: String): List<TextSpan> {
         val spans = ArrayList<TextSpan>()
-        val bi = BreakIterator.getSentenceInstance(Locale.ENGLISH)
-        bi.setText(text)
-        var start = bi.first()
-        var end = bi.next()
-        while (end != BreakIterator.DONE) {
-            spans.add(TextSpan(start, end))
-            start = end
-            end = bi.next()
+        var start = 0
+        for (b in SentenceBreaks.boundaries(text)) {
+            spans.add(TextSpan(start, b))
+            start = b
         }
+        if (start < text.length) spans.add(TextSpan(start, text.length))
         return spans.ifEmpty { listOf(TextSpan(0, text.length)) }
     }
 
