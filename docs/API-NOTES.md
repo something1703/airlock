@@ -115,6 +115,20 @@ Model availability on the **Agent Platform (formerly Vertex AI) backend** under 
 | **On-device timings, 17 Nov (this Mac, Chrome 155, Nano v3 GPU):** trivial prompt ~0.9 s; `detect.v1` on the 260-char sample 10–12 s warm, ~22 s as the first long prompt after page load (~630 chars of JSON out ≈ 18 tok/s); `gen.v1` ~1.4 s each; `attack.v1` ~6 s. Concurrent prompts are **not** faster (3× `gen.v1`: 5.0 s parallel vs 4.3 s sequential) — the GPU serialises. `onDeviceParams.promptOptions.responseConstraint` (JSON schema) works but gave no speed-up. No temperature/topK control is exposed in `LanguageModelCreateOptions` (3.1.0). | ✅ observed |
 | Web Remote Config (`@firebase/remote-config` 0.10.0): `getRemoteConfig`, `activate`, `fetchAndActivate`, `getAll` → `Value.getSource()` (`static`/`default`/`remote`) + `asString()`; `settings.minimumFetchIntervalMillis` / `fetchTimeoutMillis`. Cached in IndexedDB `firebase_remote_config`. Verified live 17 Nov: 29 keys fetched from the dev project. Needs `https://firebaseremoteconfig.googleapis.com` in the CSP `connect-src`. | ✅ typings + live |
 
+## 6c. Android SDK facts (verified 17 Nov in source jars: `firebase-ai` 18.2.0 (BoM 35.2.0), `firebase-ai-ondevice` 16.0.0-beta08)
+
+| Fact | Status |
+|------|--------|
+| Hybrid lives in the main SDK: `FirebaseAI.generativeModel(modelName, generationConfig?, safetySettings?, tools?, toolConfig?, systemInstruction?, requestOptions, onDeviceConfig: OnDeviceConfig)` (`FirebaseAI.kt:106`). On-device inference needs the extra artifact `firebase-ai-ondevice` (beta only), which pulls ML Kit `genai-prompt` 1.0.0-beta5; without it, on-device modes resolve to `MissingOnDeviceGenerativeModelProvider`. | ✅ source |
+| `OnDeviceConfig(mode, maxOutputTokens?, temperature?, topK?, seed?, candidateCount = 1, modelOption?, enableThinking?)` — `@PublicPreviewAPI`. **Unlike web, temperature/topK/seed are settable on device** (use greedy-ish settings for detection). | ✅ `OnDeviceConfig.kt:40` |
+| `InferenceMode.PREFER_ON_DEVICE / PREFER_IN_CLOUD / ONLY_ON_DEVICE / ONLY_IN_CLOUD` (class with companion constants, not an enum). | ✅ |
+| **Fallback semantics differ from iOS:** `PREFER_ON_DEVICE` → on-device, falls back to cloud on any exception. `PREFER_IN_CLOUD` → cloud, falls back on device **only if the device is offline** (`NetworkStatusChecker` precondition; `shouldFallbackInException = false`), i.e. a 503 does NOT fall back. Our model fallback chain (`model_cloud_fallback`) therefore matters on Android too. | ✅ `GenerativeModel.kt:384-405` |
+| `GenerativeModel.onDeviceExtension: OnDeviceExtension?` → `suspend checkStatus(): OnDeviceModelStatus` (`UNAVAILABLE / DOWNLOADABLE / DOWNLOADING / AVAILABLE`), `download(): Flow<DownloadStatus>` (`DownloadStarted(bytesToDownload)`, `DownloadInProgress(totalBytesDownloaded)`, …), `suspend warmUp()`, `suspend getModelName()`. | ✅ `GenerativeModel.kt:454` |
+| `GenerateContentResponse.inferenceSource: InferenceSource` (`ON_DEVICE` / `IN_CLOUD`) and `modelVersion: String?` (on-device responses report `"ondevice"`). | ✅ `type/GenerateContentResponse.kt` |
+| `FirebaseAIException` subclasses: `ServerException` exposes **no HTTP status** — Airlock classifies it by message text (503/429/"overloaded" → transient) in `android/app/.../engines/ErrorMapper.kt`, never surfacing the message (INV-8). | ✅ source; ⚠ message-based |
+| ML Kit `genai-prompt` stream chunks are treated as **deltas** (accumulated by Airlock). Not yet verified on Nano hardware (the emulator has no AICore). | 🔍 verify on a real device / Test Lab |
+| Live, 17 Nov (API 36 emulator, dev project): on-device status UNAVAILABLE (no AICore) → rules + forced review (INV-9); sealed text answered by Gemini via Firebase AI Logic; `gemini-3.8-flash` stalled past the 15 s first-chunk guard → fallback chain answered with `gemini-3.5-flash-lite` (27.7 s). App Check debug token unregistered → 403 attestation logged but requests succeed (not enforced). | ✅ observed |
+
 ## 7. Corrections log (vs. earlier planning chats)
 
 1. Model Armor needs the **Agent Platform** backend (billing). It does not work with the free Gemini Developer API backend.

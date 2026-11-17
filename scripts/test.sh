@@ -52,7 +52,14 @@ fi
 
 if [[ -f android/gradlew ]]; then
   echo "▶ Android (gradle test)"
-  (cd android && ./gradlew test -q)
+  # JDK 21 (Temurin) is the toolchain; the app module needs android/app/google-services.json (gitignored) —
+  # without it only the core engine is tested.
+  JH=$(/usr/libexec/java_home -v 21 2>/dev/null || echo "${JAVA_HOME:-}")
+  if [[ -f android/app/google-services.json ]]; then
+    (cd android && JAVA_HOME="$JH" ./gradlew :core:test :app:assembleDebug -q)
+  else
+    (cd android && JAVA_HOME="$JH" ./gradlew :core:test -q)
+  fi
 fi
 
 if [[ -f functions/package.json ]]; then

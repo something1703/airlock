@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copy rules: docs/06-UI-UX.md §9 (honest claims only; explain and prepare, never advise). -->
+<resources>
+    <string name="app_name">Airlock</string>
+    <string name="shortcut_demo_short">Try the demo</string>
+    <string name="shortcut_demo_long">Try Airlock with scripted answers</string>
+
+    <!-- Navigation -->
+    <string name="nav_ask">Ask</string>
+    <string name="nav_ledger">Ledger</string>
+    <string name="nav_vault">Vault</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_main">Main navigation</string>
+    <string name="loading">Opening Airlock…</string>
+
+    <!-- Categories -->
+    <string name="cat_person">Person</string>
+    <string name="cat_org">Organisation</string>
+    <string name="cat_location">Place</string>
+    <string name="cat_contact">Contact</string>
+    <string name="cat_id">ID</string>
+    <string name="cat_date">Date</string>
+    <string name="cat_health">Health</string>
+    <string name="cat_secret">Secret</string>
+    <string name="cat_quasi">Detail</string>
+    <plurals name="cat_count_person">
+        <item quantity="one">%d person</item>
+        <item quantity="other">%d people</item>
+    </plurals>
+    <plurals name="cat_count_org">
+        <item quantity="one">%d organisation</item>
+        <item quantity="other">%d organisations</item>
+    </plurals>
+    <plurals name="cat_count_location">
+        <item quantity="one">%d place</item>
+        <item quantity="other">%d places</item>
+    </plurals>
+    <plurals name="cat_count_contact">
+        <item quantity="one">%d contact detail</item>
+        <item quantity="other">%d contact details</item>
+    </plurals>
+    <plurals name="cat_count_id">
+        <item quantity="one">%d ID</item>
+        <item quantity="other">%d IDs</item>
+    </plurals>
+    <plurals name="cat_count_date">
+        <item quantity="one">%d date</item>
+        <item quantity="other">%d dates</item>
+    </plurals>
+    <plurals name="cat_count_health">
+        <item quantity="one">%d health detail</item>
+        <item quantity="other">%d health details</item>
+    </plurals>
+    <plurals name="cat_count_secret">
+        <item quantity="one">%d secret</item>
+        <item quantity="other">%d secrets</item>
+    </plurals>
+    <plurals name="cat_count_quasi">
+        <item quantity="one">%d other detail</item>
+        <item quantity="other">%d other details</item>
+    </plurals>
+    <string name="chip_you">You</string>
+    <string name="chip_label">%1$s %2$s</string>
+    <string name="chip_label_role">%1$s %2$s · %3$s</string>
+    <string name="chip_a11y_protected">Protected: %1$s</string>
+    <string name="chip_a11y_secret">Hidden secret: %1$s</string>
+    <string name="chip_a11y_low">, possibly private</string>
+    <string name="chip_a11y_toggle">. Double-tap to send it as written.</string>
+    <string name="chip_a11y_general">Made less specific: %1$s</string>
+    <string name="chip_hidden_code">hidden code</string>
+    <string name="chip_hidden_code_a11y">Hidden code, never shown</string>
+    <string name="chip_unknown">unknown</string>
+    <string name="chip_unknown_a11y">A placeholder Airlock doesn\'t know</string>
+    <string name="restored_a11y">%1$s, filled in on your phone</string>
+
+    <!-- On-device status -->
+    <string name="status_demo_title">Demo mode — scripted answers</string>
+    <string name="status_demo_body">No real AI calls are made. Open Airlock from its normal icon to use Gemini Nano and Gemini.</string>
+    <string name="status_nofb_title">Demo mode — Firebase isn\'t set up in this build</string>
+    <string name="status_nofb_body">Answers are scripted and nothing is sent. Add a google-services.json to use Gemini Nano and Gemini (see the README).</string>
+    <string name="status_download_title">Preparing the on-device model… %1$d%%</string>
+    <string name="status_download_title_unknown">Preparing the on-device model…</string>
+    <string name="status_download_body">Your phone is downloading Gemini Nano. This happens once.</string>
+    <string name="status_ready_title">On-device AI is ready</string>
+    <string name="status_ready_body">Gemini Nano reads your text on this phone before anything is sent.</string>
+    <string name="status_checking">Checking for Gemini Nano on this phone…</string>
+    <string name="status_downloadable_title">On-device AI needs a one-time download</string>
+    <string name="status_downloadable_body">Until then, Airlock seals with strict rules and asks you to check everything.</string>
+    <string name="status_download_button">Download on-device model</string>
+    <string name="status_unavailable_title">This phone can\'t run on-device AI</string>
+    <string name="status_unavailable_body">Airlock still works: it seals with rules and asks you to review everything before anything is sent. Gemini only ever gets the sealed version.</string>
+
+    <!-- Onboarding -->
+    <string name="onb_step">Step %1$d of %2$d</string>
+    <string name="onb1_title">AI is great. Oversharing isn’t.</string>
+    <string name="onb1_sub">Airlock lets you ask the smartest AI about private things, while the details that identify you stay on your phone.</string>
+    <string name="onb1_p1_b">1. Your phone reads it first.</string>
+    <string name="onb1_p1">Gemini Nano finds names, places and numbers and seals them, on this phone.</string>
+    <string name="onb1_p2_b">2. Gemini gets the problem, not the person.</string>
+    <string name="onb1_p2">Only the sealed version is sent, after a final check.</string>
+    <string name="onb1_p3_b">3. The real names come back on your phone.</string>
+    <string name="onb1_p3">Every request gets a receipt showing exactly what left.</string>
+    <string name="onb1_honest">Airlock hides who you are, not what happened. Detection isn’t perfect, which is why you can review everything before it’s sent. Airlock helps you understand and prepare; it doesn’t give legal, medical or financial advice.</string>
+    <string name="onb_get_started">Get started</string>
+    <string name="hero_a11y">Animation: names, an address and a phone number pass through the airlock and come out as labelled chips.</string>
+    <string name="hero_device">Your phone</string>
+    <string name="hero_cloud">Gemini</string>
+    <string name="hero_person_before">Raj Patel</string>
+    <string name="hero_person_after">Person 1 · landlord</string>
+    <string name="hero_place_before">14 Elm St, Apt 3B</string>
+    <string name="hero_place_after">Place 1</string>
+    <string name="hero_contact_before">312-555-0147</string>
+    <string name="hero_contact_after">Contact 1</string>
+    <string name="onb2_title">Who should always be protected?</string>
+    <string name="onb2_sub">Add your name and the people you never want to share. Stored only on this phone, encrypted.</string>
+    <string name="onb2_your_name">Your name</string>
+    <string name="onb2_your_name_hint">e.g. Maya Chen</string>
+    <string name="onb2_other_hint">Someone else, e.g. Raj Patel</string>
+    <string name="onb2_other_a11y">Person\'s name</string>
+    <string name="onb2_role_hint">role, e.g. landlord</string>
+    <string name="onb2_role_a11y">Their role to you</string>
+    <string name="onb2_add">Add someone</string>
+    <string name="onb2_alias_note">First names are protected too: “Raj Patel” also covers “Raj”.</string>
+    <string name="continue_">Continue</string>
+    <string name="skip">Skip</string>
+    <string name="back">Back</string>
+    <string name="onb3_title">Choose how careful to be.</string>
+    <string name="onb3_sub">You can change this any time, and per request.</string>
+    <string name="dial_a11y">Privacy dial</string>
+    <string name="dial_strict">Strict</string>
+    <string name="dial_strict_line">Hides more and always shows you what leaves. Best for very sensitive things.</string>
+    <string name="dial_balanced">Balanced</string>
+    <string name="dial_balanced_line">Hides names, places and numbers; keeps dates and amounts so answers stay useful.</string>
+    <string name="dial_open">Open</string>
+    <string name="dial_open_line">Hides names, contact details and IDs only.</string>
+    <string name="dial_strength">Strength %1$d of 3</string>
+    <string name="start">Start</string>
+
+    <!-- Ask -->
+    <string name="ask_title">Ask</string>
+    <string name="ask_sub">Paste anything. Your phone reads it first and seals what identifies you.</string>
+    <string name="ask_hint">Paste a tense text thread, a lease clause, a strange message…</string>
+    <string name="ask_a11y">Your message</string>
+    <string name="ask_shared">Shared from another app. Nothing has been read or sent yet.</string>
+    <string name="tasks_a11y">What do you want?</string>
+    <string name="task_help">Help me with this</string>
+    <string name="task_reply">Draft a reply</string>
+    <string name="task_explain">Explain simply</string>
+    <string name="task_summary">Summarise</string>
+    <string name="task_questions">Questions to ask</string>
+    <string name="task_actions">List actions</string>
+    <string name="ask_seal">Seal on this phone</string>
+    <string name="ask_sample">Try a sample (fictional)</string>
+    <string name="ask_sample_text">Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I\'ve texted you four times. I work nights at Mercy General Hospital and need to sleep during the day — please send someone this week. You can reach me on 312-555-0147. Thanks, Maya Chen</string>
+    <string name="recent">Recent</string>
+    <string name="recent_on_device">on device</string>
+    <string name="recent_gemini">Gemini</string>
+    <string name="recent_open_a11y">Open conversation: %1$s</string>
+
+    <!-- Sealing -->
+    <string name="sealing_title">Sealing on your phone</string>
+    <string name="sealing_sub">Nothing has left this phone. You’ll see exactly what will be sent before it goes.</string>
+    <string name="sealing_lock">On this phone · works offline</string>
+    <string name="step_detect">Reading on your phone</string>
+    <string name="step_detect_part">Reading on your phone · part %1$d of %2$d</string>
+    <string name="step_generalise">Making details less specific</string>
+    <string name="step_risks">Checking what someone could still guess</string>
+    <string name="step_done_a11y">%1$s, done</string>
+    <string name="step_active_a11y">%1$s, in progress</string>
+    <string name="sealing_elapsed">%1$s s · Gemini Nano is doing this work on your phone</string>
+    <string name="sealing_elapsed_rules">%1$s s · Airlock\'s rules are doing this work on your phone</string>
+
+    <!-- Review -->
+    <string name="review_title">Check before sending</string>
+    <string name="review_sub">This is exactly what will leave your phone. Tap a protected detail to send it as written instead.</string>
+    <string name="review_view_sealed">Leaves your phone</string>
+    <string name="review_view_raw">You wrote</string>
+    <string name="review_view_a11y">Show</string>
+    <string name="reason_phone_unavailable">The on-device model isn\'t available, so Airlock used strict rules. Please check everything.</string>
+    <string name="reason_llm_failed">The on-device model couldn\'t read part of this. Rules were used there — please check it.</string>
+    <string name="reason_refused">The on-device model declined to read part of this. Rules were used there — please check it.</string>
+    <string name="reason_low_confidence">Some details might be private (amber dot). Decide whether to protect them.</string>
+    <string name="reason_ambiguous">Some words could be a name or an ordinary word. Please check.</string>
+    <string name="reason_secrets">This contains a code or password. It has been removed — never share these.</string>
+    <plurals name="reason_risks">
+        <item quantity="one">Someone could still guess one thing about you. See below.</item>
+        <item quantity="other">Someone could still guess %d things about you. See below.</item>
+    </plurals>
+    <string name="reason_redteam_unavailable">Airlock couldn\'t check what someone could still guess. Read the sealed text carefully.</string>
+    <string name="blocked_title">Airlock stopped this before it left</string>
+    <string name="blocked_body">The final check found %1$s still in the text. Protect it above, or edit your message.</string>
+    <string name="gate_g1">a name from your Vault</string>
+    <string name="gate_g2">a detail Airlock sealed elsewhere in the text</string>
+    <string name="gate_g3">an email, phone number, ID or code</string>
+    <string name="gate_g4">a malformed placeholder</string>
+    <string name="gate_g5">an explanation that reveals too much</string>
+    <string name="gate_g6">hidden or look-alike characters</string>
+    <string name="gate_g7">a message that\'s too long</string>
+    <string name="summary_protected">protected</string>
+    <string name="summary_general">made less specific</string>
+    <string name="summary_kept">sent as written</string>
+    <string name="summary_sealed_in">Sealed on this phone in %1$s s</string>
+    <string name="redteam_pending_title">Checking what someone could still guess…</string>
+    <string name="redteam_pending_body">Still on your phone. You can review and change details meanwhile; sending unlocks when the check is done.</string>
+    <string name="risks_title">What someone could still guess</string>
+    <string name="risk_guess">"A reader could guess: "</string>
+    <string name="risk_because">because of “%1$s”</string>
+    <string name="risk_because_prefix">"because of "</string>
+    <string name="risk_suggestion_prefix">"Suggestion: "</string>
+    <string name="risk_use">Use suggestion</string>
+    <string name="risk_keep">Keep as is</string>
+    <string name="details_title">Details</string>
+    <string name="detail_replaced">replaced</string>
+    <string name="detail_kept">sent as written</string>
+    <string name="detail_removed">removed</string>
+    <string name="detail_general">sent as “%1$s”</string>
+    <string name="detail_general_default">a general description</string>
+    <string name="detail_from_vault">" · from your Vault"</string>
+    <string name="detail_low">" · possibly private"</string>
+    <string name="detail_switch_a11y">Protect %1$s</string>
+    <string name="seal_send">Seal &amp; send</string>
+    <string name="seal_finishing">Finishing the check…</string>
+    <string name="cancel">Cancel</string>
+    <string name="review_note">Gemini sees only the sealed version. Real names come back on your phone.</string>
+    <string name="review_failed">Airlock couldn\'t read this on your phone. Nothing was sent.</string>
+    <string name="door_label">Sealed · leaving your phone</string>
+
+    <!-- Thread -->
+    <string name="thread_not_found">This conversation isn\'t here any more.</string>
+    <string name="thread_back_to_ask">Back to Ask</string>
+    <string name="thread_new">New question</string>
+    <string name="thread_delete_a11y">Delete this conversation</string>
+    <string name="thread_delete_title">Delete this conversation from this phone?</string>
+    <string name="thread_delete_body">Your words, the answers and the real names for this conversation are removed. Its receipts stay in the Ledger so the chain can still be verified — they only ever held the sealed text.</string>
+    <string name="delete">Delete</string>
+    <string name="bubble_raw_label">You wrote · never sent</string>
+    <string name="bubble_sealed_label">What Gemini saw</string>
+    <string name="bubble_show_raw">Show what I wrote</string>
+    <string name="bubble_show_sealed">Show sealed</string>
+    <string name="bubble_sealed_on_device">What left for the answer</string>
+    <string name="badge_answering">Sealed request sent · answering…</string>
+    <string name="badge_fallback">On this phone · cloud unavailable · %1$s s</string>
+    <string name="badge_phone">On this phone · nothing sent · %1$s s</string>
+    <string name="badge_cloud">Gemini · %1$s · %2$s s</string>
+    <string name="badge_error">Not answered</string>
+    <string name="typing_a11y">Waiting for the answer</string>
+    <string name="receipt_line">Receipt %1$s</string>
+    <string name="receipt_chars">%1$d characters sent</string>
+    <string name="receipt_none">Nothing left this phone — no receipt needed.</string>
+    <string name="fidelity_guessed">Gemini wrote a real detail it guessed — check the answer.</string>
+    <string name="fidelity_unknown">The answer mentioned a placeholder Airlock doesn’t know.</string>
+    <string name="copy">Copy</string>
+    <string name="copied">Copied</string>
+    <string name="copy_a11y">Copy the answer</string>
+    <string name="followup_hint">Ask a follow-up — it gets sealed too</string>
+    <string name="followup_a11y">Follow-up question</string>
+    <string name="followup_send">Continue</string>
+    <string name="thread_note">Real names show underlined: Gemini wrote placeholders and your phone filled them in.</string>
+    <string name="err_offline">You\'re offline. Quick tasks still work on this phone; Gemini needs a connection.</string>
+    <string name="err_busy">Gemini is busy right now. Try again in a moment, or answer on this phone instead (Settings).</string>
+    <string name="err_armor">Google\'s safety check stopped this request — something identifying may have slipped past Airlock. Nothing was answered.</string>
+    <string name="err_cloud_blocked">Gemini declined to answer this request.</string>
+    <string name="err_appcheck">This app couldn\'t prove it\'s genuine to Firebase (App Check). Please try again later.</string>
+    <string name="err_unavailable">The on-device model isn\'t available on this phone. Choose Automatic in Settings to use Gemini.</string>
+    <string name="err_other">Something went wrong. Nothing private was sent.</string>
+
+    <!-- Ledger -->
+    <string name="ledger_title">Ledger</string>
+    <string name="ledger_sub">Every request that left this phone has a receipt. Receipts are chained, so editing or deleting one breaks the chain.</string>
+    <plurals name="ledger_hero_label">
+        <item quantity="one">detail kept off the cloud this week</item>
+        <item quantity="other">details kept off the cloud this week</item>
+    </plurals>
+    <string name="ledger_hero_a11y">%1$d details kept off the cloud this week</string>
+    <plurals name="ledger_requests">
+        <item quantity="one">request sent to Gemini</item>
+        <item quantity="other">requests sent to Gemini</item>
+    </plurals>
+    <plurals name="ledger_on_device">
+        <item quantity="one">answer made on this phone</item>
+        <item quantity="other">answers made on this phone</item>
+    </plurals>
+    <string name="ledger_none_sealed">No details sealed yet.</string>
+    <string name="ledger_verify">Verify chain</string>
+    <plurals name="ledger_chain_ok">
+        <item quantity="one">Chain intact · %d receipt</item>
+        <item quantity="other">Chain intact · %d receipts</item>
+    </plurals>
+    <string name="ledger_chain_broken">Chain broken at receipt #%1$d</string>
+    <string name="ledger_chain_reason">Reason: %1$s</string>
+    <string name="ledger_receipts">Receipts</string>
+    <string name="ledger_empty">No receipts yet.</string>
+    <string name="ledger_empty_sub">Answers made on this phone don’t need one — nothing left.</string>
+    <string name="ledger_row">%1$s · %2$d characters · %3$s</string>
+    <string name="ledger_row_a11y">Receipt %1$d. %2$s. Double-tap to show exactly what left.</string>
+    <string name="ledger_exact">Exactly what left (sealed):</string>
+    <string name="ledger_not_kept">(not kept)</string>
+    <string name="ledger_checks">Checks passed: %1$s · Seal %2$d ms · Network %3$d ms</string>
+    <string name="ledger_gate_ok">Gate passed</string>
+    <string name="ledger_gate_bypassed">Gate bypassed</string>
+    <string name="ledger_on_device_model">On this phone</string>
+
+    <!-- Vault -->
+    <string name="vault_title">Vault</string>
+    <string name="vault_sub">Names and details Airlock always protects, even if the on-device model misses them. Encrypted and kept only on this phone — never synced.</string>
+    <string name="vault_kind_a11y">Kind</string>
+    <string name="vault_kind_id">ID number</string>
+    <string name="vault_name_hint">e.g. Raj Patel</string>
+    <string name="vault_name_a11y">Name or detail</string>
+    <string name="vault_role_hint">role, e.g. landlord</string>
+    <string name="vault_role_a11y">Role</string>
+    <string name="vault_alias_hint">Other ways you write it, comma-separated (e.g. Raj, Mr Patel)</string>
+    <string name="vault_alias_a11y">Aliases</string>
+    <string name="vault_add">Add</string>
+    <string name="vault_empty">Nothing here yet.</string>
+    <string name="vault_empty_sub">Add the names you never want to share — Airlock will catch them even if the on-device model misses one.</string>
+    <string name="vault_you">%1$s (you)</string>
+    <string name="vault_also">also “%1$s”</string>
+    <string name="vault_remove">Remove</string>
+    <string name="vault_remove_a11y">Remove %1$s</string>
+    <string name="role_my">my %1$s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_dial">Privacy dial</string>
+    <string name="settings_pref">Where answers come from</string>
+    <string name="pref_auto">Automatic</string>
+    <string name="pref_phone">This phone only</string>
+    <string name="pref_best">Best answer</string>
+    <string name="settings_pref_note">Automatic answers quick tasks on this phone and sends harder ones, sealed, to Gemini. With “This phone only”, nothing is ever sent.</string>
+    <string name="settings_honest_title">What Airlock does and doesn’t do</string>
+    <string name="settings_honest">Airlock hides who you are, not what happened. It finds names, places, contact details and IDs on your phone and replaces them before anything is sent. Detection isn’t perfect, so you always see exactly what leaves. Airlock helps you understand and prepare; it doesn’t give legal, medical or financial advice.</string>
+    <string name="settings_storage">Raw text you paste is kept encrypted on this phone for %1$d days, then deleted. Nothing is backed up or synced.</string>
+    <string name="settings_mode_live">Mode: live (Firebase AI Logic — Gemini Nano on this phone, Gemini in the cloud).</string>
+    <string name="settings_mode_demo">Mode: demo (scripted answers, separate storage).</string>
+    <string name="settings_delete_title">Delete everything</string>
+    <string name="settings_delete_body">Removes your Vault, conversations, receipts and the encryption key from this phone.</string>
+    <string name="settings_delete_button">Delete everything…</string>
+    <string name="settings_delete_confirm">Yes, delete everything</string>
+</resources>
