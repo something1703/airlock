@@ -160,7 +160,8 @@ fun AirButton(
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed && enabled && !reduceMotion()) 0.97f else 1f, tween(140, easing = EaseOutExpo), label = "press")
     val (bg, fg, border) = when (kind) {
-        ButtonKind.PRIMARY -> Triple(c.seal, c.onSeal, c.seal)
+        // Disabled primary: a neutral fill, so it never reads as an enabled (darker) seal button in dark mode.
+        ButtonKind.PRIMARY -> if (enabled) Triple(c.seal, c.onSeal, c.seal) else Triple(c.stroke, c.text2, c.stroke)
         ButtonKind.DEFAULT -> Triple(c.raised, c.text, c.stroke)
         ButtonKind.GHOST -> Triple(Color.Transparent, c.text2, Color.Transparent)
         ButtonKind.DANGER -> Triple(c.raised, c.risk, c.stroke)
@@ -170,7 +171,7 @@ fun AirButton(
     Row(
         modifier
             .scale(scale)
-            .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
+            .graphicsLayer { alpha = if (enabled || kind == ButtonKind.PRIMARY) 1f else 0.5f }
             .defaultMinSize(minHeight = if (compact) 40.dp else 48.dp)
             .clip(shape)
             .background(bg)
@@ -229,7 +230,7 @@ fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> 
                 horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             ) {
                 icons?.getOrNull(i)?.let { Icon(it, null, Modifier.size(15.dp), tint = fg) }
-                Text(label, style = Type.small.copy(fontSize = 14.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal), color = fg, maxLines = 1)
+                Text(label, style = Type.small.copy(fontSize = 14.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal), color = fg, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }
