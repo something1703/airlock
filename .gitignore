@@ -62,5 +62,9 @@ eval/runs/
 # Firebase Hosting deploy copy of web/dist (built by predeploy)
 firebase/hosting/
 
+# Functions build output and emulator logs
+functions/lib/
+*-debug.log
+
 # Agent worktrees (local only)
 .claude/worktrees/

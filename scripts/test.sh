@@ -64,6 +64,11 @@ fi
 
 if [[ -f functions/package.json ]]; then
   echo "▶ Cloud Functions (npm test)"
-  (cd functions && npm test --silent)
+  # Rules + function tests need the Firestore emulator (Java 21 + firebase CLI); without it only the pure tests run.
+  if command -v firebase >/dev/null 2>&1; then
+    (cd functions && JAVA_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null || echo "${JAVA_HOME:-}") npm run test:emulator --silent)
+  else
+    (cd functions && npm test --silent)
+  fi
 fi
 echo "✔ All available test suites passed"

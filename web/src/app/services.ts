@@ -8,6 +8,7 @@ import { bootFirebase, signInQuietly, type FirebaseStatus } from "../ai/firebase
 import { FirebaseEngines } from "../ai/firebaseEngines";
 import { chromeAvailability } from "../ai/chromeModel";
 import { loadRemoteConfig } from "../ai/remoteConfig";
+import { FirestoreSync, type SealedSync } from "../ai/sync";
 import { AirlockStores, EncryptedStore } from "../store/encryptedStore";
 
 export interface Services {
@@ -21,6 +22,8 @@ export interface Services {
   stores: AirlockStores;
   firebase: FirebaseStatus;
   mode: "live" | "demo" | "noCloud";
+  /** Sealed-history backup (live mode only). */
+  sync?: SealedSync;
 }
 
 /** No Firebase config: the on-device model can't be reached (all AI goes through Firebase AI Logic), and nothing can go to the cloud. */
@@ -79,7 +82,7 @@ export async function createServices(search = typeof location !== "undefined" ? 
   const livePatterns = new PatternDetector(undefined, liveConfig.disabledPatternPacks);
   const engines = new FirebaseEngines(firebase.app, liveConfig, livePrompts);
   return {
-    config: liveConfig, prompts: livePrompts, patterns: livePatterns, engines, stores, firebase, mode: "live",
+    config: liveConfig, prompts: livePrompts, patterns: livePatterns, engines, stores, firebase, mode: "live", sync: new FirestoreSync(firebase.app),
     availability: chromeAvailability,
     initializeOnDevice: (onProgress) => engines.initializeOnDevice(onProgress),
   };
