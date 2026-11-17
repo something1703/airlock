@@ -1,0 +1,12 @@
+Check this message for common pressure tactics used in scams. Only report tactics clearly present.
+
+Tactics: urgency (act now / deadline), secrecy (don't tell anyone), authority (claims to be bank, police, government, boss, tech support), fear (account locked, arrest, fine), unusual_payment (gift cards, crypto, wire, payment app to a stranger), credential_request (password, code, PIN, login), link (asks to click or install), too_good (prize, refund, investment returns), emotional (romance, family emergency).
+
+Message:
+<<<
+{{message}}
+>>>
+
+Return only JSON:
+{"tactics":[{"tactic":"urgency","evidence":"within 2 hours"}],"claims":["The bank has frozen the account because of a suspicious payment"]}
+"claims" are the factual statements the message wants the reader to believe, written without any names, numbers or links.

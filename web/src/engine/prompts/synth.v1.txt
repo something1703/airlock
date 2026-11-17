@@ -1,0 +1,8 @@
+Create one realistic but entirely fictional {{doc_type}} written by {{persona}} in {{language}}, about {{situation}}. Length {{length}} words. Include natural private details: names of people, an employer or organisation, a town or city, a street address, at least one phone number or email, and one or two ID-like numbers. Add {{quasi_count}} subtle identifying details (a rare job title, a unique local landmark, a specific event).
+
+Return only JSON:
+{"text":"...",
+ "gold":[{"text":"exact substring","type":"PERSON|ORG|LOCATION|CONTACT|ID|DATE|HEALTH|SECRET","role":"..."}],
+ "quasi":[{"text":"exact substring","reveals":"occupation"}],
+ "profile":{"name":"...","city":"...","employer":"...","age":37,"occupation":"..."},
+ "task":"what the writer wants help with"}

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web engine (typecheck + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  lint-and-fixtures:
+    name: Invariant lint + fixture freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fixtures regenerate byte-identically
+        run: |
+          python3 -I spec/tools/make_fixtures.py
+          git diff --exit-code -- spec/fixtures
+      - name: Invariant lint
+        run: ./scripts/lint.sh
+
+  swift:
+    name: AirlockKit (swift test)
+    runs-on: macos-26
+    # Best effort until GitHub's macOS images ship an Xcode with the macOS 26+ SDK (see docs/09-TESTING.md).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+      - name: swift test
+        working-directory: Packages/AirlockKit
+        run: swift test

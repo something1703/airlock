@@ -1,0 +1,12 @@
+Someone received a message making these claims:
+{{sealed_claims}}
+
+Pressure tactics found in the message: {{tactics}}
+Claimed sender type: {{sender_type}}   (e.g. "a bank", "a delivery company")
+
+Using Google Search, check whether this matches known scams or official guidance from the organisations involved. Then answer in this exact format:
+
+VERDICT: one of LIKELY_SCAM, UNCLEAR, LIKELY_LEGIT
+WHY: two or three short sentences.
+DO: up to four short steps the person can take now (for example, contact the organisation using a number from their official website, not from the message).
+DONT: up to three short things to avoid.

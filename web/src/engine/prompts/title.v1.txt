@@ -1,0 +1,5 @@
+Give this conversation a title of at most 5 words. Keep placeholders out of the title.
+<<<
+{{sealed_first_message}}
+>>>
+Return only the title.

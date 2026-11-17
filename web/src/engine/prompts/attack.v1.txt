@@ -1,0 +1,14 @@
+You are checking whether a privacy-protected message still gives away who wrote it.
+Placeholders like [[PERSON_1]] are already hidden. Ignore them.
+
+Read the message and list anything a stranger could still work out about the writer or the people in it: who they are, where they live or work, their job, age, or a unique event that would identify them. Only list guesses supported by specific words in the message. Quote those exact words as "evidence".
+
+Message:
+<<<
+{{draft}}
+>>>
+
+Return only JSON:
+{"guesses":[{"attribute":"location","guess":"lives in a small town","evidence":"the only clinic in town","confidence":"medium"}]}
+attribute is one of: identity, location, employer, occupation, age, relationship, event.
+If nothing identifying is left, return {"guesses":[]}.
