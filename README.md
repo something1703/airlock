@@ -115,6 +115,8 @@ The iOS/macOS app (`App/`) never calls Firebase AI Logic directly: `App/Services
 | Deep answers on sealed text | `PREFER_IN_CLOUD` / `ONLY_IN_CLOUD`, model fallback chain | `generateContentStream(text, { signal, timeout })`, unary last resort | `FirebaseSealedEngine.stream` |
 | Which side answered | — | `response.inferenceSource` (`on_device` / `in_cloud`) | `FirebaseSealedEngine` |
 
+**Other Firebase services** (not AI calls, listed for completeness): Remote Config (`web/src/ai/remoteConfig.ts`), App Check (reCAPTCHA v3 on web, App Attest / Play Integrity on Apple / Android), anonymous Auth, Firestore sealed-history backup (`web/src/ai/sync.ts`, rules in `firebase/firestore.rules`), Hosting, and Cloud Functions in `functions/` (`aggregateStats`, `scanSealed` — Sensitive Data Protection on already-sealed text — and `deleteUserData`).
+
 ---
 
 ## Quick start (developers)

@@ -15,6 +15,9 @@ import { restore, fidelityCheck } from "../engine/restore";
 import { writesAsUser } from "../engine/answer";
 import type { StoredSealed, StoredTurn, ThreadRecord } from "../store/encryptedStore";
 import type { SealDraft } from "../engine/sealer";
+import type { SyncBatch } from "../ai/sync";
+import { assistantTurnDto, receiptDto, threadDto, userTurnDto, type ReceiptDto } from "./syncDto";
+import type { Route } from "../engine/types";
 
 export type Screen = "onboarding" | "ask" | "review" | "thread" | "ledger" | "vault" | "settings";
 
@@ -22,6 +25,8 @@ export interface Prefs {
   dial: DialPreset;
   preference: AnswerPreference;
   onboarded: boolean;
+  /** Back up sealed history (only turns that already went to Gemini) to Firestore. */
+  backup: boolean;
 }
 
 export interface UserTurn {
@@ -80,7 +85,7 @@ export interface State {
 }
 
 const prefsKey = (mode: string): string => (mode === "demo" ? "airlock.prefs.demo.v1" : "airlock.prefs.v1");
-const defaultPrefs: Prefs = { dial: "balanced", preference: "auto", onboarded: false };
+const defaultPrefs: Prefs = { dial: "balanced", preference: "auto", onboarded: false, backup: true };
 
 function loadPrefs(mode: string): Prefs {
   try {
@@ -315,6 +320,37 @@ export class AirlockSession {
     await this.stream(threadId, sealed, r.task, entities, history, r.result.sealMs);
     if (isNew) await this.nameThread(threadId, sealed);
     await this.persistThread(threadId);
+    void this.backup(threadId);
+  }
+
+  /**
+   * Sealed-history backup. Only pairs whose answer has a receipt (i.e. the sealed text already went to Gemini)
+   * are synced, so "On this device · nothing sent" stays true for on-device answers. Never blocks the UI.
+   */
+  private async backup(threadId: string): Promise<void> {
+    const sync = this.services.sync;
+    const t = this.state.threads.find((x) => x.id === threadId);
+    if (!sync || !this.state.prefs.backup || !t) return;
+    const turns: SyncBatch["turns"] = [];
+    let receipt: ReceiptDto | null = null;
+    let lastRoute: Route = "cloudFirst";
+    t.turns.forEach((turn, i) => {
+      const answer = t.turns[i + 1];
+      if (turn.kind !== "user" || !turn.sealed || answer?.kind !== "assistant" || !answer.outcome?.receipt) return;
+      const o = answer.outcome;
+      const r = o.receipt!;
+      const at = Date.parse(r.createdAt) || Date.now();
+      turns.push({ id: `${String(i).padStart(3, "0")}-user`, dto: userTurnDto(turn.sealed, o.route, o.modelVersion, r.id, at) });
+      turns.push({ id: `${String(i + 1).padStart(3, "0")}-assistant`, dto: assistantTurnDto(o.modelText, o.route, o.modelVersion, r.id, at) });
+      receipt = receiptDto(r);
+      lastRoute = o.route;
+    });
+    if (!turns.length) return;
+    try {
+      await sync.push({ threadId, thread: threadDto({ title: t.title, createdAt: t.createdAt, updatedAt: Date.now(), lastRoute, turnCount: turns.length }), turns, receipt, profile: { dial: this.state.prefs.dial, appVersion: "web-0.1.0" } });
+    } catch {
+      // Backup is best-effort; the conversation is saved locally regardless.
+    }
   }
 
   /** On-device title from the *sealed* first message (`title.v1`), so a title can't contain a real name. */
@@ -391,6 +427,7 @@ export class AirlockSession {
   /** Deletes a conversation, its entity map and captures. Its receipts stay: the chain must stay verifiable. */
   async deleteThread(id: string): Promise<void> {
     await this.services.stores.deleteThread(id);
+    void this.services.sync?.deleteThread(id).catch(() => {});
     this.set({ threads: this.state.threads.filter((t) => t.id !== id), ...(this.state.currentThreadId === id ? { currentThreadId: null, screen: "ask" as Screen } : {}) });
   }
 
@@ -428,6 +465,7 @@ export class AirlockSession {
   }
 
   async deleteEverything(): Promise<void> {
+    await this.services.sync?.deleteAll().catch(() => {});
     await this.services.stores.deleteEverything();
     this.ledger.receipts.length = 0;
     try {

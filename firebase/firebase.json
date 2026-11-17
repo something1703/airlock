@@ -1,6 +1,7 @@
 {
-  "remoteconfig": {
-    "template": "remoteconfig.template.json"
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "hosting": {
     "public": "hosting",
@@ -69,12 +70,19 @@
       }
     ]
   },
+  "remoteconfig": {
+    "template": "remoteconfig.template.json"
+  },
   "emulators": {
     "hosting": {
       "port": 5055
     },
     "ui": {
       "enabled": false
-    }
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "singleProjectMode": true
   }
 }

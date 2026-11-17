@@ -6,7 +6,7 @@ import { AirlockSession, cleanTitle, titleFrom } from "../src/app/session";
 const SAMPLE = "Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I work nights at Mercy General Hospital. You can reach me on 312-555-0147. Thanks, Maya Chen";
 
 async function demoSession(): Promise<AirlockSession> {
-  const s = new AirlockSession(await createServices("?demo=1"), { dial: "balanced", preference: "best", onboarded: true });
+  const s = new AirlockSession(await createServices("?demo=1"), { dial: "balanced", preference: "best", onboarded: true, backup: true });
   await s.load();
   await s.deleteEverything();
   s.setPrefs({ onboarded: true, preference: "best" });
@@ -78,7 +78,7 @@ describe("AirlockSession (demo engines, end to end)", () => {
     await s.send();
     const id = s.getState().currentThreadId!;
 
-    const again = new AirlockSession(s.services, { dial: "balanced", preference: "best", onboarded: true });
+    const again = new AirlockSession(s.services, { dial: "balanced", preference: "best", onboarded: true, backup: true });
     await again.load();
     const t = again.getState().threads.find((x) => x.id === id)!;
     expect(t.turns).toHaveLength(2);
@@ -100,7 +100,7 @@ describe("AirlockSession (demo engines, end to end)", () => {
     if (loc) s.toggleEntity(loc.id);
     await s.send();
     await s.saveVault([...s.getState().vault, { id: "w", canonical: "Willowbrook Court", aliases: ["Willowbrook"], category: "location", isUser: false }]);
-    const again = new AirlockSession(s.services, { dial: "balanced", preference: "best", onboarded: true });
+    const again = new AirlockSession(s.services, { dial: "balanced", preference: "best", onboarded: true, backup: true });
     await again.load();
     const user = again.getState().threads[0]!.turns[0]!;
     expect(user.kind === "user" && user.sealed).toBeNull();
