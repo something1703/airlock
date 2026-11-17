@@ -198,6 +198,9 @@ describe("Protect this (user-marked details)", () => {
     const r = await p.run("Visit 14 Elm St tomorrow");
     const out = p.protect(r, "Elm", "location", new Map()).result;
     expect(out.draft.text).not.toContain("Elm");
+  });
+});
+
 describe("red-team locate", () => {
   it("finds evidence case-insensitively even when the draft is already lower-case (regression)", () => {
     expect(locate("Near the old mill", "we live near the old mill.")).toEqual([{ start: 8, end: 25 }]);
