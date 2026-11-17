@@ -44,8 +44,8 @@ jobs:
   swift:
     name: AirlockKit (swift test)
     runs-on: macos-26
-    # Best effort until GitHub's macOS images ship an Xcode with the macOS 26+ SDK (see docs/09-TESTING.md).
-    continue-on-error: true
+    # GitHub's image has an older Xcode (26.6 / Swift 6.3) than local development (27.2 / 6.4): this job
+    # proves the package still builds and passes on the older toolchain.
     steps:
       - uses: actions/checkout@v4
       - name: Select newest Xcode
