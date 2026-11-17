@@ -120,6 +120,36 @@ class DetectTest {
         }
     }
 
+    /** `Math.log2` values from node (V8); `ln(x)/ln 2` differs in the last bit for some, which can flip the entropy threshold. */
+    @Test fun log2IsV8Exact() {
+        val cases = listOf(
+            (7.0 / 11) to -0.6520766965796931, (5.0 / 27) to -2.4329594072761065, (1.0 / 24) to -4.584962500721156,
+            (1.0 / 10) to -3.321928094887362, 0.125 to -3.0, 1.0 to 0.0,
+        )
+        for ((x, want) in cases) assertEquals(want, JsMath.log2(x), "log2($x)")
+        // Entropy exactly at the 3.5 threshold (8 symbols × 2, 4 symbols × 4 → H = 3.5) must count as a secret.
+        assertEquals(3.5, Validators.shannonEntropy("aabbccddeeffgghh" + "1111222233334444"))
+    }
+
+    /** Found by differential testing against the web engine: Java regex defaults differ from JS `u`/`iu`. */
+    @Test fun regexSemanticsMatchJavaScript() {
+        val d = PatternDetector()
+        // Java's \b treats a combining mark after a letter as a word char; JS (ASCII \b) does not.
+        assertTrue(d.detect("x éGB82WEST12345698765432 y").any { it.subtype == "iban" && it.text == "GB82WEST12345698765432" })
+        // JS `iu` doesn't fold Turkish İ to i (Java UNICODE_CASE does), so no case-insensitive rule may swallow it.
+        assertTrue(d.detect("x İstanbul312-555-0147 y").none { it.text.contains('İ') })
+        assertTrue(Js.pattern("[A-Za-z0-9]+", ignoreCase = true).matcher("İstanbul").let { it.find() && it.group() == "stanbul" })
+        // …but it does fold ſ to s and the Kelvin sign to k.
+        assertTrue(Js.pattern("^pass$", ignoreCase = true).matcher("paſſ").matches())
+        assertTrue(Js.pattern("^k$", ignoreCase = true).matcher("K").matches())
+        assertFalse(Js.pattern("^i$", ignoreCase = true).matcher("İ").matches())
+        assertFalse(Js.pattern("^i$", ignoreCase = true).matcher("ı").matches())
+        // JS \s includes U+FEFF and excludes U+0085.
+        assertTrue(Js.pattern("^a\\sb$").matcher("a﻿b").matches())
+        assertFalse(Js.pattern("^a\\sb$").matcher("a\u0085b").matches())
+        assertFalse(Js.pattern("^a$").matcher("a\n").find())
+    }
+
     @Test fun disablingAPackAndBadRules() {
         assertFalse(PatternDetector(PatternPacks.BUNDLED, setOf("national")).detect("PAN ABCPE1234F").any { it.subtype == "national_id" })
         val bad = assertFailsWith<IllegalArgumentException> { PatternDetector(listOf(PatternPack("x", "", listOf(PatternRule("bad", "id", "x", "low", "("))))) }

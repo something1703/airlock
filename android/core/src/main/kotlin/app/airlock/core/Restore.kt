@@ -42,7 +42,7 @@ class PlaceholderParser(val knownIds: Set<PlaceholderId>) {
     companion object {
         const val MAX_TOKEN_LENGTH = 24
         private const val CATS = "PERSON|ORG|LOC|CONTACT|ID|DATE|HEALTH|SECRET"
-        private val BRACKETED = Pattern.compile("(\\[\\[|\\[|【)[ ]{0,2}($CATS)([_ ])(\\d{1,4}|ME)[ ]{0,2}(\\]\\]|\\]|】)", Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CASE)
+        private val BRACKETED = Js.pattern("(\\[\\[|\\[|【)[ ]{0,2}($CATS)([_ ])(\\d{1,4}|ME)[ ]{0,2}(\\]\\]|\\]|】)", ignoreCase = true)
         private val BARE = Pattern.compile("(?<![A-Za-z0-9_\\[【])($CATS)_(\\d{1,4}|ME)(?![A-Za-z0-9_\\]】])")
 
         private fun canonicalId(cat: String, idx: String): PlaceholderId? {
