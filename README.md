@@ -112,6 +112,15 @@ Firebase AI Logic iOS SDK **12.19.0** (the release with the documented `HybridMo
 | Deep answers on sealed text | `PREFER_IN_CLOUD` / `ONLY_IN_CLOUD`, model fallback chain | `generateContentStream(text, { signal, timeout })`, unary last resort | `FirebaseSealedEngine.stream` |
 | Which side answered | — | `response.inferenceSource` (`on_device` / `in_cloud`) | `FirebaseSealedEngine` |
 
+**Android app** (`android/`, Firebase BoM 35.2.0 = `firebase-ai` 18.2.0 + `firebase-ai-ondevice` 16.0.0-beta08): every call is in `android/app/src/main/kotlin/app/airlock/android/engines/` (a test fails if Firebase AI is used anywhere else).
+
+| Capability | Inference mode | Firebase AI Logic call | File |
+|-----------|----------------|------------------------|------|
+| Detection, generalising, red-team, titles on raw/sealed text | `InferenceMode.ONLY_ON_DEVICE` (Gemini Nano via ML Kit / AICore), temperature 0, topK 1 | `generativeModel(..., onDeviceConfig = OnDeviceConfig(...))`, `generateContent` | `FirebaseEngines` (phone engine) |
+| Model status, download, warm-up | — | `onDeviceExtension.checkStatus()`, `download()`, `warmUp()` | `FirebaseEngines` |
+| Quick tasks / deep answers on sealed text | `PREFER_ON_DEVICE` / `PREFER_IN_CLOUD` / `ONLY_IN_CLOUD`, model fallback chain | `generateContentStream` with first-chunk guard, unary last resort | `HybridEngines`, `FirebaseModelCaller` |
+| Which side answered | — | `GenerateContentResponse.inferenceSource` | `FirebaseModelCaller` |
+
 **Other Firebase services** (not AI calls, listed for completeness): Remote Config (`web/src/ai/remoteConfig.ts`), App Check (reCAPTCHA v3 on web, App Attest / Play Integrity on Apple / Android), anonymous Auth, Firestore sealed-history backup (`web/src/ai/sync.ts`, rules in `firebase/firestore.rules`), Hosting, and Cloud Functions in `functions/` (`aggregateStats`, `scanSealed` — Sensitive Data Protection on already-sealed text — and `deleteUserData`).
 
 ---
