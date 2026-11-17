@@ -7,6 +7,7 @@ import type { Route } from "../engine/types";
 import { bootFirebase, signInQuietly, type FirebaseStatus } from "../ai/firebase";
 import { FirebaseEngines } from "../ai/firebaseEngines";
 import { chromeAvailability } from "../ai/chromeModel";
+import { loadRemoteConfig } from "../ai/remoteConfig";
 import { AirlockStores, EncryptedStore } from "../store/encryptedStore";
 
 export interface Services {
@@ -72,9 +73,13 @@ export async function createServices(search = typeof location !== "undefined" ? 
     return { config, prompts, patterns, engines: new NoCloudEngines(), availability: async () => "unavailable", stores, firebase, mode: "noCloud" };
   }
   void signInQuietly(firebase.app);
-  const engines = new FirebaseEngines(firebase.app, config, prompts);
+  // Live mode: Remote Config (model names, thresholds, prompt overrides) replaces the bundled defaults.
+  const liveConfig = new AppConfig(await loadRemoteConfig(firebase.app));
+  const livePrompts = new PromptLibrary(liveConfig.promptOverridesJson);
+  const livePatterns = new PatternDetector(undefined, liveConfig.disabledPatternPacks);
+  const engines = new FirebaseEngines(firebase.app, liveConfig, livePrompts);
   return {
-    config, prompts, patterns, engines, stores, firebase, mode: "live",
+    config: liveConfig, prompts: livePrompts, patterns: livePatterns, engines, stores, firebase, mode: "live",
     availability: chromeAvailability,
     initializeOnDevice: (onProgress) => engines.initializeOnDevice(onProgress),
   };
