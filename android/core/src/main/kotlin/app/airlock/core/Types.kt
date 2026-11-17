@@ -245,7 +245,7 @@ class SealedText internal constructor(
     /** Exactly what leaves the device. */
     fun outbound(): String = if (legend.isEmpty()) value else "$value\n\n${renderedLegend()}"
 
-    override fun toString(): String = "SealedText(${value.length} chars)"
+    override fun toString(): String = "Sealed(${value.length} chars)"
 }
 
 /** Capability that only the egress gate holds. */
