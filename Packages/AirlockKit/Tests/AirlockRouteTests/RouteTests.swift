@@ -163,3 +163,31 @@ func sealedMessage(_ text: String = "Hi [[PERSON_1]], the heater is still broken
         #expect(stats.byCategory["person"] == 10 && stats.sealedDetails == 10)
     }
 }
+
+@Suite struct ThreadTitlerTests {
+    @Test func cleanAcceptsPlainShortTitles() {
+        #expect(ThreadTitler.clean("Title: \"broken heater repair\"\n") == "Broken heater repair")
+        #expect(ThreadTitler.clean("**Asking for a repair.**") == "Asking for a repair")
+    }
+
+    @Test func cleanRejectsPlaceholdersAndLongOutput() {
+        #expect(ThreadTitler.clean("Reply to [[PERSON_1]]") == nil)
+        #expect(ThreadTitler.clean("Reply to PERSON_1 now") == nil)
+        #expect(ThreadTitler.clean("Note from ME") == nil)
+        #expect(ThreadTitler.clean("one two three four five six seven eight") == nil)
+        #expect(ThreadTitler.clean("1234") == nil)
+        #expect(ThreadTitler.clean("   ") == nil)
+    }
+
+    @Test func titlesTheSealedTextOnDevice() async throws {
+        let phone = MockPhoneEngine { id, _ in id == "title.v1" ? "Heater repair request" : "{}" }
+        let titler = ThreadTitler(phone: phone, prompts: try PromptLibrary())
+        #expect(await titler.title(for: try sealedMessage()) == "Heater repair request")
+        #expect(phone.calledPromptIDs == ["title.v1"])
+    }
+
+    @Test func unavailableModelGivesNoTitle() async throws {
+        let phone = MockPhoneEngine(availability: .appleIntelligenceNotEnabled) { _, _ in "Should not be used" }
+        #expect(await ThreadTitler(phone: phone, prompts: try PromptLibrary()).title(for: try sealedMessage()) == nil)
+    }
+}

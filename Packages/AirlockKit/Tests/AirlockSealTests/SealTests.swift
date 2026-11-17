@@ -317,6 +317,35 @@ struct GateFixture: Decodable {
         #expect(sealed.gateReport.counts["person"] == 1)
     }
 
+    @Test func storedTurnRegatesAndFailsOnceVaultChanges() throws {
+        let raj = Entity(
+            id: PlaceholderID(category: .person, number: 1), category: .person, canonical: "Raj Patel", surfaceForms: ["Raj Patel", "Raj"],
+            sources: [.llm], confidence: .high)
+        let legend = [LegendLine(placeholder: raj.id, description: "the user's landlord")]
+        let stored = SealDraft(
+            storedText: "My neighbour Dana says [[PERSON_1]] still hasn't fixed the heater.", legend: legend, entities: EntityMap([raj]),
+            revealedVaultIDs: [], keptValues: [])
+        #expect(stored.replacements.isEmpty && stored.secretWarnings.isEmpty)
+
+        // Passes the gate again with the Vault it was sealed under.
+        let sealed = try EgressGate(patterns: fixturePatterns, vault: []).seal(stored)
+        #expect(sealed.value == stored.text)
+
+        // The user later adds "Dana" to the Vault: the stored turn must no longer leave (G1).
+        let vault = [VaultEntry(id: "v-dana", canonical: "Dana", category: .person, roleHint: "my neighbour")]
+        do {
+            _ = try EgressGate(patterns: fixturePatterns, vault: vault).seal(stored)
+            Issue.record("expected G1 to block the stored turn")
+        } catch {
+            #expect(error.checks.contains(.g1VaultTerms))
+        }
+
+        // Revealing that Vault entry this time is honoured on reload too.
+        let revealed = SealDraft(
+            storedText: stored.text, legend: legend, entities: EntityMap([raj]), revealedVaultIDs: ["v-dana"], keptValues: [])
+        #expect(throws: Never.self) { try EgressGate(patterns: fixturePatterns, vault: vault).seal(revealed) }
+    }
+
     #if DEBUG
         @Test func debugBypassIsMarked() {
             let gate = EgressGate(patterns: fixturePatterns, vault: [])

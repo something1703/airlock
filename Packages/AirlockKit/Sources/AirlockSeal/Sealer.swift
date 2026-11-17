@@ -28,6 +28,21 @@ public struct SealDraft: Sendable, Hashable {
     public let keptValues: Set<String>
 }
 
+extension SealDraft {
+    /// Rebuilds a draft from a sealed turn saved on this device, so it can go back through
+    /// `EgressGate.seal` before it is reused (e.g. as follow-up history).
+    ///
+    /// Guarantees: this creates only a *draft* — never `SealedText`. A stored turn is never
+    /// trusted: it reaches the cloud only if it passes every gate check again against the
+    /// current Vault (INV-2). `replacements` and `secretWarnings` are empty (they only drive
+    /// the Review screen, which a stored turn no longer shows).
+    public init(storedText text: String, legend: [LegendLine], entities: EntityMap, revealedVaultIDs: Set<String>, keptValues: Set<String>) {
+        self.init(
+            text: text, legend: legend, replacements: [], entities: entities, secretWarnings: [], revealedVaultIDs: revealedVaultIDs,
+            keptValues: keptValues)
+    }
+}
+
 /// Stage 6 — build the sealed draft and its legend (`docs/03-PRIVACY-ENGINE.md` §7).
 ///
 /// Guarantees:

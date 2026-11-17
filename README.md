@@ -99,8 +99,11 @@ Firebase AI Logic iOS SDK **12.19.0** (the release with the documented `HybridMo
 | Deep answers on sealed text (streaming) | Cloud first, on-device fallback | `.hybridModel(primary: .geminiModel(...), secondary: .systemModel())`, `streamResponse` | same |
 | Private tools (function calling) | Cloud only | `generativeModel(modelName:tools: [.functionDeclarations])` + `Chat` | `AirlockEngines/ToolAndSearchEngines.swift` (`FirebaseToolEngine`) |
 | Fact check with Google Search | Cloud only | `generativeModel(modelName:tools: [.googleSearch()])` | `AirlockEngines/ToolAndSearchEngines.swift` (`FirebaseSearchEngine`) |
+| Conversation titles from the **sealed** first message (`title.v1`) | On-device only | same phone-only session | `AirlockRoute/ThreadTitler.swift`, called from `App/Features/Session/AirlockSession.swift` |
 | Which model answered | — | `response.rawResponse.modelVersion` | `AirlockCore/Route.swift` (`EngineResult.ranOnDevice`) |
 | Phone model availability | — | `FirebaseAI.SystemLanguageModel.default.availability` | `AirlockEngines/ErrorMapper.swift` |
+
+The iOS/macOS app (`App/`) never calls Firebase AI Logic directly: `App/Services/AppServices.swift` creates `FirebaseEngines` (live) or scripted demo engines (`-demo`, the Demo scheme, or no Firebase config), and `App/Features/Session/AirlockSession.swift` drives `SealPipeline` → `EgressGate` → `AnswerService`.
 
 **Web app** (`web/`, `firebase@13.3.0`): every call is in `web/src/ai/firebaseEngines.ts`, the only web file that imports `firebase/ai` (lint-enforced).
 
