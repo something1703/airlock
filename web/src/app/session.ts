@@ -17,7 +17,7 @@ import type { StoredSealed, StoredTurn, ThreadRecord } from "../store/encryptedS
 import type { SealDraft } from "../engine/sealer";
 import type { SyncBatch } from "../ai/sync";
 import { assistantTurnDto, receiptDto, threadDto, userTurnDto, type ReceiptDto } from "./syncDto";
-import type { Route } from "../engine/types";
+import type { PrivacyCategory, Route } from "../engine/types";
 
 export type Screen = "onboarding" | "ask" | "review" | "thread" | "ledger" | "vault" | "settings";
 
@@ -269,6 +269,17 @@ export class AirlockSession {
     const isKept = e.action.kind === "keep";
     overrides.set(id, isKept ? { action: PLACEHOLDER, revealThisTime: false } : { action: KEEP, revealThisTime: e.vaultEntryId != null });
     this.reseal(overrides, r.accepted);
+  }
+
+  /** "Protect this": mark a phrase the detectors missed; every occurrence becomes a placeholder. No model call. */
+  protect(phrase: string, category: Exclude<PrivacyCategory, "quasi">): boolean {
+    const r = this.state.review;
+    if (!r?.result) return false;
+    const before = r.result;
+    const { result, overrides } = this.pipeline().protect(r.result, phrase, category, r.overrides, r.accepted);
+    if (result === before) return false;
+    this.setReview({ result, overrides, blocked: null });
+    return true;
   }
 
   acceptRisk(risk: Risk): void {

@@ -140,6 +140,21 @@ describe("AirlockSession (demo engines, end to end)", () => {
     for (const bad of ["", "{}", "Heater for [[PERSON_1]]", "Heater for PERSON_1", "a ".repeat(40), "one two three four five six seven eight"]) expect(cleanTitle(bad)).toBeNull();
   });
 
+  it("Protect this: a missed phrase is sealed everywhere, survives later toggles, and never reaches the outbound text", async () => {
+    const s = await demoSession();
+    await s.startReview("The leak at Willowbrook Court got worse. Willowbrook Court management won't answer, Raj.", { kind: "help" });
+    expect(s.getState().review!.result!.draft.text).toContain("Willowbrook");
+    expect(s.protect("willowbrook court", "location")).toBe(true);
+    expect(s.getState().review!.result!.draft.text).not.toContain("Willowbrook");
+    const raj = s.getState().review!.result!.draft.entities.sorted().find((e) => e.canonical === "Raj Patel")!;
+    s.toggleEntity(raj.id); // a later toggle must not undo the user's mark
+    expect(s.getState().review!.result!.draft.text).not.toContain("Willowbrook");
+    expect(s.protect("Nowhere Clinic", "org")).toBe(false);
+    await s.send();
+    expect(s.ledger.receipts.at(-1)!.outboundText).not.toContain("Willowbrook");
+    expect(s.getState().threads[0]!.turns.at(-1)!.kind === "assistant").toBe(true);
+  });
+
   it("titles never contain placeholder tokens", () => {
     expect(titleFrom("Hi [[PERSON_1]], the heater at [[LOC_1]] has been broken")).toBe("Hi someone the heater at a place");
     expect(titleFrom("[[PERSON_ME]]")).toBe("Me");
