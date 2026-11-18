@@ -68,7 +68,7 @@ The harness was not committed. The final run found 0 mismatches.
 
 - `redTeam.ts` `locate`: the case-insensitive pass uses `hay === text` to choose the needle. If the draft is already all
   lower-case, the second pass reuses the original-case needle, so "Near the old mill" is not found in "near the old
-  mill". Ported as is.
+  mill". **Fixed on 17 Nov in web (#8) and Kotlin** with regression tests; Swift was already correct.
 - `homoglyphs.ts` `mixedScriptWords`: `wordStart` is only set when no Latin/Cyrillic/Greek letter has been seen yet.
   A word that starts with letters from another script gets a span that begins at its first Latin/Cyrillic/Greek letter.
   This only affects highlighting; the G6 verdict is the same. Ported as is.

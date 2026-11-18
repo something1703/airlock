@@ -244,7 +244,9 @@ export class AirlockSession {
     const full = await later.catch(() => ({ ...result, redTeamPending: false, redTeamUnavailable: true }));
     const r = this.state.review;
     if (!r?.result || r.result.normalised !== result.normalised) return;
-    this.setReview({ result: this.pipeline().reseal(full, r.overrides, r.accepted) });
+    // Keep what the user changed meanwhile (Protect this re-merges): take only the red-team outcome from `full`.
+    const merged = { ...full, merge: r.result.merge, candidates: r.result.candidates };
+    this.setReview({ result: this.pipeline().reseal(merged, r.overrides, r.accepted) });
   }
 
   private warmed = false;

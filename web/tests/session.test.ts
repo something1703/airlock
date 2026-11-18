@@ -155,6 +155,27 @@ describe("AirlockSession (demo engines, end to end)", () => {
     expect(s.getState().threads[0]!.turns.at(-1)!.kind === "assistant").toBe(true);
   });
 
+  it("a mark made while the red-team check is still running survives the late result (regression)", async () => {
+    const services = await createServices("?demo=1");
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    const phone = services.engines.phone;
+    const slowPhone = { availability: () => phone.availability(), respond: async (p: Parameters<typeof phone.respond>[0], o: Parameters<typeof phone.respond>[1]) => { if (p.promptId === "attack.v1") await gate; return phone.respond(p, o); } };
+    const s = new AirlockSession({ ...services, engines: { phone: slowPhone, sealed: services.engines.sealed.bind(services.engines) } }, { dial: "balanced", preference: "best", onboarded: true, backup: false });
+    await s.load();
+    await s.deleteEverything();
+    s.setPrefs({ onboarded: true, dial: "balanced", backup: false });
+    const started = s.startReview("The leak at Willowbrook Court got worse, Raj.", { kind: "help" });
+    while (!s.getState().review?.result) await new Promise((r) => setTimeout(r, 1));
+    expect(s.getState().review!.result!.redTeamPending).toBe(true);
+    expect(s.protect("Willowbrook Court", "location")).toBe(true);
+    release();
+    await started;
+    const after = s.getState().review!.result!;
+    expect(after.redTeamPending).toBe(false);
+    expect(after.draft.text).not.toContain("Willowbrook");
+  });
+
   it("titles never contain placeholder tokens", () => {
     expect(titleFrom("Hi [[PERSON_1]], the heater at [[LOC_1]] has been broken")).toBe("Hi someone the heater at a place");
     expect(titleFrom("[[PERSON_ME]]")).toBe("Me");
