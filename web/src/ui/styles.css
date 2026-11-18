@@ -301,6 +301,8 @@ input.field, select.field { border: 1px solid var(--stroke); border-radius: 12px
 .tool-item summary::-webkit-details-marker { display: none; }
 .tool-item summary::after { content: ""; width: 7px; height: 7px; border-right: 1.8px solid var(--text-2); border-bottom: 1.8px solid var(--text-2); transform: rotate(-45deg); transition: transform var(--t-med) var(--ease-out); margin-left: 4px; }
 .tool-item[open] summary::after { transform: rotate(45deg); }
+.tool-item:not(:has(.tool-detail)) summary { cursor: default; }
+.tool-item:not(:has(.tool-detail)) summary::after { display: none; }
 .tool-item summary > svg { color: var(--cloud); }
 .tool-name { font-weight: 600; flex: 1; }
 .tool-status { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 2px 9px; }
