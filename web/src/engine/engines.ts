@@ -1,5 +1,6 @@
 // Engine contracts (port of AirlockCore/Engines.swift). No Firebase here: src/ai/ implements these with
 // Firebase AI Logic; mocks.ts implements them for tests and previews.
+import type { SenderType, TacticId } from "./proof";
 import type { Route, SealedText } from "./types";
 
 /** Chrome on-device model state (from the Prompt API's `availability()`). */
@@ -83,7 +84,48 @@ export interface SealedEngine {
   stream(sealed: SealedText, task: TaskSpec, history?: SealedHistory): AsyncIterable<EngineChunk>;
 }
 
+/** One web page the cloud model used to ground its answer (`groundingMetadata.groundingChunks[i].web`). */
+export interface GroundingSource {
+  /** Index into the response's `groundingChunks` (what `GroundingSupport.groundingChunkIndices` refer to). */
+  chunkIndex: number;
+  title: string;
+  uri: string;
+}
+
+/** A piece of the answer text and the chunks that support it (`groundingMetadata.groundingSupports`). */
+export interface GroundingSupportRef {
+  text: string;
+  chunkIndices: number[];
+}
+
+/**
+ * A Google Search–grounded answer. `searchEntryPointHtml` is Google's Search Suggestions snippet
+ * (`searchEntryPoint.renderedContent`) — it must be displayed, unmodified, with the answer.
+ */
+export interface GroundedResult extends EngineResult {
+  sources: GroundingSource[];
+  supports: GroundingSupportRef[];
+  searchEntryPointHtml: string | null;
+  webSearchQueries: string[];
+}
+
+/** What the claim check may know besides the sealed claim: fixed vocabularies only, never user text. */
+export interface ClaimContext {
+  tactics: readonly TacticId[];
+  senderType: SenderType;
+}
+
+/**
+ * Proof mode's cloud check (`claimcheck.v1`): cloud-only Gemini with Google Search grounding.
+ * Accepts ONLY SealedText plus fixed-vocabulary context (INV-1); never runs on device.
+ */
+export interface ClaimCheckEngine {
+  check(sealedClaim: SealedText, context: ClaimContext): Promise<GroundedResult>;
+}
+
 export interface EngineProvider {
   readonly phone: PhoneOnlyEngine;
   sealed(route: Route, quality: AnswerQuality): SealedEngine;
+  /** Search-grounded claim check (Proof mode). Absent when there is no cloud (no Firebase config). */
+  readonly claimCheck?: ClaimCheckEngine;
 }
