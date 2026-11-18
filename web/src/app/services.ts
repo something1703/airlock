@@ -1,6 +1,8 @@
 import { AppConfig } from "../core/appConfig";
-import { CHROME_ON_DEVICE_MODEL, EngineError, type EngineProvider, type PhoneAvailability, type PhoneOnlyEngine, type SealedEngine, type ToolEngine } from "../engine/engines";
-import { MockEngines, MockPhoneEngine, MockSealedEngine } from "../engine/mocks";
+import { CHROME_ON_DEVICE_MODEL, EngineError, type EngineProvider, type PhoneAvailability, type PhoneOnlyEngine, type SealedEngine, type ToolCall, type ToolEngine } from "../engine/engines";
+import { MockEngines, MockPhoneEngine, MockSealedEngine, MockToolEngine } from "../engine/mocks";
+import { MEETING_TONE } from "../engine/answer";
+import { nextWorkWeek } from "../engine/tools";
 import { PatternDetector } from "../engine/patterns";
 import { PromptLibrary } from "../engine/prompts";
 import type { Route } from "../engine/types";
@@ -62,7 +64,40 @@ function demoEngines(): EngineProvider {
   });
   const reply = (route: Route) =>
     new MockSealedEngine(route, (_s, task) => (task.id === "task.summary.v1" ? "- [[PERSON_1]] hasn't fixed the heater.\n- You've asked several times." : "Here's a firm, polite reply you can send to [[PERSON_1]]:\n\nHi [[PERSON_1]], the heater at [[LOC_1]] is still broken. Please arrange a repair this week.\n\nThanks,\n[[PERSON_ME]]"), route === "phoneFirst" ? CHROME_ON_DEVICE_MODEL : "gemini-demo");
-  return new MockEngines(phone, { phoneFirst: reply("phoneFirst"), cloudFirst: reply("cloudFirst"), cloudOnly: reply("cloudOnly"), phoneOnly: reply("phoneOnly") });
+  return new MockEngines(phone, { phoneFirst: reply("phoneFirst"), cloudFirst: reply("cloudFirst"), cloudOnly: reply("cloudOnly"), phoneOnly: reply("phoneOnly") }, demoToolEngine());
+}
+
+const DEMO_REPLY = "Here's a firm, polite reply you can send to [[PERSON_1]]:\n\nHi [[PERSON_1]], the heater at [[LOC_1]] is still broken. Please arrange a repair this week.\n\nThanks,\n[[PERSON_ME]]";
+
+/**
+ * Demo function calling: "Propose a meeting time" asks for today's date and next week's free time in one
+ * (parallel) turn — so the consent cards show — then drafts with whatever the user allowed.
+ */
+function demoToolEngine(): MockToolEngine {
+  return new MockToolEngine(async (round, { task, results, declarations }) => {
+    const meeting = task.instruction.includes(MEETING_TONE);
+    if (!meeting) return { text: DEMO_REPLY };
+    if (round === 0) {
+      const week = nextWorkWeek(Date.now(), Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+      const calls: ToolCall[] = [{ id: "demo-1", name: "today_context", args: {} }];
+      if (declarations.some((d) => d.name === "find_free_slots")) calls.push({ id: "demo-2", name: "find_free_slots", args: { start_date: week.start, end_date: week.end, min_minutes: 60, max_results: 3 } });
+      return { calls };
+    }
+    await new Promise((r) => setTimeout(r, 400));
+    let slots: string[] = [];
+    for (const r of results) {
+      try {
+        const v = JSON.parse(r.sealed.value) as { slots?: unknown };
+        if (Array.isArray(v.slots)) slots = v.slots.filter((s): s is string => typeof s === "string");
+      } catch {
+        // Not JSON: ignore.
+      }
+    }
+    const body = slots.length >= 2
+      ? `Could we meet next week to sort out the heater at [[LOC_1]]? I'm free ${slots[0]} or ${slots[1]} — whichever suits you.`
+      : "Could we find a time next week to sort out the heater at [[LOC_1]]? I'm flexible — let me know a day and time that suits you, and I'll make it work.";
+    return { text: `Here's a reply proposing a meeting:\n\nHi [[PERSON_1]],\n\n${body}\n\nThanks,\n[[PERSON_ME]]` };
+  }, "gemini-demo");
 }
 
 export async function createServices(search = typeof location !== "undefined" ? location.search : ""): Promise<Services> {

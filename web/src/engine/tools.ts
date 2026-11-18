@@ -555,6 +555,12 @@ function weekOf(today: CivilDate, offsetWeeks: number): { start: CivilDate; end:
   return { start: fromDayNumber(monday), end: fromDayNumber(monday + 6) };
 }
 const todayIn = (ctx: ToolContext): CivilDate => zonedParts(ctx.now, ctx.timeZone);
+
+/** Monday–Friday of next week as ISO dates, in `tz`. */
+export function nextWorkWeek(now: number, tz: string): { start: string; end: string; monday: CivilDate } {
+  const w = weekOf(zonedParts(now, tz), 1);
+  return { start: isoDate(w.start), end: isoDate(fromDayNumber(dayNumber(w.start) + 4)), monday: w.start };
+}
 const dayEntry = (c: CivilDate): string => `${WEEKDAY_SHORT[weekdayOf(c)]} ${isoDate(c)}`;
 
 export const DateContextTool: PrivateTool = {

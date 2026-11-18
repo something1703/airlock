@@ -123,6 +123,87 @@ describe("AirlockSession (demo engines, end to end)", () => {
     expect(again.verifyChain().valid).toBe(true);
   });
 
+  describe("private tools: Propose a meeting time", () => {
+    const MEET = "Hi Raj, can we meet next week about the heater at 14 Elm St? Thanks, Maya Chen";
+
+    /** Sends, answering every consent card with `decide` as soon as it appears. */
+    async function sendAnswering(s: AirlockSession, decide: "allow" | "deny"): Promise<string[]> {
+      const seen: string[] = [];
+      const off = s.subscribe(() => {
+        for (const c of s.getState().consents) {
+          if (seen.includes(c.title)) continue;
+          seen.push(c.title);
+          queueMicrotask(() => s.answerConsent(c.id, decide));
+        }
+      });
+      await s.send();
+      off();
+      return seen;
+    }
+
+    it("with an imported calendar: consent cards for date + free time, a draft with two real free slots, nothing private shared", async () => {
+      const s = await demoSession();
+      expect(await s.useSampleCalendar()).toBe(true);
+      expect(s.getState().calendar).toMatchObject({ sample: true });
+      await s.startReview(MEET, { kind: "meeting" });
+      const cards = await sendAnswering(s, "allow");
+      expect(cards).toEqual(["Gemini wants to know today’s date", "Gemini wants to check your free time next week"]);
+      const answer = s.getState().threads[0]!.turns.at(-1)!;
+      if (answer.kind !== "assistant") throw new Error("expected answer");
+      expect(answer.status).toBe("done");
+      const slots = (JSON.parse(answer.tools.find((t) => t.tool === "find_free_slots")!.shared!) as { slots: string[] }).slots;
+      expect(slots.length).toBeGreaterThanOrEqual(2);
+      expect(answer.text).toContain(`I'm free ${slots[0]} or ${slots[1]}`);
+      expect(answer.text).toContain("Hi Raj");
+      expect(answer.outcome?.route).toBe("cloudOnly");
+      const shared = answer.tools.map((t) => t.shared ?? "").join("\n");
+      for (const raw of ["Raj", "Maya", "Elm", "Dentist", "Day off", "stand-up"]) expect(shared).not.toContain(raw);
+      expect(s.getState().consents).toHaveLength(0);
+
+      // Tool activity survives a reload.
+      const again = new AirlockSession(s.services, { onboarded: true, preference: "best" });
+      await again.load();
+      const reloaded = again.getState().threads[0]!.turns.at(-1)!;
+      expect(reloaded.kind === "assistant" && reloaded.tools.map((t) => t.status)).toEqual(["allowed", "allowed"]);
+      expect(again.getState().calendar).toMatchObject({ sample: true });
+    });
+
+    it("declining consent still yields a sensible draft", async () => {
+      const s = await demoSession();
+      await s.useSampleCalendar();
+      await s.startReview(MEET, { kind: "meeting" });
+      await sendAnswering(s, "deny");
+      const answer = s.getState().threads[0]!.turns.at(-1)!;
+      if (answer.kind !== "assistant") throw new Error("expected answer");
+      expect(answer.status).toBe("done");
+      expect(answer.text).toContain("Could we find a time next week");
+      expect(answer.tools.map((t) => [t.status, t.shared])).toEqual([["declined", '{"error":"user_declined"}'], ["declined", '{"error":"user_declined"}']]);
+    });
+
+    it("without a calendar the free-time tool isn't offered; 'Always allow' skips the date card next time; remove calendar", async () => {
+      const s = await demoSession();
+      await s.startReview(MEET, { kind: "meeting" });
+      const seen: string[] = [];
+      const off = s.subscribe(() => {
+        for (const c of s.getState().consents) if (!seen.includes(c.id)) { seen.push(c.id); queueMicrotask(() => s.answerConsent(c.id, "allow", true)); }
+      });
+      await s.send();
+      off();
+      expect(seen).toHaveLength(1);
+      expect(s.getState().prefs.toolsAlwaysAllow).toEqual(["today_context"]);
+      const id = s.getState().currentThreadId!;
+      await s.startReview("And if Raj can't make it?", { kind: "meeting" }, id);
+      await s.send();
+      const last = s.getState().threads[0]!.turns.at(-1)!;
+      expect(last.kind === "assistant" && last.tools.map((t) => t.status)).toEqual(["allowed"]);
+      expect(s.getState().consents).toHaveLength(0);
+      await s.useSampleCalendar();
+      await s.removeCalendar();
+      expect(s.getState().calendar).toBeNull();
+      expect(await s.importCalendar("not a calendar")).toBe(false);
+    });
+  });
+
   it("sending is impossible while the red-team check is still pending", async () => {
     const s = await demoSession();
     await s.startReview(SAMPLE, { kind: "help" });
