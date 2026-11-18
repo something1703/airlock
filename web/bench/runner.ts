@@ -274,7 +274,7 @@ export function makeManifest(runId: string, dataset: string, split: string, item
   for (const [k, v] of Object.entries(DEFAULTS)) remote[k] = remoteString(v);
   return {
     schema_version: RUN_SCHEMA_VERSION, run_id: runId, mode: models.labels.mode, label: models.labels.mode === "mock" ? MOCK_LABEL : null,
-    created_at: new Date().toISOString(), finished_at: null, git_sha: git(["rev-parse", "HEAD"]) || "unknown", git_dirty: git(["status", "--porcelain"]) !== "",
+    created_at: new Date().toISOString(), finished_at: null, git_sha: git(["rev-parse", "HEAD"]) || "unknown", git_dirty: git(["status", "--porcelain", "--untracked-files=no"]) !== "",
     dataset, split, n_items: items.length,
     configs: configs.filter((c) => CONFIGS[c].unsupported === null),
     skipped_configs: configs.filter((c) => CONFIGS[c].unsupported !== null).map((c) => ({ config: c, reason: CONFIGS[c].unsupported ?? "" })),
