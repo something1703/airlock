@@ -8,8 +8,8 @@ export interface ProofSample {
   message: string;
   /** What the demo's "on-device model" answers to `tactics.v1`. */
   tactics: { tactics: { tactic: string; evidence: string }[]; claims: string[] };
-  /** What the demo's "Gemini + Google Search" answers to `claimcheck.v1`. */
-  cloud: string;
+  /** What the demo's "Gemini + Google Search" answers to `claimcheck.v1`, one per claim. */
+  cloud: string[];
 }
 
 export const PROOF_SAMPLES: ProofSample[] = [
@@ -20,22 +20,28 @@ export const PROOF_SAMPLES: ProofSample[] = [
       tactics: [{ tactic: "secrecy", evidence: "Do not share this message with anyone" }, { tactic: "authority", evidence: "Lakeview Bank" }],
       claims: ["A bank has frozen the account because of a suspicious payment", "The account can be unlocked by replying with a one-time code"],
     },
-    cloud: "VERDICT: LIKELY_SCAM\nWHY: Banks don't ask customers to send one-time codes by text. Consumer guidance lists a request for a code as a common sign of fraud.\nDO:\n- Call the number on the back of your card.\n- Check your account in your bank's official app.\nDONT:\n- Don't reply with any code.\n- Don't click links in the message.",
+    cloud: [
+      "VERDICT: LIKELY_SCAM\nWHY: Texts saying an account is frozen after a \"suspicious payment\" are a widely reported bank-impersonation scam. Banks say they'll ask you to call the number on your card instead.\nDO:\n- Call the number on the back of your card.\n- Check your account in your bank's official app.\nDONT:\n- Don't use any number or link from the message.",
+      "VERDICT: LIKELY_SCAM\nWHY: Banks don't ask customers to send one-time codes by text. Consumer guidance lists a request for a code as a common sign of fraud.\nDO:\n- Report the message to your bank.\nDONT:\n- Don't reply with any code.\n- Don't share the code with anyone who calls.",
+    ],
   },
   {
     label: "A parcel fee",
     message: "Swiftpost: your parcel is on hold because of an unpaid customs fee of 1.99. Pay now at bit.ly/3Fk9xQz or it will be returned to the sender.",
     tactics: {
-      tactics: [{ tactic: "urgency", evidence: "Pay now" }, { tactic: "unusual_payment", evidence: "unpaid customs fee of 1.99" }],
+      tactics: [{ tactic: "urgency", evidence: "Pay now" }, { tactic: "fear", evidence: "or it will be returned to the sender" }],
       claims: ["A parcel is being held until a small customs fee is paid", "The fee can be paid through a link in the text"],
     },
-    cloud: "VERDICT: LIKELY_SCAM\nWHY: Small “customs fee” texts with short links are a widely reported delivery scam. Couriers tell customers to check the official tracking page instead.\nDO:\n- Check the tracking number on the courier's official website.\n- Report the text to your mobile provider.\nDONT:\n- Don't pay through the link.\n- Don't enter card details.",
+    cloud: [
+      "VERDICT: LIKELY_SCAM\nWHY: Small “customs fee” texts are a widely reported delivery scam. Couriers tell customers to check the official tracking page instead.\nDO:\n- Check the tracking number on the courier's official website.\nDONT:\n- Don't pay a fee you weren't expecting.",
+      "VERDICT: LIKELY_SCAM\nWHY: Short links hide where they lead, and fake payment pages are used to collect card details.\nDO:\n- Report the text to your mobile provider.\nDONT:\n- Don't pay through the link.\n- Don't enter card details.",
+    ],
   },
   {
     label: "A dentist reminder",
     message: "Reminder from Bright Smile Dental: your check-up is on Tuesday at 3:30pm. Reply C to confirm or call the practice to rebook.",
     tactics: { tactics: [], claims: ["The reader has a dental check-up booked"] },
-    cloud: "VERDICT: LIKELY_LEGIT\nWHY: Appointment reminders that only ask you to confirm are normal. This one doesn't ask for money, codes or personal details.\nDO:\n- Call the practice on its usual number if you're unsure.\nDONT:\n- Don't reply with personal details.",
+    cloud: ["VERDICT: LIKELY_LEGIT\nWHY: Appointment reminders that only ask you to confirm are normal. This one doesn't ask for money, codes or personal details.\nDO:\n- Call the practice on its usual number if you're unsure.\nDONT:\n- Don't reply with personal details."],
   },
 ];
 
@@ -61,8 +67,9 @@ const DEMO_ENTRY_POINT = `<style>.d{font:13px/1.4 system-ui,sans-serif;border:1p
 /** Demo `claimcheck.v1`: matches the sealed claim to a sample, else answers from the tactics found. */
 export function demoClaimCheck(sealedValue: string, ctx: ClaimContext): Partial<GroundedResult> {
   const sample = PROOF_SAMPLES.find((s) => s.tactics.claims.includes(sealedValue));
+  const scripted = sample?.cloud[sample.tactics.claims.indexOf(sealedValue)];
   const strong = ctx.tactics.some((t) => t === "credential_request" || t === "unusual_payment");
-  const text = sample?.cloud ?? (strong
+  const text = scripted ?? (strong
     ? "VERDICT: LIKELY_SCAM\nWHY: Messages that ask for codes or unusual payments match common scam warnings.\nDO:\n- Contact the organisation using a number from its official website.\nDONT:\n- Don't send money or codes."
     : "VERDICT: UNCLEAR\nWHY: The demo can't check this message against the web.\nDO:\n- Contact the sender through a channel you already trust.\nDONT:\n- Don't click links you weren't expecting.");
   const why = /WHY: ([^\n]*)/.exec(text)?.[1] ?? "";

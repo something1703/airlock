@@ -42,6 +42,19 @@ export const TACTIC_LABEL: Record<TacticId, string> = {
   emotional: "Plays on feelings",
 };
 
+/** Why each tactic matters (shown under model-found flags, which have no rule detail). */
+export const TACTIC_WHY: Record<TacticId, string> = {
+  urgency: "Scammers rush you so you don't stop to check",
+  secrecy: "Being told to keep quiet is a common warning sign",
+  authority: "Says it's from someone official — check that yourself",
+  fear: "Threats are used to make you act without thinking",
+  unusual_payment: "Gift cards, crypto and transfers are hard to get back",
+  credential_request: "Real organisations don't ask you to send codes or passwords",
+  link: "Links in unexpected messages can lead to fake pages",
+  too_good: "Unexpected prizes and refunds are a common hook",
+  emotional: "Pressure through feelings makes it harder to check",
+};
+
 /** Plain English names sent to the cloud in `{{tactics}}` (fixed strings, no user content). */
 const TACTIC_PROMPT_NAME: Record<TacticId, string> = {
   urgency: "urgency", secrecy: "secrecy", authority: "authority", fear: "fear", unusual_payment: "unusual payment",
@@ -132,16 +145,16 @@ interface Rule {
 
 const RULES: Rule[] = [
   { tactic: "unusual_payment", re: /\b(?:gift ?cards?|itunes cards?|google play cards?|steam cards?|apple gift|amazon gift|vanilla (?:visa|card)|voucher codes?)\b/i, detail: "Asks for gift cards — real organisations don't take payment this way" },
-  { tactic: "unusual_payment", re: /\b(?:bitcoin|btc|ethereum|usdt|tether|crypto(?:currency)? wallet|bc1[a-z0-9]{25,59}|0x[a-f0-9]{40})\b/i, detail: "Asks for cryptocurrency" },
+  { tactic: "unusual_payment", re: /\b(?:bitcoin|btc|ethereum|usdt|tether|crypto(?:currency)? wallet|bc1[a-z0-9]{25,59}|0x[a-f0-9]{40})\b/i, detail: "Asks for cryptocurrency — payments that can't be reversed" },
   { tactic: "unusual_payment", re: /\b(?:western union|moneygram|wire (?:the )?(?:money|transfer|funds)|zelle|venmo|cash ?app|friends and family)\b/i, detail: "Asks for a payment that's hard to get back", weight: 2 },
-  { tactic: "credential_request", re: /\b(?:send|share|reply with|text (?:me|us|back)|tell (?:me|us)|give (?:me|us)|read (?:me|us|it|out)|forward|provide)\b[^.!?\n]{0,30}\b(?:code|pin|password|passcode|otp|one[- ]time|login details|security (?:number|question)s?|card details)\b/i, detail: "Asks for a code, PIN or password", negatable: true },
+  { tactic: "credential_request", re: /\b(?:send|share|reply with|text (?:me|us|back)|tell (?:me|us)|give (?:me|us)|read (?:me|us|it|out)|forward|provide)\b[^.!?\n]{0,30}\b(?:code|pin|password|passcode|otp|one[- ]time|login details|security (?:number|question)s?|card details)\b/i, detail: "Real organisations don't ask you to send codes or passwords", negatable: true },
   { tactic: "link", re: /\b(?:anydesk|teamviewer|quick ?support|remote access|install (?:this|the|our) app|download (?:this|the|our) app|\.apk\b)/i, detail: "Asks you to install something or give remote access", weight: 3 },
-  { tactic: "urgency", re: /\b(?:within (?:the next )?\d+ ?(?:minutes?|mins?|hours?|hrs?)|immediately|act now|right away|final (?:notice|warning|reminder)|last chance|urgent(?:ly)?|today only|before midnight|expires? today)\b/i, detail: "Pushes you to act fast" },
-  { tactic: "fear", re: /\b(?:(?:account|card|access|number)\s+(?:has been|is|will be|was)\s+(?:locked|suspended|frozen|closed|blocked|disabled|restricted)|arrest(?:ed)?|warrant|legal action|lawsuit|prosecut\w*|penalt(?:y|ies)|deport\w*)\b/i, detail: "Threatens you with a loss, a fine or the police" },
-  { tactic: "secrecy", re: /\b(?:don'?t tell|do not tell|keep (?:this|it) (?:between us|secret|quiet|confidential|to yourself)|tell no ?one|don'?t mention)\b/i, detail: "Asks you to keep it secret" },
-  { tactic: "too_good", re: /\b(?:you(?:'ve| have) (?:won|been selected)|claim your (?:prize|reward|refund|gift)|lottery|jackpot|guaranteed (?:returns?|profits?)|double your money|risk[- ]free (?:returns?|investment))\b/i, detail: "Promises a prize, refund or easy money" },
-  { tactic: "emotional", re: /\b(?:hi (?:mum|mom|dad)\b|new number|lost my phone|broke my phone|family emergency|i'?m in (?:trouble|hospital|jail))/i, detail: "Plays on your feelings" },
-  { tactic: "authority", re: /\b(?:police|irs|hmrc|tax office|social security|federal|fraud (?:team|department)|security team|tech support|microsoft support|apple support|customs)\b/i, detail: "Claims to be an official body" },
+  { tactic: "urgency", re: /\b(?:within (?:the next )?\d+ ?(?:minutes?|mins?|hours?|hrs?)|immediately|act now|right away|final (?:notice|warning|reminder)|last chance|urgent(?:ly)?|today only|before midnight|expires? today)\b/i, detail: "A deadline that leaves no time to check" },
+  { tactic: "fear", re: /\b(?:(?:account|card|access|number)\s+(?:has been|is|will be|was)\s+(?:locked|suspended|frozen|closed|blocked|disabled|restricted)|arrest(?:ed)?|warrant|legal action|lawsuit|prosecut\w*|penalt(?:y|ies)|deport\w*)\b/i, detail: "Threats of a loss, a fine or the police" },
+  { tactic: "secrecy", re: /\b(?:don'?t tell|do not tell|keep (?:this|it) (?:between us|secret|quiet|confidential|to yourself)|tell no ?one|don'?t mention)\b/i, detail: "Being told to keep quiet is a common warning sign" },
+  { tactic: "too_good", re: /\b(?:you(?:'ve| have) (?:won|been selected)|claim your (?:prize|reward|refund|gift)|lottery|jackpot|guaranteed (?:returns?|profits?)|double your money|risk[- ]free (?:returns?|investment))\b/i, detail: "A prize, refund or easy money you didn't expect" },
+  { tactic: "emotional", re: /\b(?:hi (?:mum|mom|dad)\b|new number|lost my phone|broke my phone|family emergency|i'?m in (?:trouble|hospital|jail))/i, detail: "A sudden personal emergency or new number" },
+  { tactic: "authority", re: /\b(?:police|irs|hmrc|tax office|social security|federal|fraud (?:team|department)|security team|tech support|microsoft support|apple support)\b/i, detail: "Says it's from an official body — check that yourself" },
 ];
 
 function negated(text: string, at: number): boolean {
