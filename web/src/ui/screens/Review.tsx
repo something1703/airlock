@@ -96,6 +96,17 @@ export function ReviewScreen() {
   const { result } = review;
   const risks = s.pendingRisks();
 
+  async function copySealed() {
+    const text = await s.scrubAndCopy();
+    if (text) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // Clipboard can be blocked; the sealed text is shown in the conversation to copy by hand.
+      }
+    }
+  }
+
   async function send() {
     setSending(true);
     await new Promise((r) => setTimeout(r, reduceMotion() ? 0 : 950));
@@ -208,6 +219,8 @@ export function ReviewScreen() {
       </div>
       <div className="row">
         <button className="btn btn-primary" disabled={sending || result.redTeamPending === true} onClick={() => void send()}><span className="row" style={{ gap: 8 }}><IconShield size={16} /> {result.redTeamPending ? "Finishing the check…" : "Seal & send"}</span></button>
+        {!review.threadId && <button className="btn" disabled={sending || result.redTeamPending === true} onClick={() => void copySealed()} aria-describedby="copy-sealed-hint">Copy sealed version</button>
+        <span id="copy-sealed-hint" className="sr-only">Copies the sealed text to use with any other AI or person. Airlock sends nothing.</span>}
         <button className="btn btn-ghost" onClick={() => s.go(review.threadId ? "thread" : "ask")}>Cancel</button>
         <span className="small">Gemini sees only the left-hand version. Real names come back on your device.</span>
       </div>

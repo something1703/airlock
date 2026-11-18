@@ -242,6 +242,21 @@ input.field, select.field { border: 1px solid var(--stroke); border-radius: 12px
 .caret::after { content: ""; display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; vertical-align: text-bottom; background: var(--seal); animation: blink 1s steps(2) infinite; }
 @keyframes blink { to { opacity: 0; } }
 
+/* ---------- What could Gemini still guess (F-25) ---------- */
+.guess-card .guess-icon, .guess-icon.seal { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; flex: none; }
+.guess-card .guess-icon { background: var(--cloud-tint); color: var(--cloud); }
+.guess-icon.seal { background: var(--seal-tint); color: var(--seal); }
+.guess-row { border: 1px solid var(--stroke); border-left: 4px solid var(--muted); border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; }
+.guess-row.high { border-left-color: var(--risk); }
+.guess-row.medium { border-left-color: var(--review); }
+.guess-row.low { border-left-color: var(--cloud); }
+.guess-attr { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+.guess-conf { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 1px 8px; }
+.guess-conf.high { background: var(--risk-tint); color: var(--risk); }
+.guess-conf.medium { background: var(--review-tint); color: var(--review); }
+.guess-conf.low { background: var(--cloud-tint); color: var(--cloud); }
+.guess-value { font-weight: 600; }
+
 /* ---------- Ledger ---------- */
 .chain-row { transition: background-color 400ms; }
 .chain-row.lit { animation: lit 900ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 120ms); }

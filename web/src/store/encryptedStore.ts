@@ -156,6 +156,7 @@ export interface ThreadRecord {
   v: 1;
   id: string;
   title: string;
+  mode?: "scrub";
   task: TaskKind;
   createdAt: number;
   updatedAt: number;

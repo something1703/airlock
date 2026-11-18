@@ -41,6 +41,12 @@ class NoCloudEngines implements EngineProvider {
   }
 }
 
+const DEMO_INFERENCES = JSON.stringify({ inferences: [
+  { attribute: "situation", value: "Renting an apartment with a broken heater, in a dispute with the landlord", confidence: "high", evidence: "the heater at [[LOC_1]] has been broken" },
+  { attribute: "occupation", value: "Works night shifts, probably in healthcare", confidence: "medium", evidence: "work nights at a large hospital" },
+  { attribute: "region", value: "Likely the United States", confidence: "low", evidence: "date format 'Oct 28'" },
+] });
+
 /** `?demo=1`: scripted engines for screenshots and judges without Firebase (clearly labelled in the UI). */
 function demoEngines(): EngineProvider {
   const phone = new MockPhoneEngine((id, text) => {
@@ -57,7 +63,7 @@ function demoEngines(): EngineProvider {
     return "{}";
   });
   const reply = (route: Route) =>
-    new MockSealedEngine(route, (_s, task) => (task.id === "task.summary.v1" ? "- [[PERSON_1]] hasn't fixed the heater.\n- You've asked several times." : "Here's a firm, polite reply you can send to [[PERSON_1]]:\n\nHi [[PERSON_1]], the heater at [[LOC_1]] is still broken. Please arrange a repair this week.\n\nThanks,\n[[PERSON_ME]]"), route === "phoneFirst" ? CHROME_ON_DEVICE_MODEL : "gemini-demo");
+    new MockSealedEngine(route, (_s, task) => (task.id === "infer.v1" ? DEMO_INFERENCES : task.id === "task.summary.v1" ? "- [[PERSON_1]] hasn't fixed the heater.\n- You've asked several times." : "Here's a firm, polite reply you can send to [[PERSON_1]]:\n\nHi [[PERSON_1]], the heater at [[LOC_1]] is still broken. Please arrange a repair this week.\n\nThanks,\n[[PERSON_ME]]"), route === "phoneFirst" ? CHROME_ON_DEVICE_MODEL : "gemini-demo");
   return new MockEngines(phone, { phoneFirst: reply("phoneFirst"), cloudFirst: reply("cloudFirst"), cloudOnly: reply("cloudOnly"), phoneOnly: reply("phoneOnly") });
 }
 

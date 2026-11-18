@@ -11,6 +11,8 @@ import { type DialPreset, type EntityMap, type PlaceholderId, type SealedText, E
 import type { VaultEntry } from "../engine/vault";
 import type { ChainVerification } from "../engine/hashchain";
 import type { Services } from "./services";
+import { inferWhatCloudCanGuess, type InferResult } from "../engine/infer";
+import { renderedLegend } from "../engine/types";
 import { restore, fidelityCheck } from "../engine/restore";
 import { writesAsUser } from "../engine/answer";
 import type { StoredSealed, StoredTurn, ThreadRecord } from "../store/encryptedStore";
@@ -47,10 +49,14 @@ export interface AssistantTurn {
   segments: RestoredSegment[];
   outcome: AnswerOutcome | null;
   error: string | null;
+  /** F-27: the text the user pasted (placeholders) before restore. */
+  pasted?: string;
 }
 export interface Thread {
   id: string;
   title: string;
+  /** "scrub": the user copied the sealed text to use elsewhere (F-27); answers are pasted back and restored. */
+  mode?: "scrub";
   task: TaskKind;
   entities: EntityMap;
   turns: (UserTurn | AssistantTurn)[];
@@ -377,6 +383,55 @@ export class AirlockSession {
     }
   }
 
+  /**
+   * F-27 Scrub & copy: produce the sealed version (through the egress gate, exactly like sending) for the user
+   * to paste into any other tool, and open a conversation where they can paste the answer back to restore it.
+   * Nothing is sent by Airlock, so no receipt is written (the copy is the user's own action).
+   */
+  async scrubAndCopy(): Promise<string | null> {
+    const r = this.state.review;
+    if (!r?.result || r.result.redTeamPending) return null;
+    const draft = applyRisks(r.accepted, r.result.draft);
+    let sealed: SealedText;
+    try {
+      sealed = new EgressGate(this.services.patterns, this.state.vault).seal(draft);
+    } catch (e) {
+      if (e instanceof GateBlocked) {
+        this.setReview({ blocked: [...e.hits] });
+        return null;
+      }
+      throw e;
+    }
+    const entities = r.result.draft.entities;
+    const id = crypto.randomUUID();
+    const stored: StoredSealed = { text: draft.text, legend: [...draft.legend], revealedVaultIds: [...draft.revealedVaultIds], keptValues: [...draft.keptValues] };
+    this.set({
+      threads: [{ id, title: titleFrom(sealed.value), mode: "scrub", task: r.task, entities, turns: [{ kind: "user", raw: r.raw, display: sealed.value, sealed, stored }], createdAt: Date.now() }, ...this.state.threads],
+      review: null, currentThreadId: id, screen: "thread",
+    });
+    await this.services.stores.saveEntities(id, entities);
+    await this.persistThread(id);
+    return sealed.legend.length ? `${sealed.value}\n\n${renderedLegend(sealed)}` : sealed.value;
+  }
+
+  /** F-27: restore an answer the user got elsewhere, locally, with this conversation's placeholders. */
+  async restorePasted(threadId: string, text: string): Promise<void> {
+    const t = this.state.threads.find((x) => x.id === threadId);
+    if (!t || !text.trim()) return;
+    const me = this.state.vault.find((v) => v.isUser);
+    const restored = restore(text, { entities: t.entities, userFirstName: me?.canonical.split(" ")[0] ?? null, writingAsUser: writesAsUser(t.task) });
+    this.setThread(threadId, (x) => ({ ...x, turns: [...x.turns, { kind: "assistant", task: t.task, status: "done", text: restored.text, segments: restored.segments, outcome: null, error: null, pasted: text }] }));
+    await this.persistThread(threadId);
+  }
+
+  /** F-25: ask Gemini what it can still infer from the sealed text it already saw (cloudOnly, new receipt). */
+  async inferGuesses(threadId: string): Promise<InferResult> {
+    const t = this.state.threads.find((x) => x.id === threadId);
+    const last = [...(t?.turns ?? [])].reverse().find((x): x is UserTurn => x.kind === "user" && x.sealed !== null);
+    if (!t || !last?.sealed) throw new EngineError("other", "no-sealed-turn");
+    return inferWhatCloudCanGuess({ engines: this.services.engines, prompts: this.services.prompts, ledger: this.ledger, sealed: last.sealed, threadId, armorExpected: this.services.config.armorExpected });
+  }
+
   // MARK: Saved conversations (encrypted, local only)
 
   private async persistThread(id: string): Promise<void> {
@@ -387,12 +442,12 @@ export class AirlockSession {
       if (turn.kind === "user") turns.push({ kind: "user", raw: turn.raw, sealed: turn.stored });
       else if (turn.status !== "streaming")
         turns.push({
-          kind: "assistant", task: turn.task, status: turn.status, modelText: turn.outcome?.modelText ?? "", error: turn.error,
+          kind: "assistant", task: turn.task, status: turn.status, modelText: turn.outcome?.modelText ?? turn.pasted ?? "", error: turn.error,
           outcome: turn.outcome ? { route: turn.outcome.route, modelVersion: turn.outcome.modelVersion, ranOnDevice: turn.outcome.ranOnDevice, fellBackToPhone: turn.outcome.fellBackToPhone, latencyMs: turn.outcome.latencyMs, receiptId: turn.outcome.receipt?.id ?? null } : null,
         });
     }
     try {
-      await this.services.stores.saveThread({ v: 1, id: t.id, title: t.title, task: t.task, createdAt: t.createdAt, updatedAt: Date.now(), turns });
+      await this.services.stores.saveThread({ v: 1, id: t.id, title: t.title, ...(t.mode ? { mode: t.mode } : {}), task: t.task, createdAt: t.createdAt, updatedAt: Date.now(), turns });
     } catch {
       // Saving is best-effort; the conversation stays usable in memory.
     }
@@ -425,12 +480,12 @@ export class AirlockSession {
           const restored = restore(st.modelText, ctx);
           const o = st.outcome;
           turns.push({
-            kind: "assistant", task: st.task, status: st.status, text: restored.text, segments: restored.segments, error: st.error,
+            kind: "assistant", task: st.task, status: st.status, text: restored.text, segments: restored.segments, error: st.error, ...(st.outcome ? {} : { pasted: st.modelText }),
             outcome: o ? { modelText: st.modelText, restored, fidelity: fidelityCheck(st.modelText, ctx), route: o.route, modelVersion: o.modelVersion, ranOnDevice: o.ranOnDevice, fellBackToPhone: o.fellBackToPhone, latencyMs: o.latencyMs, receipt: this.ledger.receipts.find((x) => x.id === o.receiptId) ?? null } : null,
           });
         }
       }
-      out.push({ id: rec.id, title: rec.title, task: rec.task, entities, turns, createdAt: rec.createdAt });
+      out.push({ id: rec.id, title: rec.title, ...(rec.mode ? { mode: rec.mode } : {}), task: rec.task, entities, turns, createdAt: rec.createdAt });
     }
     return out;
   }
