@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -185,13 +187,13 @@ private fun BottomBar(active: Screen, onSelect: (Screen) -> Unit) {
             .windowInsetsPadding(WindowInsets.navigationBars)
             .semantics { contentDescription = navA11y },
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth().height(64.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 64.dp)) {
             val itemW = maxWidth / NAV.size
             val index = NAV.indexOfFirst { it.first == active }.coerceAtLeast(0)
-            val x by animateDpAsState(itemW * index, tween(320, easing = EaseOutExpo), label = "indicator")
+            val x by animateDpAsState(itemW * index, tween(if (reduceMotion()) 0 else 320, easing = EaseOutExpo), label = "indicator")
             // A pill that slides between items (web: the nav indicator).
-            Box(Modifier.offset(x = x + (itemW - 64.dp) / 2, y = 8.dp).size(width = 64.dp, height = 30.dp).clip(CircleShape).background(c.sealTint))
-            Row(Modifier.fillMaxSize()) {
+            Box(Modifier.offset(x = x + (itemW - 64.dp) / 2, y = 6.dp).size(width = 64.dp, height = 30.dp).clip(CircleShape).background(c.sealTint))
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                 NAV.forEach { (screen, label, icon) ->
                     val on = screen == active
                     val tint by animateColorAsState(if (on) c.seal else c.text2, tween(280), label = "navTint")
@@ -200,12 +202,14 @@ private fun BottomBar(active: Screen, onSelect: (Screen) -> Unit) {
                         Modifier
                             .weight(1f)
                             .fillMaxHeight()
+                            .heightIn(min = 64.dp)
                             .clickable(role = Role.Tab) { onSelect(screen) }
+                            .padding(top = 6.dp, bottom = 8.dp)
                             .semantics { selected = on },
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
                     ) {
-                        Icon(icon, null, Modifier.size(22.dp), tint = tint)
+                        // The icon sits in a fixed 30 dp slot so the sliding pill stays behind it at any font size.
+                        Box(Modifier.height(30.dp), contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(22.dp), tint = tint) }
                         Text(text, style = Type.small.copy(fontSize = 12.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal), color = if (on) c.text else c.text2)
                     }
                 }

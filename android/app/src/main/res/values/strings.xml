@@ -173,8 +173,8 @@
     <string name="step_risks">Checking what someone could still guess</string>
     <string name="step_done_a11y">%1$s, done</string>
     <string name="step_active_a11y">%1$s, in progress</string>
-    <string name="sealing_elapsed">%1$s s · Gemini Nano is doing this work on your phone</string>
-    <string name="sealing_elapsed_rules">%1$s s · Airlock\'s rules are doing this work on your phone</string>
+    <string name="sealing_elapsed">%1$s\u00A0s · Gemini Nano is doing this work on your phone</string>
+    <string name="sealing_elapsed_rules">%1$s\u00A0s · Airlock\'s rules are doing this work on your phone</string>
 
     <!-- Review -->
     <string name="review_title">Check before sending</string>
@@ -205,7 +205,7 @@
     <string name="summary_protected">protected</string>
     <string name="summary_general">made less specific</string>
     <string name="summary_kept">sent as written</string>
-    <string name="summary_sealed_in">Sealed on this phone in %1$s s</string>
+    <string name="summary_sealed_in">Sealed on this phone in %1$s\u00A0s</string>
     <string name="redteam_pending_title">Checking what someone could still guess…</string>
     <string name="redteam_pending_body">Still on your phone. You can review and change details meanwhile; sending unlocks when the check is done.</string>
     <string name="risks_title">What someone could still guess</string>
@@ -259,8 +259,8 @@
     <string name="bubble_show_sealed">Show sealed</string>
     <string name="bubble_sealed_on_device">What left for the answer</string>
     <string name="badge_answering">Sealed request sent · answering…</string>
-    <string name="badge_fallback">On this phone · cloud unavailable · %1$s s</string>
-    <string name="badge_phone">On this phone · nothing sent · %1$s s</string>
+    <string name="badge_fallback">On this phone · cloud unavailable · %1$s\u00A0s</string>
+    <string name="badge_phone">On this phone · nothing sent · %1$s\u00A0s</string>
     <string name="badge_cloud">Gemini · %1$s · %2$s s</string>
     <string name="badge_error">Not answered</string>
     <string name="typing_a11y">Waiting for the answer</string>

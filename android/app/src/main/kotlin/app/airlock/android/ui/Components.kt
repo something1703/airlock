@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -37,6 +39,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -170,6 +173,7 @@ fun AirButton(
     val shape = RoundedCornerShape(12.dp)
     Row(
         modifier
+            .minimumInteractiveComponentSize()
             .scale(scale)
             .graphicsLayer { alpha = if (enabled || kind == ButtonKind.PRIMARY) 1f else 0.5f }
             .defaultMinSize(minHeight = if (compact) 40.dp else 48.dp)
@@ -196,6 +200,7 @@ fun Pill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
     val fg by animateColorAsState(if (selected) c.bg else c.text, tween(280), label = "pillText")
     Box(
         modifier
+            .minimumInteractiveComponentSize()
             .defaultMinSize(minHeight = 40.dp)
             .clip(CircleShape)
             .background(bg)
@@ -212,7 +217,7 @@ fun Pill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
 fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier = Modifier, a11y: String, icons: List<ImageVector?>? = null) {
     val c = LocalAirlock.current
     Row(
-        modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, c.stroke, RoundedCornerShape(12.dp)).semantics { contentDescription = a11y },
+        modifier.height(IntrinsicSize.Min).clip(RoundedCornerShape(12.dp)).border(1.dp, c.stroke, RoundedCornerShape(12.dp)).semantics { contentDescription = a11y },
     ) {
         options.forEachIndexed { i, (value, label) ->
             val on = value == selected
@@ -221,7 +226,8 @@ fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> 
             Row(
                 Modifier
                     .weight(1f, fill = true)
-                    .defaultMinSize(minHeight = 42.dp)
+                    .fillMaxHeight()
+                    .defaultMinSize(minHeight = 48.dp)
                     .background(bg)
                     .clickable(role = Role.RadioButton) { onSelect(value) }
                     .semantics { this.selected = on }
@@ -288,7 +294,12 @@ fun Field(
                     .border(1.dp, c.stroke, RoundedCornerShape(if (singleLine) 12.dp else 16.dp))
                     .padding(horizontal = 14.dp, vertical = if (singleLine) 12.dp else 14.dp),
             ) {
-                if (value.isEmpty()) Text(placeholder, style = Type.body.copy(lineHeight = 24.sp), color = c.muted)
+                if (value.isEmpty()) {
+                    Text(
+                        placeholder, style = Type.body.copy(lineHeight = 24.sp), color = c.muted,
+                        maxLines = if (singleLine) 1 else Int.MAX_VALUE, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
                 inner()
             }
         },
@@ -333,9 +344,10 @@ fun Banner(tone: Tone, title: String, modifier: Modifier = Modifier, body: Strin
 @Composable
 fun StepDots(step: Int, of: Int, a11y: String) {
     val c = LocalAirlock.current
+    val still = reduceMotion()
     Row(Modifier.clearAndSetSemantics { contentDescription = a11y }, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         repeat(of) { i ->
-            val w by animateDpAsState(if (i == step) 24.dp else 8.dp, tween(280, easing = EaseOutExpo), label = "dot")
+            val w by animateDpAsState(if (i == step) 24.dp else 8.dp, tween(if (still) 0 else 280, easing = EaseOutExpo), label = "dot")
             Box(Modifier.size(width = w, height = 8.dp).clip(CircleShape).background(if (i == step) c.seal else c.stroke))
         }
     }
@@ -358,6 +370,17 @@ fun TypingDots(a11y: String) {
         }
     }
 }
+
+/** Expand-and-fade for disclosures; none with reduced motion. */
+@Composable
+fun revealIn(): androidx.compose.animation.EnterTransition =
+    if (reduceMotion()) androidx.compose.animation.EnterTransition.None
+    else androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically()
+
+@Composable
+fun revealOut(): androidx.compose.animation.ExitTransition =
+    if (reduceMotion()) androidx.compose.animation.ExitTransition.None
+    else androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
 
 /** A pulsing dot (red-team pending, live badge). */
 @Composable

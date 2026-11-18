@@ -28,10 +28,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMenuComponents
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -52,6 +56,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -93,6 +100,8 @@ import app.airlock.android.ui.card
 import app.airlock.android.ui.elapsedSeconds
 import app.airlock.android.ui.enter
 import app.airlock.android.ui.reduceMotion
+import app.airlock.android.ui.revealIn
+import app.airlock.android.ui.revealOut
 import app.airlock.android.ui.rememberLabels
 import app.airlock.android.ui.sealedPreviewSegs
 import app.airlock.android.ui.withChipsSegs
@@ -310,7 +319,7 @@ private fun Checked(session: AirlockSession, s: State, review: Review, onSeal: (
             SummaryBar(sealedCount, generalised, kept, result.sealMs)
         }
 
-        AnimatedVisibility(pending, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+        AnimatedVisibility(pending, enter = revealIn(), exit = revealOut()) {
             Row(
                 Modifier.fillMaxWidth().card(c).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -402,22 +411,36 @@ private val PROTECT_AS = listOf(
  * "You wrote", selectable: a read-only text field, because it reports the selection (a SelectionContainer doesn't).
  * Selecting a phrase pre-fills "Protect something Airlock missed". The text stays on the phone.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SelectableText(text: String, onSelect: (String) -> Unit) {
     val c = LocalAirlock.current
     var value by remember(text) { mutableStateOf(TextFieldValue(text)) }
-    BasicTextField(
-        value = value,
-        onValueChange = { v ->
-            value = v.copy(text = text)
-            val sel = v.selection
-            if (!sel.collapsed && sel.max <= text.length) onSelect(text.substring(sel.min, sel.max))
-        },
-        readOnly = true,
-        textStyle = Type.body.copy(color = c.text),
-        cursorBrush = SolidColor(c.seal),
-        modifier = Modifier.fillMaxWidth(),
-    )
+    CompositionLocalProvider(LocalTextToolbar provides NoTextToolbar) {
+        BasicTextField(
+            value = value,
+            onValueChange = { v ->
+                value = v.copy(text = text)
+                val sel = v.selection
+                if (!sel.collapsed && sel.max <= text.length) onSelect(text.substring(sel.min, sel.max))
+            },
+            readOnly = true,
+            textStyle = Type.body.copy(color = c.text),
+            cursorBrush = SolidColor(c.seal),
+            // Compose's new text context menu ignores LocalTextToolbar; drop every item there too.
+            modifier = Modifier.fillMaxWidth().filterTextContextMenuComponents { false },
+        )
+    }
+}
+
+/**
+ * No Copy / Share / "Read aloud" menu on "You wrote": selecting there is only for marking what to protect, and the
+ * system menu would hand the raw text to other apps' text actions (some of which use the cloud).
+ */
+private object NoTextToolbar : TextToolbar {
+    override val status: TextToolbarStatus get() = TextToolbarStatus.Hidden
+    override fun hide() {}
+    override fun showMenu(rect: Rect, onCopyRequested: (() -> Unit)?, onPasteRequested: (() -> Unit)?, onCutRequested: (() -> Unit)?, onSelectAllRequested: (() -> Unit)?) {}
 }
 
 /** Mark something the detectors missed (web `ProtectBar`). Works fully without a selection, from the keyboard too. */
@@ -467,12 +490,13 @@ private fun toggle(session: AirlockSession, e: Entity, haptics: androidx.compose
 @Composable
 private fun SummaryBar(sealedCount: Int, generalised: Int, kept: Int, sealMs: Double) {
     val c = LocalAirlock.current
+    val still = reduceMotion()
     Wrap(spacing = 14.dp) {
         for ((n, label) in listOf(sealedCount to R.string.summary_protected, generalised to R.string.summary_general, kept to R.string.summary_kept)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 AnimatedContent(
                     n,
-                    transitionSpec = { (slideInVertically { it / 2 } + fadeIn()) togetherWith (slideOutVertically { -it / 2 } + fadeOut()) },
+                    transitionSpec = { if (still) fadeIn(tween(0)) togetherWith fadeOut(tween(0)) else (slideInVertically { it / 2 } + fadeIn()) togetherWith (slideOutVertically { -it / 2 } + fadeOut()) },
                     label = "count",
                 ) { v -> Text("$v", style = Type.small.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold), color = c.text) }
                 Text(stringResource(label), style = Type.small.copy(fontSize = 14.sp), color = c.text2)

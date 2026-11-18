@@ -76,6 +76,8 @@ import app.airlock.android.ui.TypingDots
 import app.airlock.android.ui.Wrap
 import app.airlock.android.ui.enter
 import app.airlock.android.ui.reduceMotion
+import app.airlock.android.ui.revealIn
+import app.airlock.android.ui.revealOut
 import app.airlock.android.ui.rememberLabels
 import app.airlock.android.ui.restoredSegs
 import app.airlock.android.ui.sealedTextSegs
@@ -127,7 +129,7 @@ fun ThreadScreen(session: AirlockSession, s: State, scroll: ScrollState) {
             AirButton("", { confirmDelete = true }, kind = ButtonKind.DANGER_GHOST, icon = AirlockIcons.Trash, compact = true, contentDescription = stringResource(R.string.thread_delete_a11y))
         }
         AirButton(stringResource(R.string.thread_new), { session.go(app.airlock.android.session.Screen.ASK) }, kind = ButtonKind.DEFAULT, icon = AirlockIcons.Plus, compact = true)
-        AnimatedVisibility(confirmDelete, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+        AnimatedVisibility(confirmDelete, enter = revealIn(), exit = revealOut()) {
             Banner(
                 Tone.RISK, stringResource(R.string.thread_delete_title), body = stringResource(R.string.thread_delete_body),
                 action = {
