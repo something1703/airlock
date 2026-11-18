@@ -73,10 +73,10 @@ airlock/
 │   ├── Sources/AirlockProof/       # scam-check pipeline
 │   ├── Sources/AirlockLedger/      # receipts, hash chain, stats
 │   └── Tests/...
-├── Bench/AirlockBench/             # macOS app: synthetic data, runs the real pipeline, exports results
+├── web/bench/                      # AirlockBench runner (Node CLI on the TypeScript engine): synthetic data, ablations
 ├── firebase/                       # firebase.json, firestore.rules, indexes, remoteconfig.template.json
 ├── functions/                      # Cloud Functions (TypeScript): stats aggregation, SDP scan callable
-├── eval/                           # Cloud Run scorer (Python), BigQuery schemas, reports/
+├── eval/                           # scorer (Python, Cloud Run Job), BigQuery + evidence schemas, datasets, reports/
 ├── scripts/                        # bootstrap.sh, gen.sh (xcodegen), test.sh, lint.sh
 ├── demo-samples/                   # fictional texts for judges and the video (never real data)
 └── docs/
@@ -114,6 +114,7 @@ The iOS/macOS app (`App/`) never calls Firebase AI Logic directly: `App/Services
 | Quick tasks on sealed text | `PREFER_ON_DEVICE` | `generateContentStream` | `FirebaseSealedEngine` |
 | Deep answers on sealed text | `PREFER_IN_CLOUD` / `ONLY_IN_CLOUD`, model fallback chain | `generateContentStream(text, { signal, timeout })`, unary last resort | `FirebaseSealedEngine.stream` |
 | Which side answered | — | `response.inferenceSource` (`on_device` / `in_cloud`) | `FirebaseSealedEngine` |
+| AirlockBench live evaluation — `synth.v1`, `judge.v1` (temperature 0), `attacker.v1`, raw **synthetic** baseline; answers reuse the rows above | `ONLY_IN_CLOUD` | `FirebaseEngines.model(...)`, `generateContent` | `web/bench/live.ts` → `firebaseEngines.ts`. **Not run yet:** live runs need the owner's permission (`--live --i-have-permission` + `AIRLOCK_BENCH_LIVE_OK=yes`); all runs so far used mock engines |
 
 **Android app** (`android/`, Firebase BoM 35.2.0 = `firebase-ai` 18.2.0 + `firebase-ai-ondevice` 16.0.0-beta08): every call is in `android/app/src/main/kotlin/app/airlock/android/engines/` (a test fails if Firebase AI is used anywhere else).
 
