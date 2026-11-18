@@ -80,7 +80,7 @@ jobs:
         run: npx -y firebase-tools@15.36.0 emulators:exec --project demo-airlock --only firestore --config ../firebase/firebase.json "npx vitest run"
 
   android:
-    name: Android (core tests + debug APK)
+    name: Android (core + app tests, lint, debug APK)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -96,5 +96,9 @@ jobs:
         run: cp ci/google-services.ci.json app/google-services.json
       - name: Core conformance tests (spec/fixtures)
         run: ./gradlew :core:test --no-configuration-cache
+      - name: App unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-configuration-cache
+      - name: Android lint
+        run: ./gradlew :app:lintDebug --no-configuration-cache
       - name: Debug APK
         run: ./gradlew :app:assembleDebug --no-configuration-cache

@@ -115,7 +115,7 @@ import app.airlock.core.PrivacyCategory
 import app.airlock.core.ReplacementKind
 import app.airlock.core.ReviewReason
 import app.airlock.core.SealProgress
-import java.util.Locale
+import androidx.compose.ui.platform.LocalConfiguration
 
 @Composable
 fun ReviewScreen(session: AirlockSession, s: State, onSeal: () -> Unit) {
@@ -188,7 +188,7 @@ private fun Sealing(review: Review, rulesOnly: Boolean) {
             }
             // The ticking timer is visual only; announcing it every 100 ms would drown out the steps.
             Small(
-                stringResource(if (rulesOnly) R.string.sealing_elapsed_rules else R.string.sealing_elapsed, String.format(Locale.getDefault(), "%.1f", elapsed)),
+                stringResource(if (rulesOnly) R.string.sealing_elapsed_rules else R.string.sealing_elapsed, String.format(LocalConfiguration.current.locales[0], "%.1f", elapsed)),
                 Modifier.clearAndSetSemantics { },
             )
         }
@@ -504,7 +504,7 @@ private fun SummaryBar(sealedCount: Int, generalised: Int, kept: Int, sealMs: Do
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Icon(AirlockIcons.Phone, null, Modifier.size(14.dp), tint = c.seal)
-            Text(stringResource(R.string.summary_sealed_in, String.format(Locale.getDefault(), "%.1f", sealMs / 1000)), style = Type.small.copy(fontSize = 14.sp), color = c.text2)
+            Text(stringResource(R.string.summary_sealed_in, String.format(LocalConfiguration.current.locales[0], "%.1f", sealMs / 1000)), style = Type.small.copy(fontSize = 14.sp), color = c.text2)
         }
     }
 }

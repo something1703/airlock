@@ -102,7 +102,7 @@ fun Onboarding(session: AirlockSession, s: State) {
     var step by rememberSaveable { mutableIntStateOf(0) }
     BackHandler(enabled = step > 0) { step-- }
     val still = reduceMotion()
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         AnimatedContent(
             targetState = step,
             transitionSpec = {
