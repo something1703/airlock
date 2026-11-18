@@ -21,7 +21,7 @@ export const USAGE = `AirlockBench — docs/07-EVALUATION.md
   npm run bench -- generate [--dataset all|synth-v1|synth-hard|demo-set] [--seed N]
   npm run bench -- run [--dataset synth-v1|synth-hard|demo-set|<file.jsonl>] [--split test|dev|all]
                        [--configs A_raw,B_rules,...] [--smoke | --full] [--limit N]
-                       [--run-id ID] [--resume ID] [--oracle-recall 0.9]
+                       [--run-id ID] [--resume ID] [--oracle-recall 0.9] [--out DIR (default eval/runs)]
   npm run bench -- live-check
 
 Every run is MOCK unless --live --i-have-permission is given AND ${LIVE_ENV}=yes is set.
@@ -134,7 +134,8 @@ async function cmdRun(a: Args, d: Deps, io: IO): Promise<number> {
   const runId = resume ?? flag(a, "run-id") ?? `${today()}-${models.labels.mode}-${Date.now().toString(36)}`;
   if (models.labels.mode === "mock") io.out(`⚠ ${MOCK_LABEL} (mock on-device model, scripted answers/judge/attacker; no network)`);
   io.out(`Run ${runId}: ${items.length} items × ${configs.length} configs (${datasetName}, split ${split})`);
-  const summary = await runBench({ runId, outDir: d.runsDir ?? runsDir(), dataset: datasetName, split, items, configs, models, resume: !!resume });
+  const outDir = flag(a, "out") ? resolve(flag(a, "out")!) : (d.runsDir ?? runsDir());
+  const summary = await runBench({ runId, outDir, dataset: datasetName, split, items, configs, models, resume: !!resume });
   for (const s of summary.manifest.skipped_configs) io.out(`• skipped ${s.config}: ${s.reason}`);
   io.out(`✔ ${summary.records} new records (${summary.skippedExisting} already done) → ${join(summary.runDir, "items.jsonl")}`);
   io.out(`Next: python3 -I eval/scorer/score.py report --run-dir ${summary.runDir}`);

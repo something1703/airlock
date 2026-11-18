@@ -50,6 +50,13 @@ if [[ -f web/package.json ]]; then
   (cd web && npm run typecheck --silent && npm test --silent)
 fi
 
+if [[ -d eval/scorer ]]; then
+  # Mock engines only — never a cloud call (live runs need the owner's permission; docs/07 "How to run").
+  echo "▶ AirlockBench (scorer unit tests + 30-item mock smoke)"
+  (cd eval/scorer && python3 -m unittest discover -s tests -q)
+  eval/bench.sh smoke
+fi
+
 if [[ -f android/gradlew ]]; then
   echo "▶ Android (gradle test)"
   # JDK 21 (Temurin) is the toolchain; the app module needs android/app/google-services.json (gitignored) —
