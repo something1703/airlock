@@ -62,6 +62,8 @@ import app.airlock.android.ui.bottomHairline
 import app.airlock.android.ui.countUp
 import app.airlock.android.ui.enter
 import app.airlock.android.ui.reduceMotion
+import app.airlock.android.ui.revealIn
+import app.airlock.android.ui.revealOut
 import app.airlock.core.ChainVerification
 import app.airlock.core.ON_DEVICE_MODEL
 import app.airlock.core.PrivacyCategory
@@ -148,10 +150,15 @@ fun LedgerScreen(session: AirlockSession, s: State) {
 @Composable
 private fun StatLine(n: Int, label: String) {
     val c = LocalAirlock.current
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("$n", style = Type.bodyBold, color = c.text)
-        Text(label, style = Type.body, color = c.text)
+    // One text, so a long label wraps under the number instead of in a narrow column beside it (large fonts).
+    val line = androidx.compose.ui.text.buildAnnotatedString {
+        pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
+        append("$n")
+        pop()
+        append(" ")
+        append(label)
     }
+    Text(line, style = Type.body, color = c.text)
 }
 
 private val DATE: DateTimeFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT)
@@ -214,7 +221,7 @@ private fun ReceiptRow(r: Receipt, index: Int, lit: Boolean, verifyRun: Int, bro
             Text(summary, Modifier.weight(1f), style = Type.small, color = c.text)
             Box(Modifier.size(10.dp).clip(CircleShape).background(if (r.gatePassed) c.seal else c.risk))
         }
-        AnimatedVisibility(open, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+        AnimatedVisibility(open, enter = revealIn(), exit = revealOut()) {
             Column(
                 Modifier.padding(vertical = 10.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.bg).padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),

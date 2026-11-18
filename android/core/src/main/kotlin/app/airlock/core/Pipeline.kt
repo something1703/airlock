@@ -54,6 +54,8 @@ data class SealResult(
     val redTeamUnavailable: Boolean,
     /** Staged mode: the red-team check is still running; sending must wait. Null outside staged mode. */
     val redTeamPending: Boolean? = null,
+    /** Every detection before merging (kept so the user can add their own and re-merge — "Protect this"). */
+    val candidates: List<Candidate> = emptyList(),
 ) {
     /** Risks not yet accepted. */
     val pendingRisks: List<Risk> get() {
@@ -118,7 +120,8 @@ class SealPipeline(
         var risks: List<Risk> = emptyList()
         var accepted: List<Risk> = emptyList()
         var redTeamUnavailable = false
-        fun base() = SealResult(normalised, m, draft, emptyList(), false, report, rewrites, now() - t0, risks, accepted, redTeamUnavailable)
+        val allCandidates: List<Candidate> = candidates.toList()
+        fun base() = SealResult(normalised, m, draft, emptyList(), false, report, rewrites, now() - t0, risks, accepted, redTeamUnavailable, candidates = allCandidates)
         if (settings.redTeamEnabled && policy.redTeamMode != RedTeamMode.OFF) {
             if (report.unavailable != null) redTeamUnavailable = true
             else if (staged != null && policy.redTeamMode == RedTeamMode.SUGGEST) {
@@ -164,6 +167,41 @@ class SealPipeline(
         overrides: Map<PlaceholderId, UserOverride> = emptyMap(),
         progress: (SealProgress) -> Unit = {},
     ): StagedSeal = prepare(raw, existing, overrides, progress, scope)
+
+    /** [protect] output: the resealed result and the overrides that now include the user's marks. */
+    data class Protected(val result: SealResult, val overrides: Map<PlaceholderId, UserOverride>)
+
+    /**
+     * "Protect this": the user marks a phrase the detectors missed (essential when the on-device model is
+     * unavailable — INV-9). Every word-bounded occurrence becomes a `user` detection (highest merge priority),
+     * then we re-merge with the current entities as `existing`, so every placeholder keeps its number and the
+     * user's earlier toggles still point at the same details. No model call. Returns the same [result] instance
+     * (and [overrides]) when the phrase is blank or not in the text. [PrivacyCategory.QUASI] is not markable.
+     */
+    fun protect(
+        result: SealResult,
+        phrase: String,
+        category: PrivacyCategory,
+        overrides: Map<PlaceholderId, UserOverride>,
+        acceptedRisks: List<Risk> = result.acceptedRisks,
+    ): Protected {
+        require(category != PrivacyCategory.QUASI) { "quasi is not a markable category" }
+        val text = result.normalised.text
+        val needle = Js.trim(phrase)
+        val spans = if (needle.isNotEmpty()) FoldedSearch.ranges(needle, text) else emptyList()
+        if (spans.isEmpty()) return Protected(result, overrides)
+        val added = spans.map { Candidate(it, text.substring(it.start, it.end), category, detector = DetectorId.USER, confidence = Confidence.HIGH) }
+        val candidates = result.candidates + added
+        val m = Merger.merge(candidates, text, result.merge.entities.clone(), vault)
+        // What the user marked becomes a placeholder (restorable in the answer), not a generalisation.
+        val next = LinkedHashMap(overrides)
+        for (mention in m.mentions) {
+            if (added.any { it.span.start == mention.span.start && it.span.end == mention.span.end } && !next.containsKey(mention.entityId)) {
+                next[mention.entityId] = UserOverride(Action.Placeholder, revealThisTime = false)
+            }
+        }
+        return Protected(reseal(result.copy(merge = m, candidates = candidates), next, acceptedRisks), next)
+    }
 
     /** Re-applies Review edits without calling the model (chip toggles and "Use suggestion" are instant). */
     fun reseal(result: SealResult, overrides: Map<PlaceholderId, UserOverride>, acceptedRisks: List<Risk> = result.acceptedRisks): SealResult {

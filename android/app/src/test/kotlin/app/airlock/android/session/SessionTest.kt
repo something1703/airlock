@@ -3,6 +3,7 @@ package app.airlock.android.session
 import app.airlock.android.AppConfig
 import app.airlock.android.engines.DemoEngines
 import app.airlock.android.engines.DemoSealedEngine
+import app.airlock.android.engines.DownloadEvent
 import app.airlock.android.store.AirlockStores
 import app.airlock.android.store.EncryptedStore
 import app.airlock.android.store.SoftwareKeyProvider
@@ -25,6 +26,7 @@ import app.airlock.core.VaultEntry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
@@ -230,6 +232,77 @@ class SessionTest {
         assertTrue(s.send())
         for (raw in listOf("Raj", "Maya", "312-555")) assertFalse(rec.sent.joinToString().contains(raw))
         assertTrue(phone.calls.isEmpty(), "INV-9: no on-device call, and nothing raw went anywhere else")
+    }
+
+    @Test fun protectThisSealsAMissedPhraseEverywhereSurvivesTogglesAndNeverLeaves() = runTest {
+        val (svc, rec) = services()
+        val s = session(svc, backgroundScope)
+        s.startReview("The leak at Willowbrook Court got worse. Willowbrook Court management won't answer, Raj.", TaskKind.Help)
+        assertTrue(s.current.review!!.result!!.draft.text.contains("Willowbrook"))
+        assertTrue(s.protect("willowbrook court", PrivacyCategory.LOCATION))
+        assertFalse(s.current.review!!.result!!.draft.text.contains("Willowbrook"))
+        val raj = s.current.review!!.result!!.draft.entities.sorted().first { it.canonical == "Raj Patel" }
+        s.toggleEntity(raj.id) // a later toggle must not undo the user's mark
+        assertFalse(s.current.review!!.result!!.draft.text.contains("Willowbrook"))
+        assertFalse(s.protect("Nowhere Clinic", PrivacyCategory.ORG))
+        assertFalse(s.protect("   ", PrivacyCategory.ORG))
+        assertTrue(s.send())
+        assertFalse(s.ledger.receipts.last().outboundText!!.contains("Willowbrook"))
+        assertFalse(rec.sent.joinToString().contains("Willowbrook"))
+        val answer = s.current.threads.first().turns.last() as Turn.Assistant
+        assertEquals(Turn.Status.DONE, answer.status)
+    }
+
+    @Test fun protectThisMadeWhileTheRedTeamIsPendingSurvivesItsResult() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val demo = DemoEngines.phone(pace = false)
+        val phone = MockPhoneEngine { id, text ->
+            if (id == "attack.v1") gate.await()
+            demo.respond(app.airlock.core.PhonePrompt(id, text), app.airlock.core.ANALYSIS_OPTIONS).text
+        }
+        val (svc, rec) = services(phone)
+        val s = session(svc, backgroundScope)
+        val job = launch { s.startReview("The leak at Willowbrook Court got worse, Raj.", TaskKind.Help) }
+        s.state.first { it.review?.result?.redTeamPending == true }
+        assertTrue(s.protect("Willowbrook Court", PrivacyCategory.LOCATION))
+        gate.complete(Unit)
+        job.join()
+        val result = s.current.review!!.result!!
+        assertEquals(false, result.redTeamPending)
+        assertFalse(result.draft.text.contains("Willowbrook"), "the late red-team result keeps the user's mark")
+        assertTrue(s.send())
+        assertFalse(rec.sent.joinToString().contains("Willowbrook"))
+    }
+
+    @Test fun aFailedModelDownloadOffersRetryAndASuccessfulOneClearsIt() = runTest {
+        var avail = PhoneAvailability.DOWNLOADABLE
+        var fail = true
+        var seen: Float? = null
+        lateinit var s: AirlockSession
+        val base = services().first
+        val svc = Services(
+            base.config, base.prompts, base.patterns, base.engines, base.stores, base.prefs, AppMode.LIVE,
+            availability = { avail },
+            download = {
+                flow {
+                    emit(DownloadEvent.Progress(0f))
+                    emit(DownloadEvent.Progress(0.5f))
+                    seen = s.current.downloadProgress
+                    if (fail) emit(DownloadEvent.Failed) else { avail = PhoneAvailability.AVAILABLE; emit(DownloadEvent.Done) }
+                }
+            },
+        )
+        s = session(svc, backgroundScope)
+        s.enableOnDevice()
+        assertEquals(0.5f, seen, "progress is reported")
+        assertFalse(s.current.downloading)
+        assertTrue(s.current.downloadFailed)
+        assertEquals(PhoneAvailability.DOWNLOADABLE, s.current.availability)
+
+        fail = false
+        s.enableOnDevice()
+        assertFalse(s.current.downloadFailed)
+        assertEquals(PhoneAvailability.AVAILABLE, s.current.availability)
     }
 
     @Test fun titlesAreCleanAndPlaceholderFree() {
