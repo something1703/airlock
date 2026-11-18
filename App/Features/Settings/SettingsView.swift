@@ -7,12 +7,21 @@ struct SettingsView: View {
     let session: AirlockSession
     @State private var confirm = false
     @State private var showDiagram = false
+    @State private var showEvidence = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollViewReader { proxy in
             screen
                 .onAppear {
+                    if session.showEvidence {
+                        session.showEvidence = false
+                        // After the tab has settled: pushing during its first appearance loses the push.
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(300))
+                            showEvidence = true
+                        }
+                    }
                     guard session.showAbout else { return }
                     showDiagram = true
                     Task {
@@ -48,6 +57,7 @@ struct SettingsView: View {
             .card()
             .enter()
             about.id("about").enter(1)
+            evidenceLink.enter(2)
             VStack(alignment: .leading, spacing: 8) {
                 Text("What Airlock does and doesn't do").font(.headline).foregroundStyle(Palette.text)
                 Text(
@@ -59,7 +69,7 @@ struct SettingsView: View {
                 Text(verbatim: modeLine).font(.footnote).foregroundStyle(Palette.text2)
             }
             .card()
-            .enter(2)
+            .enter(3)
             VStack(alignment: .leading, spacing: 10) {
                 Text("Delete everything").font(.headline).foregroundStyle(Palette.text)
                 Text("Removes your Vault, conversations, receipts and the encryption key from this device.").font(.footnote).foregroundStyle(Palette.text2)
@@ -73,10 +83,34 @@ struct SettingsView: View {
                 }
             }
             .card()
-            .enter(3)
+            .enter(4)
         }
         .navigationTitle(Text("Settings"))
         .hidesNavigationBarOnPhone()
+        .navigationDestination(isPresented: $showEvidence) { EvidenceView(evidence: session.evidence) }
+    }
+
+    /// "How Airlock is tested": opens the AirlockBench results (web Settings `.ev-link`).
+    private var evidenceLink: some View {
+        Button {
+            showEvidence = true
+        } label: {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("How Airlock is tested").font(.headline).foregroundStyle(Palette.text)
+                    Text("AirlockBench: leak rate, names caught, answer quality — and what we still miss.")
+                        .font(.footnote).foregroundStyle(Palette.text2).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Icon(.arrow, size: 14).foregroundStyle(Palette.text2)
+            }
+            .frame(minHeight: 44)
+            .card()
+            .contentShape(RoundedRectangle(cornerRadius: Metrics.radius, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("How Airlock is tested"))
+        .accessibilityHint(Text("Shows AirlockBench results: leak rate, names caught, answer quality and what Airlock still misses"))
     }
 
     /// "How Airlock works": a one-line summary that opens the 7-step diagram.
@@ -127,6 +161,12 @@ struct SettingsView: View {
 
 #Preview("Settings") {
     NavigationStack { SettingsView(session: PreviewSession.make()) }
+}
+
+#Preview("Settings · How Airlock is tested") {
+    let session = PreviewSession.make()
+    session.showEvidence = true
+    return NavigationStack { SettingsView(session: session) }
 }
 
 #Preview("Settings · How Airlock works") {

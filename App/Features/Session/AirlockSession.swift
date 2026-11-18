@@ -48,6 +48,8 @@ final class AirlockSession {
     private(set) var sealRequest = 0
     /// Settings opens on "How Airlock works" (demo screenshots).
     var showAbout = false
+    /// Settings opens "How Airlock is tested" once (demo screenshots); Settings clears it.
+    var showEvidence = false
     /// Review opens scrolled to its buttons (demo screenshots of Scrub & copy).
     var revealReviewActions = false
 
@@ -111,6 +113,12 @@ final class AirlockSession {
     func go(_ s: AppSection) {
         section = s
         if s == .ask { askPath = [] }
+    }
+
+    /// AirlockBench results for "How Airlock is tested": Remote Config `evidence_json` when it
+    /// parses, otherwise the best report bundled with the app (real runs before mock runs).
+    var evidence: Evidence? {
+        Evidence.load(remoteJSON: services.config.string("evidence_json"), bundled: Evidence.bundledReports())
     }
 
     func openThread(_ id: String) {
@@ -683,6 +691,9 @@ final class AirlockSession {
             showAbout = true
         case "vault": go(.vault)
         case "settings": go(.settings)
+        case "evidence":
+            go(.settings)
+            showEvidence = true
         default: break
         }
     }

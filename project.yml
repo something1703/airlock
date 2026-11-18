@@ -85,6 +85,17 @@ targets:
           else
             echo "warning: No GoogleService-Info.plist at $SRC — the app runs with Firebase disabled (see docs/HUMAN-TODO.md H-02..H-04)."
           fi
+      - name: Bundle AirlockBench evidence reports
+        basedOnDependencyAnalysis: false
+        script: |
+          # The Evidence screen's fallback when Remote Config `evidence_json` is unset (docs/06-UI-UX.md §5.12).
+          # Each run keeps its folder name, so any number of runs can ship: Evidence/<run>.json.
+          DEST="${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Evidence"
+          rm -rf "$DEST" && mkdir -p "$DEST"
+          for f in "${SRCROOT}"/eval/reports/*/evidence.json; do
+            [ -f "$f" ] || continue
+            cp "$f" "$DEST/$(basename "$(dirname "$f")").json"
+          done
 schemes:
   Airlock (Dev):
     build:
