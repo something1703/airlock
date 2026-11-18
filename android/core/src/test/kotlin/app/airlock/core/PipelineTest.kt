@@ -11,6 +11,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /** Port of web/tests/pipeline.test.ts (prompts, chunker, LLM detector, red team, seal pipeline, routing/answers/receipts). */
@@ -298,6 +299,48 @@ class PipelineTest {
         val s = pipe(MockPhoneEngine.answering("{\"items\":[]}"), DialPreset.OPEN).run("Your verification code is 482913.")
         assertEquals("Your verification code is [[SECRET_1]].", s.draft.text)
         assertContains(s.reasons, ReviewReason.SecretsFound)
+    }
+
+    // MARK: Protect this (user-marked details)
+
+    private val protectVault = listOf(VaultEntry("v-raj", "Raj Patel", listOf("Raj"), PrivacyCategory.PERSON, "my landlord", false))
+    private val protectRaw = "Hi Raj, I work nights at Mercy General Hospital. Mercy General Hospital is far from 14 Elm St."
+    // Rules only: the on-device model is unavailable, so the org name is missed (INV-9 path).
+    private fun protectPipe() = SealPipeline(MockPhoneEngine.answering("", PhoneAvailability.UNAVAILABLE), PatternDetector(), protectVault, PromptLibrary(), SealSettings(dial = DialPreset.BALANCED))
+
+    @Test fun protectMarksEveryOccurrenceKeepsNumbersAndTogglesAndPassesTheGate() = runTest {
+        val p = protectPipe()
+        val r = p.run(protectRaw)
+        assertContains(r.draft.text, "Mercy General Hospital")
+        val raj = r.draft.entities.sorted().first { it.canonical == "Raj Patel" }
+        val overrides = mapOf(raj.id to UserOverride(Action.Keep, revealThisTime = true))
+        val kept = p.reseal(r, overrides)
+        assertContains(kept.draft.text, "Raj")
+
+        val (protectedR, after) = p.protect(kept, "mercy general hospital", PrivacyCategory.ORG, overrides)
+        assertEquals(Action.Placeholder, after["ORG_1"]?.action)
+        assertEquals(Action.Keep, after[raj.id]?.action)
+        assertFalse(protectedR.draft.text.contains("Mercy"))
+        assertEquals(2, Regex("\\[\\[ORG_1]]").findAll(protectedR.draft.text).count())
+        assertEquals("Raj Patel", protectedR.draft.entities[raj.id]?.canonical)
+        assertContains(protectedR.draft.text, "Raj")
+        assertTrue(protectedR.draft.entities["ORG_1"]?.sources?.contains(DetectorId.USER) == true)
+        EgressGate(PatternDetector(), protectVault).seal(protectedR.draft)
+    }
+
+    @Test fun protectIsANoOpForMissingOrBlankText() = runTest {
+        val p = protectPipe()
+        val r = p.run(protectRaw)
+        assertSame(r, p.protect(r, "Nowhere Clinic", PrivacyCategory.ORG, emptyMap()).result)
+        assertSame(r, p.protect(r, "   ", PrivacyCategory.ORG, emptyMap()).result)
+        assertFailsWith<IllegalArgumentException> { p.protect(r, "Raj", PrivacyCategory.QUASI, emptyMap()) }
+    }
+
+    @Test fun protectUserMarkInsideAnExistingDetectionWins() = runTest {
+        // user > vault > pattern > llm
+        val p = protectPipe()
+        val r = p.run("Visit 14 Elm St tomorrow")
+        assertFalse(p.protect(r, "Elm", PrivacyCategory.LOCATION, emptyMap()).result.draft.text.contains("Elm"))
     }
 
     // MARK: routing, answers and receipts
