@@ -232,6 +232,46 @@ class SessionTest {
         assertTrue(phone.calls.isEmpty(), "INV-9: no on-device call, and nothing raw went anywhere else")
     }
 
+    @Test fun protectThisSealsAMissedPhraseEverywhereSurvivesTogglesAndNeverLeaves() = runTest {
+        val (svc, rec) = services()
+        val s = session(svc, backgroundScope)
+        s.startReview("The leak at Willowbrook Court got worse. Willowbrook Court management won't answer, Raj.", TaskKind.Help)
+        assertTrue(s.current.review!!.result!!.draft.text.contains("Willowbrook"))
+        assertTrue(s.protect("willowbrook court", PrivacyCategory.LOCATION))
+        assertFalse(s.current.review!!.result!!.draft.text.contains("Willowbrook"))
+        val raj = s.current.review!!.result!!.draft.entities.sorted().first { it.canonical == "Raj Patel" }
+        s.toggleEntity(raj.id) // a later toggle must not undo the user's mark
+        assertFalse(s.current.review!!.result!!.draft.text.contains("Willowbrook"))
+        assertFalse(s.protect("Nowhere Clinic", PrivacyCategory.ORG))
+        assertFalse(s.protect("   ", PrivacyCategory.ORG))
+        assertTrue(s.send())
+        assertFalse(s.ledger.receipts.last().outboundText!!.contains("Willowbrook"))
+        assertFalse(rec.sent.joinToString().contains("Willowbrook"))
+        val answer = s.current.threads.first().turns.last() as Turn.Assistant
+        assertEquals(Turn.Status.DONE, answer.status)
+    }
+
+    @Test fun protectThisMadeWhileTheRedTeamIsPendingSurvivesItsResult() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val demo = DemoEngines.phone(pace = false)
+        val phone = MockPhoneEngine { id, text ->
+            if (id == "attack.v1") gate.await()
+            demo.respond(app.airlock.core.PhonePrompt(id, text), app.airlock.core.ANALYSIS_OPTIONS).text
+        }
+        val (svc, rec) = services(phone)
+        val s = session(svc, backgroundScope)
+        val job = launch { s.startReview("The leak at Willowbrook Court got worse, Raj.", TaskKind.Help) }
+        s.state.first { it.review?.result?.redTeamPending == true }
+        assertTrue(s.protect("Willowbrook Court", PrivacyCategory.LOCATION))
+        gate.complete(Unit)
+        job.join()
+        val result = s.current.review!!.result!!
+        assertEquals(false, result.redTeamPending)
+        assertFalse(result.draft.text.contains("Willowbrook"), "the late red-team result keeps the user's mark")
+        assertTrue(s.send())
+        assertFalse(rec.sent.joinToString().contains("Willowbrook"))
+    }
+
     @Test fun titlesAreCleanAndPlaceholderFree() {
         assertEquals("Broken heater, landlord unresponsive", AirlockSession.cleanTitle("\"Broken heater, landlord unresponsive.\"\n"))
         assertEquals("Rent increase question", AirlockSession.cleanTitle("Title: rent increase question"))

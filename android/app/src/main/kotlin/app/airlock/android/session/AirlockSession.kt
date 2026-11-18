@@ -26,6 +26,7 @@ import app.airlock.core.LedgerStats
 import app.airlock.core.PhoneAvailability
 import app.airlock.core.PhonePrompt
 import app.airlock.core.PlaceholderId
+import app.airlock.core.PrivacyCategory
 import app.airlock.core.Receipt
 import app.airlock.core.ReceiptLedger
 import app.airlock.core.RedTeam
@@ -252,7 +253,11 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
         }
         val r = current.review
         if (r?.result == null || r.result.normalised != result.normalised) return
-        setReview { it.copy(result = pipeline().reseal(full, it.overrides, it.accepted)) }
+        // Keep anything the user marked with "Protect this" meanwhile: the late result still has the first merge.
+        setReview { cur ->
+            val now = cur.result ?: return@setReview cur
+            cur.copy(result = pipeline().reseal(full.copy(merge = now.merge, candidates = now.candidates), cur.overrides, cur.accepted))
+        }
     }
 
     private var warmed = false
@@ -276,10 +281,24 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
     fun toggleEntity(id: PlaceholderId) {
         val r = current.review ?: return
         val e = r.result?.draft?.entities?.get(id) ?: return
-        if (e.category == app.airlock.core.PrivacyCategory.SECRET) return
+        if (e.category == PrivacyCategory.SECRET) return
         val overrides = HashMap(r.overrides)
         overrides[id] = if (e.action is Action.Keep) UserOverride(Action.Placeholder, false) else UserOverride(Action.Keep, e.vaultEntryId != null)
         reseal(overrides, r.accepted)
+    }
+
+    /**
+     * "Protect this": mark a phrase the detectors missed; every word-bounded occurrence becomes a placeholder that is
+     * restored in the answer. No model call. Returns false when the phrase is blank or isn't in the text.
+     */
+    fun protect(phrase: String, category: PrivacyCategory): Boolean {
+        val r = current.review ?: return false
+        val before = r.result ?: return false
+        if (category == PrivacyCategory.QUASI) return false
+        val out = pipeline().protect(before, phrase, category, r.overrides, r.accepted)
+        if (out.result === before) return false
+        setReview { it.copy(result = out.result, overrides = out.overrides, blocked = null) }
+        return true
     }
 
     fun acceptRisk(risk: Risk) {
