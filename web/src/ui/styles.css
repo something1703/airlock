@@ -257,6 +257,13 @@ input.field, select.field { border: 1px solid var(--stroke); border-radius: 12px
 .guess-conf.low { background: var(--cloud-tint); color: var(--cloud); }
 .guess-value { font-weight: 600; }
 
+/* ---------- About ---------- */
+.about-diagram summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.about-diagram summary::-webkit-details-marker { display: none; }
+.about-diagram summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--text-2); border-bottom: 2px solid var(--text-2); transform: rotate(45deg); margin-left: auto; transition: transform var(--t-med) var(--ease-out); }
+.about-diagram[open] summary::after { transform: rotate(-135deg); }
+.about-diagram img { width: 100%; height: auto; display: block; margin-top: 12px; border-radius: 16px; animation: enter var(--t-slow) var(--ease-out) both; }
+
 /* ---------- Ledger ---------- */
 .chain-row { transition: background-color 400ms; }
 .chain-row.lit { animation: lit 900ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 120ms); }

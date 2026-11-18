@@ -4,5 +4,6 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react()],
   build: { target: "es2022", sourcemap: "hidden" },
-  server: { port: 5173, strictPort: true },
+  // The app shows the same hand-made diagrams as the README (docs/images), so allow serving the repo root.
+  server: { port: 5173, strictPort: true, fs: { allow: [".."] } },
 });
