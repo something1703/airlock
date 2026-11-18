@@ -3,6 +3,7 @@ import { useAirlock, useSession } from "../../app/context";
 import type { AnswerPreference } from "../../engine/answer";
 import type { DialPreset } from "../../engine/types";
 import { OnDeviceStatus } from "./OnDeviceStatus";
+import { PrivateToolsSettings } from "../tools";
 
 export function SettingsScreen() {
   const s = useSession();
@@ -19,6 +20,7 @@ export function SettingsScreen() {
         <div><h2>Where answers come from</h2><div className="segmented" role="group" aria-label="Answer preference">{prefsList.map((p) => <button key={p.id} aria-pressed={prefs.preference === p.id} onClick={() => s.setPrefs({ preference: p.id })}>{p.label}</button>)}</div>
           <p className="small">Automatic answers quick tasks on this device and sends harder ones, sealed, to Gemini.</p></div>
       </div>
+      <PrivateToolsSettings />
       {s.services.sync && (
         <div className="card row" style={{ gap: 14, alignItems: "flex-start", flexWrap: "nowrap" }}>
           <div style={{ flex: 1 }}>

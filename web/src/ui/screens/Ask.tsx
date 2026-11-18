@@ -2,11 +2,12 @@ import { useState } from "react";
 import { useAirlock, useSession } from "../../app/context";
 import type { TaskKind } from "../../engine/answer";
 import { OnDeviceStatus } from "./OnDeviceStatus";
-import { IconArrow, IconCloud, IconDevice, IconSparkle } from "../icons";
+import { IconArrow, IconCloud, IconDevice, IconFreeTime, IconSparkle } from "../icons";
 
 export const TASKS: { label: string; task: TaskKind }[] = [
   { label: "Help me with this", task: { kind: "help" } },
   { label: "Draft a reply", task: { kind: "reply", tone: "firm but polite" } },
+  { label: "Propose a meeting time", task: { kind: "meeting" } },
   { label: "Explain simply", task: { kind: "explain" } },
   { label: "Summarise", task: { kind: "summary" } },
   { label: "Questions to ask", task: { kind: "questions" } },
@@ -14,6 +15,31 @@ export const TASKS: { label: string; task: TaskKind }[] = [
 ];
 
 const SAMPLE = "Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I've texted you four times. I work nights at Mercy General Hospital and need to sleep during the day — please send someone this week. You can reach me on 312-555-0147. Thanks, Maya Chen";
+
+/** Shown with "Propose a meeting time": where the free times come from, and how to add them. */
+function MeetingHint() {
+  const s = useSession();
+  const { calendar, prefs } = useAirlock();
+  const enabled = s.services.config.calendarToolEnabled;
+  return (
+    <div className="tool-hint enter" role="status">
+      <span className="consent-icon"><IconFreeTime size={18} /></span>
+      <div style={{ flex: 1 }} className="small">
+        {prefs.preference === "phoneOnly"
+          ? "Answers stay on this device, so Gemini can’t ask for your free time. Switch “Where answers come from” in Settings to use it."
+          : calendar && enabled
+            ? <>Gemini can ask for your free time from the {calendar.sample ? "sample calendar (fictional)" : "calendar you imported"}. You’ll be asked first, and only free times are shared.</>
+            : "Gemini will suggest times without your calendar. To share real free times, import an .ics file. It never leaves this browser."}
+      </div>
+      {!calendar && enabled && prefs.preference !== "phoneOnly" && (
+        <div className="row" style={{ gap: 6 }}>
+          <button className="btn btn-ghost" onClick={() => void s.useSampleCalendar()}>Use a sample calendar</button>
+          <button className="btn btn-ghost" onClick={() => s.go("settings")}>Import…</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Ask() {
   const s = useSession();
@@ -34,6 +60,7 @@ export function Ask() {
           <button key={t.label} className="pill" aria-pressed={JSON.stringify(t.task) === JSON.stringify(task)} onClick={() => setTask(t.task)}>{t.label}</button>
         ))}
       </div>
+      {task.kind === "meeting" && <MeetingHint />}
       <div className="row">
         <button className="btn btn-primary" disabled={!text.trim()} onClick={() => void s.startReview(text, task)}><span className="row" style={{ gap: 8 }}>Seal on this device <IconArrow size={16} /></span></button>
         <button className="btn btn-ghost" onClick={() => { setText(SAMPLE); s.warmUp(); }}><span className="row" style={{ gap: 6 }}><IconSparkle size={16} /> Try a sample (fictional)</span></button>

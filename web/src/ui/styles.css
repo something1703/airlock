@@ -281,6 +281,41 @@ input.field, select.field { border: 1px solid var(--stroke); border-radius: 12px
 .empty { display: grid; justify-items: center; gap: 8px; padding: 28px 12px; color: var(--text-2); text-align: center; }
 .empty svg { color: var(--seal); opacity: 0.8; }
 
+/* ---------- Private tools (consent + log) ----------
+   Gemini "knocks": the card rises from the answer it belongs to and its icon rings twice, then rests.
+   Colour: cloud blue = a request from Gemini; seal green = what you allowed out. */
+.consent-card { border: 1.5px solid color-mix(in srgb, var(--cloud) 55%, var(--stroke)); background: linear-gradient(180deg, var(--cloud-tint), var(--raised) 70%); border-radius: 18px; padding: 16px; display: grid; gap: 12px; box-shadow: var(--shadow-lift); animation: knock-in var(--t-slow) var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 90ms); }
+@keyframes knock-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
+.consent-icon { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--cloud) 16%, transparent); color: var(--cloud); position: relative; }
+.consent-card .consent-icon::after { content: ""; position: absolute; inset: 0; border-radius: 12px; box-shadow: 0 0 0 0 color-mix(in srgb, var(--cloud) 45%, transparent); animation: knock 1.2s 0.35s var(--ease-out) 2; }
+@keyframes knock { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cloud) 45%, transparent); } 100% { box-shadow: 0 0 0 12px transparent; } }
+.consent-kicker { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--cloud); margin-bottom: 2px; }
+.consent-title { font-weight: 700; font-size: 17px; line-height: 1.35; }
+.consent-actions { gap: 8px; }
+.small-btn { font-size: 14px; font-weight: 600; }
+.note-ok { color: var(--seal); } .note-risk { color: var(--risk); }
+
+.tool-log { display: grid; gap: 6px; margin: 0 0 12px; }
+.tool-item { border: 1px solid var(--stroke); border-radius: 12px; background: var(--bg); animation: pop 380ms var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 70ms); }
+.tool-item summary { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; list-style: none; min-height: 40px; border-radius: 12px; }
+.tool-item summary::-webkit-details-marker { display: none; }
+.tool-item summary::after { content: ""; width: 7px; height: 7px; border-right: 1.8px solid var(--text-2); border-bottom: 1.8px solid var(--text-2); transform: rotate(-45deg); transition: transform var(--t-med) var(--ease-out); margin-left: 4px; }
+.tool-item[open] summary::after { transform: rotate(45deg); }
+.tool-item summary > svg { color: var(--cloud); }
+.tool-name { font-weight: 600; flex: 1; }
+.tool-status { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 2px 9px; }
+.tool-status.ok { background: var(--seal-tint); color: var(--seal); }
+.tool-status.muted { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--text-2); }
+.tool-status.risk { background: var(--risk-tint); color: var(--risk); }
+.tool-status.wait { background: var(--cloud-tint); color: var(--cloud); }
+.tool-status.wait::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 1s infinite ease-in-out; }
+.tool-detail { padding: 0 12px 10px; animation: enter var(--t-med) var(--ease-out) both; }
+.tool-detail pre { margin: 6px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--raised); border: 1px dashed color-mix(in srgb, var(--seal) 50%, var(--stroke)); white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto; }
+
+.tool-hint, .tool-cal { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border-radius: 14px; padding: 10px 12px; background: var(--cloud-tint); }
+.tool-cal { background: var(--bg); border: 1px solid var(--stroke); }
+.tool-hint .small, .tool-cal .small { color: var(--text-2); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   .scan::after, .hero-anim .token { animation: none !important; }
