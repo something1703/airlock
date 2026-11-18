@@ -1,11 +1,13 @@
 // The ONLY web code that calls Firebase AI Logic (lint-enforced, ADR-08).
-import { AgentPlatformBackend, getAI, getGenerativeModel, GoogleAIBackend, InferenceMode, InferenceSource, type AI, type GenerativeModel } from "firebase/ai";
+import { AgentPlatformBackend, getAI, getGenerativeModel, GoogleAIBackend, InferenceMode, InferenceSource, type AI, type GenerativeModel, type GroundingMetadata, type ModelParams } from "firebase/ai";
 import type { FirebaseApp } from "firebase/app";
 import type { AppConfig } from "../core/appConfig";
 import {
-  CHROME_ON_DEVICE_MODEL, EngineError, type AnswerQuality, type EngineChunk, type EngineProvider, type EngineResult, type PhoneAvailability,
-  type PhoneOnlyEngine, type PhoneOptions, type PhonePrompt, type SealedEngine, type SealedHistory, type TaskSpec,
+  CHROME_ON_DEVICE_MODEL, EngineError, type AnswerQuality, type ClaimCheckEngine, type ClaimContext, type EngineChunk, type EngineProvider, type EngineResult,
+  type GroundedResult, type GroundingSource, type GroundingSupportRef, type PhoneAvailability, type PhoneOnlyEngine, type PhoneOptions, type PhonePrompt,
+  type SealedEngine, type SealedHistory, type TaskSpec,
 } from "../engine/engines";
+import { claimCheckPrompt } from "../engine/proof";
 import type { PromptLibrary } from "../engine/prompts";
 import type { Route, SealedText } from "../engine/types";
 import { chromeAvailability } from "./chromeModel";
@@ -67,6 +69,10 @@ export class FirebaseEngines implements EngineProvider {
     return new FirebaseSealedEngine(this, planFor(route, this.config, quality));
   }
 
+  get claimCheck(): ClaimCheckEngine {
+    return new FirebaseClaimCheckEngine(this);
+  }
+
   /** Must be called from a user gesture (click/keypress): may trigger Chrome's model download. */
   async initializeOnDevice(onProgress?: (fraction: number) => void): Promise<void> {
     try {
@@ -76,10 +82,10 @@ export class FirebaseEngines implements EngineProvider {
     }
   }
 
-  model(mode: Mode, cloudModel: string, systemInstruction?: string, maxOutputTokens?: number): GenerativeModel {
+  model(mode: Mode, cloudModel: string, systemInstruction?: string, maxOutputTokens?: number, tools?: ModelParams["tools"]): GenerativeModel {
     return getGenerativeModel(this.ai, {
       mode,
-      inCloudParams: { model: cloudModel, ...(systemInstruction ? { systemInstruction } : {}), ...(maxOutputTokens ? { generationConfig: { maxOutputTokens } } : {}) },
+      inCloudParams: { model: cloudModel, ...(systemInstruction ? { systemInstruction } : {}), ...(maxOutputTokens ? { generationConfig: { maxOutputTokens } } : {}), ...(tools ? { tools } : {}) },
     });
   }
 }
@@ -227,6 +233,53 @@ class FirebaseSealedEngine implements SealedEngine {
       clearTimeout(totalTimer);
     }
   }
+}
+
+/**
+ * Proof mode's claim check (`claimcheck.v1`): ONLY_IN_CLOUD with the Google Search tool — never on device
+ * (built-in tools aren't supported there), never a hybrid mode. Takes only SealedText + fixed-vocabulary context.
+ * A new GenerativeModel per call (INV-4). Grounding metadata comes from the first candidate
+ * (`candidates[0].groundingMetadata`, verified in @firebase/ai 3.1.0 typings).
+ */
+class FirebaseClaimCheckEngine implements ClaimCheckEngine {
+  constructor(private readonly engines: FirebaseEngines) {}
+
+  async check(sealedClaim: SealedText, context: ClaimContext): Promise<GroundedResult> {
+    const text = claimCheckPrompt(this.engines.prompts, sealedClaim, context);
+    const cfg = this.engines.config;
+    let last: EngineError | null = null;
+    for (const model of [...new Set([cfg.modelCloudProof, cfg.modelCloudFallback])]) {
+      try {
+        return await withRetry(() => this.once(model, text));
+      } catch (e) {
+        last = mapError(e);
+        if (!last.isTransientCloud) throw last;
+      }
+    }
+    throw last ?? new EngineError("serviceUnavailable");
+  }
+
+  private async once(model: string, text: string): Promise<GroundedResult> {
+    const t0 = performance.now();
+    try {
+      const { response } = await this.engines.model(InferenceMode.ONLY_IN_CLOUD, model, undefined, 1200, [{ googleSearch: {} }]).generateContent(text, { timeout: this.engines.config.cloudTimeoutMs });
+      if (response.inferenceSource === InferenceSource.ON_DEVICE) throw new EngineError("other", "not-in-cloud");
+      return { text: response.text(), modelVersion: model, ranOnDevice: false, latencyMs: performance.now() - t0, ...grounding(response.candidates?.[0]?.groundingMetadata) };
+    } catch (e) {
+      throw mapError(e);
+    }
+  }
+}
+
+/** Grounding metadata → plain data (sources keep their chunk index so supports can point at them). */
+export function grounding(meta: GroundingMetadata | undefined): Pick<GroundedResult, "sources" | "supports" | "searchEntryPointHtml" | "webSearchQueries"> {
+  const sources: GroundingSource[] = [];
+  (meta?.groundingChunks ?? []).forEach((c, chunkIndex) => {
+    if (c.web?.uri) sources.push({ chunkIndex, uri: c.web.uri, title: c.web.title ?? c.web.domain ?? "" });
+  });
+  const supports: GroundingSupportRef[] = (meta?.groundingSupports ?? []).flatMap((s) => (s.segment?.text ? [{ text: s.segment.text, chunkIndices: [...(s.groundingChunkIndices ?? [])] }] : []));
+  const html = meta?.searchEntryPoint?.renderedContent;
+  return { sources, supports, searchEntryPointHtml: html && html.trim() ? html : null, webSearchQueries: [...(meta?.webSearchQueries ?? [])] };
 }
 
 /** Exponential backoff ×3 (0.5 s, 1 s, 2 s) for 429/503. */

@@ -118,3 +118,47 @@ describe("cloud stream guards", () => {
     expect(calls).toEqual(["stream"]);
   }, 10_000);
 });
+
+describe("Proof claim check (ONLY_IN_CLOUD + Google Search)", () => {
+  it("sends the sealed claim to the proof model with the googleSearch tool, and maps grounding metadata", async () => {
+    const { initializeApp } = await import("firebase/app");
+    const { FirebaseEngines } = await import("../src/ai/firebaseEngines");
+    const { PromptLibrary } = await import("../src/engine/prompts");
+    const { EgressGate } = await import("../src/engine/gate");
+    const { PatternDetector } = await import("../src/engine/patterns");
+    const { EntityMap } = await import("../src/engine/types");
+    const app = initializeApp({ apiKey: "test", projectId: "test", appId: "1:1:web:1" }, `t-${Math.random()}`);
+    const config = new AppConfig();
+    const engines = new FirebaseEngines(app, config, new PromptLibrary());
+    const sealed = new EgressGate(new PatternDetector(), []).seal({ text: "A parcel is held until a fee is paid", legend: [], replacements: [], entities: new EntityMap(), secretWarnings: [], revealedVaultIds: new Set(), keptValues: new Set() });
+    const requests: { url: string; body: { tools?: unknown; contents: { parts: { text: string }[] }[] } }[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init: { body: string }) => {
+      requests.push({ url: String(url), body: JSON.parse(init.body) });
+      return new Response(JSON.stringify({
+        candidates: [{
+          index: 0, content: { role: "model", parts: [{ text: "VERDICT: LIKELY_SCAM\nWHY: Couriers don't ask for fees by text." }] },
+          groundingMetadata: {
+            searchEntryPoint: { renderedContent: "<div>chips</div>" }, webSearchQueries: ["parcel fee text scam"],
+            groundingChunks: [{ web: { uri: "https://consumer-advice.example/a", title: "consumer-advice.example" } }, {}],
+            groundingSupports: [{ segment: { partIndex: 0, startIndex: 0, endIndex: 10, text: "Couriers don't ask for fees by text." }, groundingChunkIndices: [0] }],
+          },
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as unknown as typeof fetch;
+    try {
+      const r = await engines.claimCheck.check(sealed, { tactics: ["link", "urgency"], senderType: "a delivery company" });
+      expect(requests).toHaveLength(1);
+      expect(requests[0]!.url).toContain(`models/${config.modelCloudProof}:generateContent`);
+      expect(requests[0]!.body.tools).toEqual([{ googleSearch: {} }]);
+      const sent = requests[0]!.body.contents[0]!.parts[0]!.text;
+      expect(sent).toContain("A parcel is held until a fee is paid");
+      expect(sent).toContain("Claimed sender type: a delivery company");
+      expect(r).toMatchObject({ ranOnDevice: false, modelVersion: config.modelCloudProof, searchEntryPointHtml: "<div>chips</div>", webSearchQueries: ["parcel fee text scam"] });
+      expect(r.sources).toEqual([{ chunkIndex: 0, uri: "https://consumer-advice.example/a", title: "consumer-advice.example" }]);
+      expect(r.supports).toEqual([{ text: "Couriers don't ask for fees by text.", chunkIndices: [0] }]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+});
