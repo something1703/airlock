@@ -51,6 +51,17 @@ export const IconAskFirst = (p: P) => <Svg {...p}><path d="M5 20.5V9a7 7 0 0 1 1
 export const IconUpload = (p: P) => <Svg {...p}><path d="M12 15V4.5M7.5 9 12 4.5 16.5 9" /><path d="M5 14.5v4A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-4" /></Svg>;
 export const IconBlocked = (p: P) => <Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="m6 6 12 12" /></Svg>;
 
+/** Proof: a magnifier with a tick inside. */
+export const IconProof = (p: P) => <Svg {...p}><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.4 15.4 4.6 4.6" /><path d="m7.8 10.7 1.9 1.9 3.6-3.7" /></Svg>;
+export const IconSearch = (p: P) => <Svg {...p}><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.4 15.4 4.6 4.6" /></Svg>;
+export const IconFlag = (p: P) => <Svg {...p}><path d="M5.5 21V4" /><path d="M5.5 4.5c3.8-2 6.2 1.6 10 0 1-.4 2-.5 3-.4v9.6c-1-.1-2 0-3 .4-3.8 1.6-6.2-2-10 0" /></Svg>;
+/** Stop sign: an octagon with a bar — "Likely a scam". */
+export const IconStop = (p: P) => <Svg {...p}><path d="M8.3 3.5h7.4l4.8 4.8v7.4l-4.8 4.8H8.3l-4.8-4.8V8.3Z" /><path d="M8.5 12h7" /></Svg>;
+export const IconShare = (p: P) => <Svg {...p}><path d="M12 15V3.5M8 7.5l4-4 4 4" /><path d="M8.5 10.5H7a2 2 0 0 0-2 2V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6.5a2 2 0 0 0-2-2h-1.5" /></Svg>;
+export const IconOffline = (p: P) => <Svg {...p}><path d="M7 18.5a4.5 4.5 0 0 1-.4-9 6 6 0 0 1 11.3 1.6A3.8 3.8 0 0 1 17.5 18.5Z" /><path d="m4 4 16 16" /></Svg>;
+export const IconExternal = (p: P) => <Svg {...p}><path d="M13.5 4.5h6v6M19.5 4.5 11 13" /><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" /></Svg>;
+export const IconCopy = (p: P) => <Svg {...p}><rect x="8.5" y="8.5" width="11" height="11" rx="2" /><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" /></Svg>;
+
 export const CATEGORY_ICON: Record<PrivacyCategory, (p: P) => ReactNode> = {
   person: IconPerson, org: IconOrg, location: IconPlace, contact: IconContact, id: IconId, date: IconDate, health: IconHealth, secret: IconSecret, quasi: IconSparkle,
 };

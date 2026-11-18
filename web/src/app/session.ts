@@ -24,8 +24,9 @@ import type { ToolName } from "../engine/engines";
 import { CalendarTool, DateContextTool, EntityRoleTool, parseIcs, type CalendarData, type ConsentBroker, type ConsentDecision, type ConsentRequest, type PrivateTool, type ToolActivity } from "../engine/tools";
 import type { ToolSetup } from "../engine/answer";
 import { sampleCalendarIcs } from "./sampleCalendar";
+import { runProof, shareWarning, type ProofResult, type ProofStage } from "../engine/proof";
 
-export type Screen = "onboarding" | "ask" | "review" | "thread" | "ledger" | "vault" | "settings";
+export type Screen = "onboarding" | "ask" | "review" | "thread" | "proof" | "ledger" | "vault" | "settings";
 
 export interface Prefs {
   dial: DialPreset;
@@ -99,6 +100,18 @@ export interface Review {
   startedAt: number;
 }
 
+/**
+ * Proof mode ("Is this a scam?"). Kept in memory only: the raw message, red flags and Gemini's grounded
+ * findings are never written to storage or synced (grounded results aren't cached — API-NOTES §2).
+ */
+export interface ProofState {
+  raw: string;
+  stage: ProofStage;
+  startedAt: number;
+  result: ProofResult | null;
+  error: string | null;
+}
+
 export interface State {
   screen: Screen;
   prefs: Prefs;
@@ -108,6 +121,7 @@ export interface State {
   threads: Thread[];
   currentThreadId: string | null;
   review: Review | null;
+  proof: ProofState | null;
   chain: ChainVerification | null;
   calendar: CalendarInfo | null;
   consents: PendingConsent[];
@@ -157,7 +171,7 @@ export class AirlockSession {
 
   constructor(readonly services: Services, initialPrefs: Partial<Prefs> = loadPrefs(services.mode)) {
     const prefs: Prefs = { ...defaultPrefs, ...initialPrefs };
-    this.state = { screen: prefs.onboarded ? "ask" : "onboarding", prefs, availability: "checking", downloadProgress: null, vault: [], threads: [], currentThreadId: null, review: null, chain: null, calendar: null, consents: [] };
+    this.state = { screen: prefs.onboarded ? "ask" : "onboarding", prefs, availability: "checking", downloadProgress: null, vault: [], threads: [], currentThreadId: null, review: null, proof: null, chain: null, calendar: null, consents: [] };
     this.ledger = new ReceiptLedger([], (r) => services.stores.saveReceipt(r));
   }
 
@@ -631,6 +645,52 @@ export class AirlockSession {
     }
   }
 
+  // MARK: Proof
+
+  private proofRun = 0;
+
+  /**
+   * "Is this a scam?": red flags on the device, then only sealed claims go to Gemini with Google Search.
+   * The raw message reaches the phone-only engine and nothing else (INV-1, INV-3).
+   */
+  async startProof(raw: string): Promise<void> {
+    const text = raw.trim();
+    if (!text) return;
+    const run = ++this.proofRun;
+    const s = this.services;
+    this.set({ screen: "proof", proof: { raw: text, stage: "scanning", startedAt: performance.now(), result: null, error: null } });
+    const setProof = (patch: Partial<ProofState>): void => {
+      if (run === this.proofRun && this.state.proof) this.set({ proof: { ...this.state.proof, ...patch } });
+    };
+    try {
+      const result = await runProof(text, {
+        phone: s.engines.phone, claimCheck: s.engines.claimCheck ?? null, patterns: s.patterns, vault: this.state.vault, prompts: s.prompts, config: s.config,
+        online: s.online(), ledger: this.ledger, threadId: `proof-${crypto.randomUUID()}`,
+      }, (stage) => setProof({ stage }));
+      setProof({ result, stage: "done" });
+    } catch {
+      setProof({ stage: "done", error: "Airlock couldn't check this message. Nothing private was sent." });
+    }
+  }
+
+  /** Back to the empty Proof screen (the previous check is discarded, not stored). */
+  resetProof(): void {
+    this.proofRun++;
+    this.set({ proof: null });
+  }
+
+  /** Opens Proof, optionally starting a check of text pasted on Ask. */
+  openProof(text?: string): void {
+    if (text?.trim()) void this.startProof(text);
+    else this.set({ screen: "proof" });
+  }
+
+  /** The friendly family warning for the current verdict (fixed phrases only), or null. */
+  proofShareText(): string | null {
+    const r = this.state.proof?.result;
+    return r ? shareWarning(r) : null;
+  }
+
   // MARK: Ledger and data
   verifyChain(): ChainVerification {
     const chain = this.ledger.verify();
@@ -652,7 +712,7 @@ export class AirlockSession {
     }
     for (const c of this.state.consents) this.answerConsent(c.id, "deny");
     this.calendarData = null;
-    this.set({ vault: [], threads: [], currentThreadId: null, review: null, chain: null, calendar: null, consents: [], prefs: defaultPrefs, screen: "onboarding" });
+    this.set({ vault: [], threads: [], currentThreadId: null, review: null, proof: null, chain: null, calendar: null, consents: [], prefs: defaultPrefs, screen: "onboarding" });
   }
 }
 

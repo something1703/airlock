@@ -1,8 +1,9 @@
 import { AppConfig } from "../core/appConfig";
 import { CHROME_ON_DEVICE_MODEL, EngineError, type EngineProvider, type PhoneAvailability, type PhoneOnlyEngine, type SealedEngine, type ToolCall, type ToolEngine } from "../engine/engines";
-import { MockEngines, MockPhoneEngine, MockSealedEngine, MockToolEngine } from "../engine/mocks";
+import { MockClaimCheckEngine, MockEngines, MockPhoneEngine, MockSealedEngine, MockToolEngine } from "../engine/mocks";
 import { MEETING_TONE } from "../engine/answer";
 import { nextWorkWeek } from "../engine/tools";
+import { demoClaimCheck, demoTactics } from "./proofSamples";
 import { PatternDetector } from "../engine/patterns";
 import { PromptLibrary } from "../engine/prompts";
 import type { Route } from "../engine/types";
@@ -26,7 +27,11 @@ export interface Services {
   mode: "live" | "demo" | "noCloud";
   /** Sealed-history backup (live mode only). */
   sync?: SealedSync;
+  /** Whether the browser reports a connection (Proof shows an on-device-only card when offline). */
+  online: () => boolean;
 }
+
+const browserOnline = (): boolean => (typeof navigator === "undefined" || typeof navigator.onLine !== "boolean" ? true : navigator.onLine);
 
 /** No Firebase config: the on-device model can't be reached (all AI goes through Firebase AI Logic), and nothing can go to the cloud. */
 class NoCloudEngines implements EngineProvider {
@@ -66,11 +71,14 @@ function demoEngines(): EngineProvider {
     }
     if (id === "gen.v1") return JSON.stringify({ rewrite: "a large hospital" });
     if (id === "attack.v1") return JSON.stringify({ guesses: [] });
+    // A short pause so the demo shows each step of the on-device scan.
+    if (id === "tactics.v1") return new Promise<string>((resolve) => setTimeout(() => resolve(demoTactics(text.split("<<<\n")[1]?.split("\n>>>")[0] ?? "")), 700));
     return "{}";
   });
   const reply = (route: Route) =>
     new MockSealedEngine(route, (_s, task) => (task.id === "infer.v1" ? DEMO_INFERENCES : task.id === "task.summary.v1" ? "- [[PERSON_1]] hasn't fixed the heater.\n- You've asked several times." : "Here's a firm, polite reply you can send to [[PERSON_1]]:\n\nHi [[PERSON_1]], the heater at [[LOC_1]] is still broken. Please arrange a repair this week.\n\nThanks,\n[[PERSON_ME]]"), route === "phoneFirst" ? CHROME_ON_DEVICE_MODEL : "gemini-demo");
-  return new MockEngines(phone, { phoneFirst: reply("phoneFirst"), cloudFirst: reply("cloudFirst"), cloudOnly: reply("cloudOnly"), phoneOnly: reply("phoneOnly") }, demoToolEngine());
+  const claimCheck = new MockClaimCheckEngine((sealed, ctx) => new Promise((resolve) => setTimeout(() => resolve(demoClaimCheck(sealed.value, ctx)), 900)));
+  return new MockEngines(phone, { phoneFirst: reply("phoneFirst"), cloudFirst: reply("cloudFirst"), cloudOnly: reply("cloudOnly"), phoneOnly: reply("phoneOnly") }, demoToolEngine(), claimCheck);
 }
 
 const DEMO_REPLY = "Here's a firm, polite reply you can send to [[PERSON_1]]:\n\nHi [[PERSON_1]], the heater at [[LOC_1]] is still broken. Please arrange a repair this week.\n\nThanks,\n[[PERSON_ME]]";
@@ -114,11 +122,11 @@ export async function createServices(search = typeof location !== "undefined" ? 
   // Demo mode gets its own encrypted database so scripted receipts never mix with real ones.
   const stores = new AirlockStores(await EncryptedStore.open(demo ? "airlock-demo" : "airlock"));
   if (demo) {
-    return { config, prompts, patterns, engines: demoEngines(), availability: async () => "available", stores, firebase: { kind: "missingConfig" }, mode: "demo" };
+    return { config, prompts, patterns, engines: demoEngines(), availability: async () => "available", stores, firebase: { kind: "missingConfig" }, mode: "demo", online: browserOnline };
   }
   const firebase = bootFirebase();
   if (firebase.kind === "missingConfig") {
-    return { config, prompts, patterns, engines: new NoCloudEngines(), availability: async () => "unavailable", stores, firebase, mode: "noCloud" };
+    return { config, prompts, patterns, engines: new NoCloudEngines(), availability: async () => "unavailable", stores, firebase, mode: "noCloud", online: browserOnline };
   }
   void signInQuietly(firebase.app);
   // Live mode: Remote Config (model names, thresholds, prompt overrides) replaces the bundled defaults.
@@ -128,7 +136,7 @@ export async function createServices(search = typeof location !== "undefined" ? 
   const engines = new FirebaseEngines(firebase.app, liveConfig, livePrompts);
   return {
     config: liveConfig, prompts: livePrompts, patterns: livePatterns, engines, stores, firebase, mode: "live", sync: new FirestoreSync(firebase.app),
-    availability: chromeAvailability,
+    availability: chromeAvailability, online: browserOnline,
     initializeOnDevice: (onProgress) => engines.initializeOnDevice(onProgress),
   };
 }

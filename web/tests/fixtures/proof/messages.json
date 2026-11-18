@@ -1,0 +1,155 @@
+{
+  "_comment": "WP-18 acceptance fixtures. Every message, name, company, domain and number is fictional. `model` is what the on-device tactics.v1 call returns (scripted), `entities` what detect.v1 finds in the claims, `cloud` the claimcheck.v1 answer (scripted), `sensitive` strings that must never leave the device, `expect` the verdict(s) that count as sensible.",
+  "messages": [
+    {
+      "id": "scam-bank-code",
+      "kind": "scam",
+      "message": "Lakeview Bank: we noticed a suspicious payment of £740 on your card. Your account has been frozen. To unlock it, reply with the 6-digit code we just sent you within 2 hours. Do not share this message with anyone.",
+      "model": { "tactics": [{ "tactic": "urgency", "evidence": "within 2 hours" }, { "tactic": "credential_request", "evidence": "reply with the 6-digit code" }, { "tactic": "fear", "evidence": "Your account has been frozen" }, { "tactic": "authority", "evidence": "Lakeview Bank" }, { "tactic": "secrecy", "evidence": "Do not share this message with anyone" }], "claims": ["Lakeview Bank has frozen the account because of a suspicious payment", "The account can be unlocked by replying with a one-time code"] },
+      "entities": [{ "text": "Lakeview Bank", "type": "ORG" }],
+      "cloud": "VERDICT: LIKELY_SCAM\nWHY: Banks don't ask customers to send one-time codes by text. Official guidance says a request for a code is a common sign of fraud.\nDO:\n- Call the number on the back of your card.\n- Check your account in the official app.\nDONT:\n- Don't reply with any code.\n- Don't click links in the message.",
+      "sensitive": ["Lakeview", "740", "6-digit"],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "scam-parcel-fee",
+      "kind": "scam",
+      "message": "Swiftpost: your parcel is on hold because of an unpaid customs fee of 1.99. Pay now at bit.ly/3Fk9xQz or it will be returned to the sender.",
+      "model": { "tactics": [{ "tactic": "urgency", "evidence": "Pay now" }, { "tactic": "link", "evidence": "bit.ly/3Fk9xQz" }, { "tactic": "authority", "evidence": "Swiftpost" }], "claims": ["A parcel is being held until a small customs fee is paid", "The fee can be paid through a link in the text"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_SCAM\nWHY: Small \"customs fee\" texts with short links are a widely reported delivery scam. Delivery companies tell customers to check the official tracking page instead.\nDO: Check the tracking number on the courier's official website; Report the text to your mobile provider.\nDONT: Don't pay through the link; Don't enter card details.",
+      "sensitive": ["bit.ly/3Fk9xQz", "1.99"],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "scam-tax-refund",
+      "kind": "scam",
+      "message": "HMRC: You are due a tax refund of £326.40. Claim your refund at hmrc-refund-claim.top before midnight.",
+      "model": { "tactics": [{ "tactic": "too_good", "evidence": "You are due a tax refund" }, { "tactic": "urgency", "evidence": "before midnight" }, { "tactic": "link", "evidence": "hmrc-refund-claim.top" }], "claims": ["The tax office owes the reader a refund", "The refund must be claimed through a website before a deadline"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_SCAM\nWHY: Tax offices don't announce refunds by text with a link. Official sites warn about refund messages like this.\nDO:\n- Sign in through the official government website you type yourself.\nDONT:\n- Don't enter bank details on the linked site.",
+      "sensitive": ["hmrc-refund-claim.top", "326.40"],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "scam-boss-gift-cards",
+      "kind": "scam",
+      "message": "Hi, it's Dana Whitfield. I'm stuck in a meeting and need a favour. Can you buy 5 Google Play cards of $100 for a client? Keep this between us for now, I'll pay you back today.",
+      "model": { "tactics": [{ "tactic": "unusual_payment", "evidence": "buy 5 Google Play cards" }, { "tactic": "secrecy", "evidence": "Keep this between us" }, { "tactic": "authority", "evidence": "stuck in a meeting" }], "claims": ["Dana Whitfield needs the reader to buy gift cards for a client", "The money for the gift cards will be paid back the same day"] },
+      "entities": [{ "text": "Dana Whitfield", "type": "PERSON" }],
+      "cloud": "VERDICT: LIKELY_SCAM\nWHY: Requests from a \"boss\" to buy gift cards are a well-known impersonation scam. Gift cards are hard to trace or refund.\nDO:\n- Contact [[PERSON_1]] on a number you already have.\nDONT:\n- Don't buy the cards or send the codes.",
+      "sensitive": ["Dana", "Whitfield", "$100"],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "scam-new-number",
+      "kind": "scam",
+      "message": "Hi Mum, I broke my phone and this is my new number. I need to pay a bill urgently, can you send £480 to my friend's account? Please don't tell Dad.",
+      "model": { "tactics": [{ "tactic": "emotional", "evidence": "Hi Mum, I broke my phone" }, { "tactic": "urgency", "evidence": "urgently" }, { "tactic": "secrecy", "evidence": "don't tell Dad" }, { "tactic": "unusual_payment", "evidence": "send £480 to my friend's account" }], "claims": ["The reader's child has a new phone number", "A bill must be paid urgently into a friend's account"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_SCAM\nWHY: \"Hi Mum, new number\" messages asking for money are a common scam. Real family members can be checked by calling their old number.\nDO:\n- Call your child on the number you already have.\nDONT:\n- Don't send money until you've spoken to them.",
+      "sensitive": ["480"],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "scam-tech-support",
+      "kind": "scam",
+      "message": "Microsoft Security Alert: your computer is infected with a virus. Call our tech support team now and install AnyDesk so we can fix it remotely.",
+      "model": { "tactics": [{ "tactic": "fear", "evidence": "your computer is infected with a virus" }, { "tactic": "authority", "evidence": "Microsoft Security Alert" }, { "tactic": "urgency", "evidence": "now" }, { "tactic": "link", "evidence": "install AnyDesk" }], "claims": ["The reader's computer has a virus", "A support team needs remote access to fix it"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_SCAM\nWHY: Software companies don't send unsolicited virus alerts asking you to install remote-access tools. This matches known tech-support scams.\nDO:\n- Run your own antivirus.\nDONT:\n- Don't install anything they ask for.\n- Don't call the number.",
+      "sensitive": [],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "scam-crypto-returns",
+      "kind": "scam",
+      "message": "Join our private investment group and double your money in 7 days with guaranteed returns. Send USDT to wallet 0x5a1f9b3c7d2e4f6a8b0c1d3e5f7a9b2c4d6e8f0a to start.",
+      "model": { "tactics": [{ "tactic": "too_good", "evidence": "double your money in 7 days" }, { "tactic": "unusual_payment", "evidence": "Send USDT to wallet" }], "claims": ["An investment group can double the reader's money in a week", "Returns are guaranteed"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_SCAM\nWHY: Guaranteed returns and crypto deposits are classic investment-scam signs. Regulators warn that no real investment can guarantee to double your money.\nDO:\n- Check the firm on your financial regulator's register.\nDONT:\n- Don't send any cryptocurrency.",
+      "sensitive": ["0x5a1f9b3c7d2e4f6a8b0c1d3e5f7a9b2c4d6e8f0a"],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "scam-prize-fee",
+      "kind": "scam",
+      "message": "Congratulations! You have won a £1,000 gift voucher from ShopRight. Click http://shopright-prize.xyz/claim and enter your card details to pay the £2.99 delivery fee.",
+      "model": { "tactics": [{ "tactic": "too_good", "evidence": "You have won a £1,000 gift voucher" }, { "tactic": "link", "evidence": "Click http://shopright-prize.xyz/claim" }, { "tactic": "credential_request", "evidence": "enter your card details" }], "claims": ["The reader has won a large voucher", "A small delivery fee must be paid by card to receive it"] },
+      "entities": [],
+      "cloud": "VERDICT: UNCLEAR\nWHY: I couldn't find this offer on the shop's official pages. Prize messages asking for a fee are often fraudulent.\nDO:\n- Check the shop's official website directly.\nDONT:\n- Don't enter card details on the linked page.",
+      "sensitive": ["shopright-prize.xyz", "1,000", "2.99"],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "scam-romance-fee",
+      "kind": "scam",
+      "message": "My darling, I can't stop thinking about you. My flight home is blocked until I pay a fee. Could you send it by Western Union? Don't mention this to your family, they wouldn't understand.",
+      "model": { "tactics": [{ "tactic": "emotional", "evidence": "My darling, I can't stop thinking about you" }, { "tactic": "unusual_payment", "evidence": "send it by Western Union" }, { "tactic": "secrecy", "evidence": "Don't mention this to your family" }], "claims": ["The sender can't fly home until a fee is paid", "The fee should be sent by money transfer"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_SCAM\nWHY: Online partners who need money for travel and ask for transfers in secret match romance-scam warnings.\nDO:\n- Talk to someone you trust about it.\nDONT:\n- Don't send money to someone you haven't met.",
+      "sensitive": [],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "scam-billing-lookalike",
+      "kind": "scam",
+      "message": "Your StreamFlix account is suspended because your payment failed. Update your billing within 24 hours at streamflix-billing-update.com/login to avoid losing access.",
+      "model": { "tactics": [{ "tactic": "urgency", "evidence": "within 24 hours" }, { "tactic": "fear", "evidence": "account is suspended" }, { "tactic": "link", "evidence": "streamflix-billing-update.com/login" }], "claims": ["The streaming account was suspended after a failed payment", "Billing must be updated through a website within a day"] },
+      "entities": [],
+      "cloud": "VERDICT: UNCLEAR\nWHY: Streaming services do email about failed payments, but the address in this message isn't one I could confirm as official.\nDO:\n- Open the app yourself to check your account.\nDONT:\n- Don't sign in through the link.",
+      "sensitive": ["streamflix-billing-update.com"],
+      "expect": ["likelyScam"]
+    },
+    {
+      "id": "legit-bank-code",
+      "kind": "legit",
+      "message": "Lakeview Bank: 482913 is your verification code. It expires in 10 minutes. Never share this code with anyone — we will never ask for it.",
+      "model": { "tactics": [], "claims": ["The bank sent a one-time verification code for a sign-in the reader started"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_LEGIT\nWHY: One-time codes that warn you never to share them match how banks normally send sign-in codes.\nDO:\n- Use the code only if you just tried to sign in.\nDONT:\n- Don't share the code with anyone who calls or texts.",
+      "sensitive": ["482913", "Lakeview"],
+      "expect": ["looksLegit"]
+    },
+    {
+      "id": "legit-dentist",
+      "kind": "legit",
+      "message": "Reminder from Bright Smile Dental: your check-up is on Tuesday at 3:30pm. Reply C to confirm or call the practice to rebook.",
+      "model": { "tactics": [], "claims": ["The reader has a dental check-up booked"] },
+      "entities": [{ "text": "Bright Smile Dental", "type": "ORG" }],
+      "cloud": "VERDICT: LIKELY_LEGIT\nWHY: Appointment reminders that only ask you to confirm are normal and don't ask for money or details.\nDO:\n- Call the practice on its usual number if you're unsure.\nDONT:\n- Don't reply with personal details.",
+      "sensitive": ["Bright Smile"],
+      "expect": ["looksLegit"]
+    },
+    {
+      "id": "legit-delivery",
+      "kind": "legit",
+      "message": "Swiftpost: your parcel will arrive tomorrow between 9am and 1pm. Track it in the Swiftpost app or at swiftpost.co.uk/track.",
+      "model": { "tactics": [], "claims": ["A parcel will be delivered tomorrow morning"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_LEGIT\nWHY: Delivery updates that point to the company's own app, without asking for payment, are normal.\nDO:\n- Track the parcel in the official app.\nDONT:\n- Don't pay any fee requested by text.",
+      "sensitive": ["swiftpost.co.uk/track"],
+      "expect": ["looksLegit"]
+    },
+    {
+      "id": "legit-friend-dinner",
+      "kind": "legit",
+      "message": "Hey! Are we still on for dinner at Rosa's on Friday? I booked a table for 7pm.",
+      "model": { "tactics": [], "claims": ["A friend booked a table for dinner on Friday"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_LEGIT\nWHY: A dinner plan with no request for money, codes or links has no signs of a scam.\nDO:\n- Reply as you normally would.\nDONT:\n- Nothing to avoid here.",
+      "sensitive": ["Rosa's"],
+      "expect": ["looksLegit"]
+    },
+    {
+      "id": "legit-office-closed",
+      "kind": "legit",
+      "message": "Hi team, the office will be closed on Monday for the bank holiday. Payroll runs as normal on Friday. Enjoy the long weekend!",
+      "model": { "tactics": [], "claims": ["The office is closed on Monday for a public holiday", "Pay will arrive as usual"] },
+      "entities": [],
+      "cloud": "VERDICT: LIKELY_LEGIT\nWHY: A routine closure notice that asks for nothing is normal workplace communication.\nDO:\n- Enjoy the weekend.\nDONT:\n- Nothing to avoid here.",
+      "sensitive": [],
+      "expect": ["looksLegit", "unsure"]
+    }
+  ]
+}

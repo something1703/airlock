@@ -228,7 +228,14 @@ DO: up to four short steps the person can take now (for example, contact the org
 DONT: up to three short things to avoid.
 ```
 
-The app parses the sections, shows grounding sources from response metadata, and renders Search suggestions as required by the grounding display rules (🔍 `API-NOTES.md`).
+The app parses the sections, shows grounding sources from response metadata, and renders Search suggestions as required by the grounding display rules (✅ `API-NOTES.md` §2).
+
+**Web implementation notes (WP-18, no prompt text changed):** `web/src/engine/proof.ts`.
+- `tactics.v1` model tactics are kept only if their `evidence` is really in the message (folded substring, or ≥ 2/3 of its words); unknown tactic names are dropped. Pattern findings come first and win on the same tactic.
+- `claims` are cleaned (one line, 8–240 chars, deduplicated, at most 3), then sealed on device with the Strict dial (Vault names and rule-found details from the *whole* message are protected wherever a claim repeats them). Each claim passes `EgressGate.seal` on its own; one grounded `claimcheck.v1` call per claim.
+- `{{sealed_claims}}` = the gate-checked outbound text (sealed value + legend lines), exactly what the receipt hashes. `{{tactics}}` = fixed tactic names; `{{sender_type}}` = one of a fixed list chosen by keyword rules on device (`unknown` when unsure). No user text besides the sealed claim reaches the prompt.
+- The overall verdict combines the per-claim `VERDICT`s with a weighted red-flag score: any `LIKELY_SCAM` → "Likely a scam"; never "Looks legitimate" without a web check or over strong red flags.
+- Live on device (18 Nov, Chrome Nano): the model sometimes keeps a date/time in a claim despite "without any names, numbers or links"; sealing generalised it. Candidate for `tactics.v2` wording — a human decision (prompt freeze rules).
 
 ---
 

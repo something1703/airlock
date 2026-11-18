@@ -94,6 +94,9 @@ The iOS/macOS app (`App/`) never calls Firebase AI Logic directly: `App/Services
 | Deep answers on sealed text | `PREFER_IN_CLOUD` / `ONLY_IN_CLOUD`, model fallback chain | `generateContentStream(text, { signal, timeout })`, unary last resort | `FirebaseSealedEngine.stream` |
 | Private tools (function calling): today's date, a placeholder's role, free time from an imported .ics — each consented, every result through `EgressGate.sealToolResult` (INV-5) | `ONLY_IN_CLOUD` (function responses never run on device) | `getGenerativeModel(ai, { mode, inCloudParams: { tools: [{ functionDeclarations }], toolConfig: AUTO } })`, `startChat()`, `sendMessageStream`, `functionCalls()`, `FunctionResponsePart` | `FirebaseToolEngine` / `FirebaseToolChat`; loop in `web/src/engine/tools.ts` (`runToolLoop`) |
 | Which side answered | — | `response.inferenceSource` (`on_device` / `in_cloud`) | `FirebaseSealedEngine` |
+| Proof: scam tactics + claim extraction on the raw message | `ONLY_ON_DEVICE` (`tactics.v1`) | `generateContent` on the phone engine | `FirebasePhoneEngine`; pipeline in `web/src/engine/proof.ts` (`runProof`) |
+| Proof: check each sealed claim against the web | `ONLY_IN_CLOUD` + Google Search grounding | `getGenerativeModel(ai, { mode, inCloudParams: { tools: [{ googleSearch: {} }] } })`, `candidates[0].groundingMetadata` (sources + Google's search suggestions shown unmodified) | `FirebaseClaimCheckEngine` |
+| What could Gemini still guess? (F-25) | `ONLY_IN_CLOUD`, same SealedText as the original request | `generateContent` via the sealed engine (`infer.v1`) | `web/src/engine/infer.ts` |
 
 **Android app** (`android/`, Firebase BoM 35.2.0 = `firebase-ai` 18.2.0 + `firebase-ai-ondevice` 16.0.0-beta08): every call is in `android/app/src/main/kotlin/app/airlock/android/engines/` (a test fails if Firebase AI is used anywhere else).
 

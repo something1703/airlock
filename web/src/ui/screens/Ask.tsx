@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAirlock, useSession } from "../../app/context";
 import type { TaskKind } from "../../engine/answer";
 import { OnDeviceStatus } from "./OnDeviceStatus";
+import { CheckScamButton } from "./Proof";
 import { IconArrow, IconCloud, IconDevice, IconFreeTime, IconSparkle } from "../icons";
 
 export const TASKS: { label: string; task: TaskKind }[] = [
@@ -63,6 +64,7 @@ export function Ask() {
       {task.kind === "meeting" && <MeetingHint />}
       <div className="row">
         <button className="btn btn-primary" disabled={!text.trim()} onClick={() => void s.startReview(text, task)}><span className="row" style={{ gap: 8 }}>Seal on this device <IconArrow size={16} /></span></button>
+        <CheckScamButton text={text} />
         <button className="btn btn-ghost" onClick={() => { setText(SAMPLE); s.warmUp(); }}><span className="row" style={{ gap: 6 }}><IconSparkle size={16} /> Try a sample (fictional)</span></button>
       </div>
       {threads.length > 0 && (

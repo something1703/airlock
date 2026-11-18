@@ -1,6 +1,5 @@
 import {
-  CHROME_ON_DEVICE_MODEL, EngineError, type AnswerQuality, type EngineChunk, type EngineProvider, type EngineResult, type PhoneAvailability, type PhoneOnlyEngine, type PhoneOptions,
-  type PhonePrompt, type SealedEngine, type SealedHistory, type SealedToolResponse, type TaskSpec, type ToolCall, type ToolChat, type ToolDeclaration, type ToolEngine, type ToolTurn,
+  CHROME_ON_DEVICE_MODEL, EngineError, type AnswerQuality, type ClaimCheckEngine, type ClaimContext, type EngineChunk, type EngineProvider, type EngineResult, type GroundedResult, type PhoneAvailability, type PhoneOnlyEngine, type PhoneOptions, type PhonePrompt, type SealedEngine, type SealedHistory, type SealedToolResponse, type TaskSpec, type ToolCall, type ToolChat, type ToolDeclaration, type ToolEngine, type ToolTurn,
 } from "./engines";
 import type { Route, SealedText } from "./types";
 
@@ -120,11 +119,26 @@ export class MockToolEngine implements ToolEngine {
   }
 }
 
+/** Scriptable search-grounded claim check; records every SealedText (and context) it receives. */
+export class MockClaimCheckEngine implements ClaimCheckEngine {
+  readonly received: { sealed: SealedText; context: ClaimContext }[] = [];
+
+  constructor(private readonly handler: (sealed: SealedText, context: ClaimContext) => Partial<GroundedResult> | Promise<Partial<GroundedResult>>) {}
+
+  async check(sealed: SealedText, context: ClaimContext): Promise<GroundedResult> {
+    this.received.push({ sealed, context });
+    const r = await this.handler(sealed, context);
+    return { text: "VERDICT: UNCLEAR", modelVersion: "mock-gemini-search", ranOnDevice: false, latencyMs: 1, sources: [], supports: [], searchEntryPointHtml: null, webSearchQueries: [], ...r };
+  }
+}
+
 export class MockEngines implements EngineProvider {
   constructor(
     readonly phone: PhoneOnlyEngine = MockPhoneEngine.answering('{"items":[]}'),
     private readonly sealedEngines: Partial<Record<Route, SealedEngine>> = {},
     readonly toolEngine: ToolEngine = new MockToolEngine(() => ({ text: "Here's a reply for [[PERSON_1]]." })),
+
+    readonly claimCheck?: ClaimCheckEngine,
   ) {}
 
   sealed(route: Route, _quality: AnswerQuality): SealedEngine {
