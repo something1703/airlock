@@ -31,7 +31,8 @@ fi
 
 if [[ -f project.yml ]] && command -v xcodegen >/dev/null && xcodebuild -version >/dev/null 2>&1 && xcrun simctl list >/dev/null 2>&1; then
   xcodegen generate --spec project.yml --quiet
-  DD="${TMPDIR:-/tmp}/airlock-derived-data"
+  # One build cache per checkout: parallel worktrees sharing a cache corrupt each other's package artifacts.
+  DD="${TMPDIR:-/tmp}/airlock-derived-data-$(pwd | shasum | cut -c1-8)"
   if grep -q "AirlockUITests" project.yml; then
     echo "▶ App (xcodebuild test, mock engines)"
     xcodebuild -project Airlock.xcodeproj -scheme "Airlock (Dev)" -destination 'platform=iOS Simulator,OS=latest,name=iPhone 18 Pro' -derivedDataPath "$DD" test -quiet
@@ -71,6 +72,8 @@ fi
 
 if [[ -f functions/package.json ]]; then
   echo "▶ Cloud Functions (npm test)"
+  # A fresh checkout or worktree has no functions/node_modules yet.
+  [[ -d functions/node_modules ]] || (cd functions && npm ci --silent --no-audit --no-fund)
   # Rules + function tests need the Firestore emulator (Java 21 + firebase CLI); without it only the pure tests run.
   if command -v firebase >/dev/null 2>&1; then
     (cd functions && JAVA_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null || echo "${JAVA_HOME:-}") npm run test:emulator --silent)
