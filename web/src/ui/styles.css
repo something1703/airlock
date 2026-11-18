@@ -274,13 +274,24 @@ input.field, select.field { border: 1px solid var(--stroke); border-radius: 12px
 .ev-num { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin: 10px 0 6px; font-variant-numeric: tabular-nums; }
 .ev-ci svg { width: 100%; height: 12px; display: block; margin-bottom: 6px; }
 .ev-track { fill: var(--stroke); } .ev-range { fill: color-mix(in srgb, var(--seal) 35%, transparent); } .ev-point { fill: var(--seal); }
-.ev-chart { width: 100%; height: auto; display: block; }
-.ev-grid { stroke: var(--stroke); stroke-width: 1; } .ev-axis { fill: var(--text-2); font-size: 12px; }
-.ev-label { fill: var(--text); font-size: 14px; font-weight: 600; } .ev-value { fill: var(--text); font-size: 13px; font-weight: 700; }
-.ev-bar { fill: color-mix(in srgb, var(--risk) 55%, var(--raised)); transform-box: fill-box; transform-origin: left; animation: ev-grow 700ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 120ms); }
-.ev-bar.best { fill: var(--seal); }
-.ev-whisker { stroke: var(--text); stroke-width: 1.6; opacity: 0.7; }
+.ev-chart { display: grid; gap: 12px; padding-top: 4px; }
+.ev-row { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr) 48px; align-items: center; gap: 12px; }
+.ev-label { font-size: 14px; font-weight: 600; text-align: right; }
+.ev-value { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ev-plot { position: relative; height: 26px; }
+.ev-grid { position: absolute; top: -6px; bottom: -6px; width: 1px; background: var(--stroke); }
+.ev-bar { position: absolute; left: 0; top: 2px; bottom: 2px; border-radius: 7px; background: color-mix(in srgb, var(--risk) 55%, var(--raised)); transform-origin: left; animation: ev-grow 700ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 120ms); }
+.ev-bar.best { background: var(--seal); }
+.ev-whisker { position: absolute; top: 50%; height: 12px; transform: translateY(-50%); border-inline: 1.6px solid var(--text); background: linear-gradient(var(--text), var(--text)) center / 100% 1.6px no-repeat; opacity: 0.7; animation: ev-fade 400ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 120ms + 500ms); }
+.ev-axis-row .ev-plot { height: 16px; }
+.ev-tick { position: absolute; transform: translateX(-50%); font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) {
+  .ev-row { grid-template-columns: minmax(0, 1fr) 44px; row-gap: 4px; }
+  .ev-label { grid-column: 1 / -1; text-align: left; }
+  .ev-axis-row .ev-label { display: none; }
+}
 @keyframes ev-grow { from { transform: scaleX(0); } }
+@keyframes ev-fade { from { opacity: 0; } }
 .ev-misses { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .ev-screen.is-mock .ev-num { color: var(--text-2); }
 .ev-screen.is-mock .ev-tile { border-style: dashed; }

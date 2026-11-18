@@ -25,34 +25,34 @@ function Tile({ label, m, definition, better, icon, index }: { label: string; m:
   );
 }
 
-/** Leak rate as each layer is added — hand-drawn bars with 95% interval whiskers. */
+const TICKS = [0, 0.25, 0.5, 0.75, 1];
+const at = (v: number) => `${(Math.min(1, Math.max(0, v)) * 100).toFixed(2)}%`;
+
+/**
+ * Leak rate as each layer is added — hand-built bars with 95% interval whiskers. HTML rather than one SVG so the
+ * labels stay readable at phone width (they move above the bars below 560px).
+ */
 function Ablation({ e }: { e: Evidence }) {
   const rows = e.ablation;
-  const W = 640, rowH = 46, left = 170, right = 70, top = 10;
-  const H = top + rows.length * rowH + 24;
-  const x = (v: number) => left + v * (W - left - right);
   return (
-    <svg className="ev-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Leak rate by configuration: ${rows.map((r) => `${r.label} ${pct(r.leak.value)}`).join(", ")}`}>
-      {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-        <g key={t}>
-          <line x1={x(t)} x2={x(t)} y1={top - 4} y2={H - 20} className="ev-grid" />
-          <text x={x(t)} y={H - 4} textAnchor="middle" className="ev-axis">{pct(t)}</text>
-        </g>
+    <div className="ev-chart" role="img" aria-label={`Leak rate by configuration: ${rows.map((r) => `${r.label} ${pct(r.leak.value)}`).join(", ")}`}>
+      {rows.map((r, i) => (
+        <div key={r.config} className="ev-row" style={{ "--i": i } as CSSProperties}>
+          <div className="ev-label">{r.label}</div>
+          <div className="ev-plot">
+            {TICKS.map((t) => <span key={t} className="ev-grid" style={{ left: at(t) }} />)}
+            <span className={`ev-bar${i === rows.length - 1 ? " best" : ""}`} style={{ width: `max(3px, ${at(r.leak.value)})` }} />
+            <span className="ev-whisker" style={{ left: at(r.leak.low), width: at(r.leak.high - r.leak.low) }} />
+          </div>
+          <div className="ev-value">{pct(r.leak.value)}</div>
+        </div>
       ))}
-      {rows.map((r, i) => {
-        const y = top + i * rowH;
-        return (
-          <g key={r.config} className="ev-bar-row" style={{ "--i": i } as CSSProperties}>
-            <text x={left - 12} y={y + 22} textAnchor="end" className="ev-label">{r.label}</text>
-            <rect x={x(0)} y={y + 8} width={Math.max(2, x(r.leak.value) - x(0))} height="22" rx="6" className={`ev-bar${i === rows.length - 1 ? " best" : ""}`} />
-            <line x1={x(r.leak.low)} x2={x(r.leak.high)} y1={y + 19} y2={y + 19} className="ev-whisker" />
-            <line x1={x(r.leak.low)} x2={x(r.leak.low)} y1={y + 13} y2={y + 25} className="ev-whisker" />
-            <line x1={x(r.leak.high)} x2={x(r.leak.high)} y1={y + 13} y2={y + 25} className="ev-whisker" />
-            <text x={Math.min(x(r.leak.high) + 8, W - right + 8)} y={y + 24} className="ev-value">{pct(r.leak.value)}</text>
-          </g>
-        );
-      })}
-    </svg>
+      <div className="ev-row ev-axis-row" aria-hidden="true">
+        <div className="ev-label" />
+        <div className="ev-plot">{TICKS.map((t) => <span key={t} className="ev-tick" style={{ left: at(t) }}>{pct(t)}</span>)}</div>
+        <div className="ev-value" />
+      </div>
+    </div>
   );
 }
 
