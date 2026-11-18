@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +47,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -58,6 +60,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.airlock.android.LocalAirlock
@@ -74,6 +77,7 @@ import app.airlock.android.ui.ButtonKind
 import app.airlock.android.ui.Card
 import app.airlock.android.ui.CategoryBadge
 import app.airlock.android.ui.EaseOutExpo
+import app.airlock.android.ui.Field
 import app.airlock.android.ui.FlowText
 import app.airlock.android.ui.H1
 import app.airlock.android.ui.H2
@@ -96,6 +100,7 @@ import app.airlock.core.Action
 import app.airlock.core.Confidence
 import app.airlock.core.Entity
 import app.airlock.core.GateCheckId
+import app.airlock.core.Js
 import app.airlock.core.PhoneAvailability
 import app.airlock.core.PrivacyCategory
 import app.airlock.core.ReplacementKind
@@ -256,6 +261,8 @@ private fun Checked(session: AirlockSession, s: State, review: Review, onSeal: (
     val haptics = LocalHapticFeedback.current
     val result = review.result ?: return
     var raw by rememberSaveable { mutableStateOf(false) }
+    var phrase by rememberSaveable { mutableStateOf("") }
+    var picked by remember { mutableStateOf(false) }
     val draft = result.draft
     val entities = draft.entities.sorted()
     val sealedCount = entities.count { it.action != Action.Keep }
@@ -291,7 +298,13 @@ private fun Checked(session: AirlockSession, s: State, review: Review, onSeal: (
                 transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(120)) },
                 label = "view",
             ) { showRaw ->
-                if (showRaw) Text(result.normalised.text, style = Type.body, color = c.text)
+                if (showRaw) SelectableText(result.normalised.text) { sel ->
+                    val t = sel.trim()
+                    if (t.isNotEmpty() && t.length <= PROTECT_MAX && '\n' !in t) {
+                        phrase = t
+                        picked = true
+                    }
+                }
                 else FlowText(sealedPreviewSegs(draft, labels) { e -> toggle(session, e, haptics) }, popIn = true)
             }
             SummaryBar(sealedCount, generalised, kept, result.sealMs)
@@ -352,8 +365,10 @@ private fun Checked(session: AirlockSession, s: State, review: Review, onSeal: (
             }
         }
 
+        ProtectCard(session, phrase, picked) { phrase = it; picked = false }
+
         if (entities.isNotEmpty()) {
-            Card(Modifier.enter(2)) {
+            Card(Modifier.enter(3)) {
                 H2(stringResource(R.string.details_title))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     entities.forEach { e -> EntityRow(e, labels) { toggle(session, e, haptics) } }
@@ -370,6 +385,77 @@ private fun Checked(session: AirlockSession, s: State, review: Review, onSeal: (
             AirButton(stringResource(R.string.cancel), { session.cancelReview() }, kind = ButtonKind.GHOST)
         }
         Small(stringResource(R.string.review_note))
+    }
+}
+
+private const val PROTECT_MAX = 120
+
+private val PROTECT_AS = listOf(
+    PrivacyCategory.PERSON to R.string.protect_person,
+    PrivacyCategory.ORG to R.string.protect_org,
+    PrivacyCategory.LOCATION to R.string.protect_place,
+    PrivacyCategory.CONTACT to R.string.protect_contact,
+    PrivacyCategory.ID to R.string.protect_id,
+)
+
+/**
+ * "You wrote", selectable: a read-only text field, because it reports the selection (a SelectionContainer doesn't).
+ * Selecting a phrase pre-fills "Protect something Airlock missed". The text stays on the phone.
+ */
+@Composable
+private fun SelectableText(text: String, onSelect: (String) -> Unit) {
+    val c = LocalAirlock.current
+    var value by remember(text) { mutableStateOf(TextFieldValue(text)) }
+    BasicTextField(
+        value = value,
+        onValueChange = { v ->
+            value = v.copy(text = text)
+            val sel = v.selection
+            if (!sel.collapsed && sel.max <= text.length) onSelect(text.substring(sel.min, sel.max))
+        },
+        readOnly = true,
+        textStyle = Type.body.copy(color = c.text),
+        cursorBrush = SolidColor(c.seal),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/** Mark something the detectors missed (web `ProtectBar`). Works fully without a selection, from the keyboard too. */
+@Composable
+private fun ProtectCard(session: AirlockSession, phrase: String, picked: Boolean, setPhrase: (String) -> Unit) {
+    val haptics = LocalHapticFeedback.current
+    var note by remember { mutableStateOf<String?>(null) }
+    val done = stringResource(R.string.protect_done, Js.trim(phrase))
+    val missing = stringResource(R.string.protect_missing, Js.trim(phrase))
+    val groupA11y = stringResource(R.string.protect_as_a11y)
+    Card(Modifier.enter(2)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            H2(stringResource(R.string.protect_title))
+            Small(stringResource(R.string.protect_body))
+        }
+        Field(
+            phrase, { setPhrase(it.take(PROTECT_MAX)); note = null }, stringResource(R.string.protect_hint), stringResource(R.string.protect_field_a11y),
+            Modifier.fillMaxWidth(),
+        )
+        if (picked && phrase.isNotBlank()) Small(stringResource(R.string.protect_from_selection))
+        Wrap(Modifier.semantics { contentDescription = groupA11y }) {
+            PROTECT_AS.forEach { (category, label) ->
+                val name = stringResource(label)
+                val ready = phrase.isNotBlank()
+                AirButton(
+                    name,
+                    {
+                        val ok = session.protect(phrase, category)
+                        haptics.performHapticFeedback(if (ok) HapticFeedbackType.Confirm else HapticFeedbackType.Reject)
+                        note = if (ok) done else missing
+                        if (ok) setPhrase("")
+                    },
+                    compact = true, enabled = ready,
+                    contentDescription = if (ready) stringResource(R.string.protect_as_button_a11y, Js.trim(phrase), name) else null,
+                )
+            }
+        }
+        note?.let { Small(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
     }
 }
 

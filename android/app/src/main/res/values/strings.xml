@@ -87,6 +87,12 @@
     <string name="status_downloadable_title">On-device AI needs a one-time download</string>
     <string name="status_downloadable_body">Until then, Airlock seals with strict rules and asks you to check everything.</string>
     <string name="status_download_button">Download on-device model</string>
+    <string name="status_download_a11y">Download progress</string>
+    <string name="status_downloading_title">Gemini Nano is downloading on this phone</string>
+    <string name="status_download_show">Show progress</string>
+    <string name="status_download_failed_title">The on-device model didn\'t finish downloading</string>
+    <string name="status_download_failed_body">Check your connection and free space, then try again. Until then, Airlock seals with strict rules and asks you to check everything.</string>
+    <string name="status_download_retry">Try again</string>
     <string name="status_unavailable_title">This phone can\'t run on-device AI</string>
     <string name="status_unavailable_body">Airlock still works: it seals with rules and asks you to review everything before anything is sent. Gemini only ever gets the sealed version.</string>
 
@@ -209,6 +215,20 @@
     <string name="risk_suggestion_prefix">"Suggestion: "</string>
     <string name="risk_use">Use suggestion</string>
     <string name="risk_keep">Keep as is</string>
+    <string name="protect_title">Protect something Airlock missed</string>
+    <string name="protect_body">Select a word in “You wrote”, or type it here. Every place it appears is replaced before sending, and the real words come back in the answer.</string>
+    <string name="protect_hint">e.g. Mercy General Hospital</string>
+    <string name="protect_field_a11y">Word or phrase to protect</string>
+    <string name="protect_as_a11y">Protect it as</string>
+    <string name="protect_as_button_a11y">Protect “%1$s” as %2$s</string>
+    <string name="protect_person">Person</string>
+    <string name="protect_org">Organisation</string>
+    <string name="protect_place">Place</string>
+    <string name="protect_contact">Contact</string>
+    <string name="protect_id">Number / ID</string>
+    <string name="protect_done">Protected every “%1$s”.</string>
+    <string name="protect_missing">“%1$s” isn\'t in your text.</string>
+    <string name="protect_from_selection">Selected in “You wrote” — choose what it is below.</string>
     <string name="details_title">Details</string>
     <string name="detail_replaced">replaced</string>
     <string name="detail_kept">sent as written</string>
