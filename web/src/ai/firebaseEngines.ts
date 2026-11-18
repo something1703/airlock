@@ -76,10 +76,12 @@ export class FirebaseEngines implements EngineProvider {
     }
   }
 
-  model(mode: Mode, cloudModel: string, systemInstruction?: string, maxOutputTokens?: number): GenerativeModel {
+  /** `temperature` is used only by AirlockBench's judge (`judge.v1` runs at temperature 0). */
+  model(mode: Mode, cloudModel: string, systemInstruction?: string, maxOutputTokens?: number, temperature?: number): GenerativeModel {
+    const generationConfig = { ...(maxOutputTokens ? { maxOutputTokens } : {}), ...(temperature !== undefined ? { temperature } : {}) };
     return getGenerativeModel(this.ai, {
       mode,
-      inCloudParams: { model: cloudModel, ...(systemInstruction ? { systemInstruction } : {}), ...(maxOutputTokens ? { generationConfig: { maxOutputTokens } } : {}) },
+      inCloudParams: { model: cloudModel, ...(systemInstruction ? { systemInstruction } : {}), ...(Object.keys(generationConfig).length ? { generationConfig } : {}) },
     });
   }
 }
