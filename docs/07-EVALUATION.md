@@ -30,6 +30,8 @@ AirlockBench (macOS app, uses AirlockKit + Firebase AI Logic)
 
 Why a Mac app and not CI: Apple's on-device model only runs on Apple hardware with Apple Intelligence on. The Mac app uses **exactly the same AirlockKit code** as the iPhone app, so results describe the shipped pipeline.
 
+> **As built (18 Nov):** the harness is a Node CLI on the TypeScript engine (`web/bench/`) plus the Python scorer (`eval/scorer/`), not a Mac app. See §10 for what exists, how to run it, and what is still missing.
+
 Run modes:
 - `--smoke` 30 items, one config (≈ 10 min) — used for the Day-3 go/no-go.
 - `--full` all items × all configs (overnight).
@@ -142,3 +144,80 @@ Record consented quotes for the Devpost story. No real user data is ever stored 
 | 25 Nov | Freeze prompts; final full run on test split |
 | 26 Nov | Evidence screen + README table from the final run |
 | 27–28 Nov | Human evaluation sessions |
+
+## 10. As built (WP-22, 18 Nov)
+
+> **No real model results exist yet.** Every run so far used mock engines. Live evaluation (Gemini through Firebase AI Logic, Cloud Storage, Sensitive Data Protection, BigQuery) needs the repo owner's explicit permission and runs **last**, on the **separate evaluation Google Cloud project**. Never fill a report or the Evidence screen with mock numbers presented as measurements.
+
+### 10.1 Layout
+
+| Path | What |
+|------|------|
+| `web/bench/synth/` | `synth-tpl.v1`: deterministic template generator (mulberry32, fixed seed `20261118`, fixed reference date 2026-11-18). 10 doc types × en/es/de × short/medium/long, fictional parts only. Same output schema as `synth.v1`. Fake secrets are OTPs, passwords and IBAN-shaped numbers with valid check digits; no provider-format keys, so `scripts/lint.sh`'s scanner never fires (tested). Emails use `example.com/.org/.net` |
+| `web/bench/dataset.ts` | `BenchItem` schema; `loadDataset` refuses anything without a bench provenance + `synthetic: true` (the guard that keeps real text out of the raw baseline) |
+| `web/bench/configs.ts` | §5 ablations. `C_rules_nl` is **skipped** in TS (the NL tagger exists only in Swift) and listed in the run manifest |
+| `web/bench/models.ts` | Mock models: `oraclePhone` (detect.v1 returns the gold spans in the chunk minus a deterministic `1 − recall` share; attack.v1 flags quasi-identifiers still in the draft; gen.v1 returns a generic rewrite), scripted answer engine, string-match attacker, scripted judge |
+| `web/bench/runner.ts` | Per item × config: `SealPipeline` → `EgressGate.seal` → `answer()` (route + streaming restore + receipt) → attacker → judge. Appends one record per case to `eval/runs/{runId}/items.jsonl` (gitignored) + `manifest.json` (git SHA, dirty flag, prompt template hashes, Remote Config snapshot, model names, platform, engine labels) |
+| `web/bench/live.ts`, `liveGate.ts` | Live models via `web/src/ai/firebaseEngines.ts` (the only Firebase AI Logic call site): hybrid sealed answers, `ONLY_IN_CLOUD` raw synthetic baseline, `attacker.v1` on `model_cloud_max`, `judge.v1` at temperature 0 with A/B randomised and un-swapped, `synth.v1` generation with validation + drop-rate. Gate first, then config checks, then Firebase imports |
+| `eval/scorer/` | Python 3.12, standard library for everything local. Metrics with Wilson / bootstrap CIs, Markdown + static HTML report (hand-made SVG, light/dark, hover tooltips, table views), `evidence.json`, BigQuery rows. `cloud.py` + `cli.py job` = the Cloud Run Job (GCS → SDP → metrics → BigQuery → reports), all clients injected and fake-tested. `Dockerfile`, `requirements.txt` (google-cloud-* pinned) |
+| `eval/schemas/` | BigQuery `runs.json`, `items.json` (adds `config` and `gate_passed` to §05 §9's list: one row per item × config), `metrics.json`; `evidence.schema.json` |
+| `eval/datasets/` | `MANIFEST.json` (counts + sha256 of each generated file; a test fails if the generator drifts) and `demo-set.jsonl` (5 scenarios of 09-TESTING §7). `synth-v1.jsonl` (600; 120 test) and `synth-hard.jsonl` (120) are regenerated, not committed |
+| `eval/reports/mock-sample/` | Committed **mock** run on the test split (`report.md`, `report.html`, `evidence.json`, `metrics.json`), labelled "MOCK RUN — not real model results" |
+| `eval/bench.sh` | `smoke` (30 items × `D_llm`, mock, ~3 s; part of `scripts/test.sh`), `mock-sample`, `test` |
+
+### 10.2 How to run
+
+Mock (default, no network, anyone can run):
+
+```bash
+cd web && npm run bench -- generate                    # writes eval/datasets/*.jsonl + MANIFEST.json
+cd web && npm run bench -- run --smoke                 # 30 test items × D_llm  (Day-3 go/no-go shape)
+cd web && npm run bench -- run                         # test split × all configs (≈ 3 s)
+cd web && npm run bench -- run --full                  # all 600 items × all configs (≈ 10 s)
+cd web && npm run bench -- run --resume <runId>        # continue an interrupted run
+python3 -I eval/scorer/score.py report --run-dir eval/runs/<runId>   # report.md/.html, evidence.json, metrics.json
+eval/bench.sh smoke | mock-sample | test
+```
+
+Flags: `--dataset synth-v1|synth-hard|demo-set|<file.jsonl>`, `--split test|dev|all`, `--configs A_raw,B_rules,…`, `--limit N`, `--oracle-recall 0.9`, `--run-id`, `--out`.
+
+**Live — only with the repo owner's explicit permission, last, on the separate evaluation project.** Every live command refuses (exit 3, "Nothing was sent") unless it gets `--live --i-have-permission` **and** the shell has `AIRLOCK_BENCH_LIVE_OK=yes`. Agents never set that variable. The owner then also provides (gitignored, never committed): `AIRLOCK_BENCH_FIREBASE_CONFIG` (eval web-app config JSON), `AIRLOCK_BENCH_APPCHECK_DEBUG_TOKEN` (registered on the eval project; the SDK prints it — don't share that output), optional `AIRLOCK_BENCH_REMOTE_CONFIG`.
+
+```bash
+cd web && npm run bench -- generate --source synth.v1 --live --i-have-permission   # optional model-written docs (*.llm.jsonl)
+cd web && npm run bench -- run --live --i-have-permission
+python3 -I eval/scorer/score.py upload --run-dir eval/runs/<runId> --bucket airlock-eval-<suffix> --project <eval-project> --live --i-have-permission
+gcloud run jobs execute airlock-scorer --args=--run-id=<runId>,--bucket=airlock-eval-<suffix>,--project=<eval-project>,--live,--i-have-permission
+# (job image: eval/scorer/Dockerfile; the job's env must carry AIRLOCK_BENCH_LIVE_OK=yes, set by the owner)
+```
+
+Under Node there is no on-device model (Chrome's Prompt API is browser-only), so a live Node run takes the INV-9 path for detection (rules + forced review) and measures rules, cloud answers, judge and attacker. Real on-device detection numbers need the browser (a web bench page) or the Mac app — see 10.6.
+
+### 10.3 Record and metric conventions
+
+- One JSON record per item × config (`CaseRecord`, `web/bench/runner.ts`): the synthetic text, gold, quasi, profile; `egress` = exactly what would leave (sealed value + rendered legend) or `null` when the gate blocked; gate result; review reasons; LLM detection report; sealed spans (normalised offsets; generator text is already in normal form, tested); red-team counts; seal ms; route, model version, on-device flag; model text, restored answer, fidelity; attacker guess; judge verdict (already un-swapped); engine labels.
+- **Gate blocked = nothing left.** Counted in the doc-leak denominator (cannot leak), in `gate_block_rate`, and as a **loss** for quality. Recall, over-redaction and quasi coverage use sent documents only; `doc_leak_rate_sent` is reported next to the headline.
+- "Sealed or generalised" = the gold text is no longer visible (folded, word-bounded) in the egress. Leak also counts PERSON first/last-name tokens ≥ 3 chars. Placeholder tokens are blanked before matching; legend lines count.
+- DATE is a direct identifier only for dates of birth; HEALTH is reported but not direct.
+- Occupation re-ID uses a deterministic proxy (fuzzy ≥ 0.8 or containment), not a judge call. City accepts the same metro (the generator records `profile.metro`).
+- Mean judge quality uses only cases where Airlock's answer was shown as B (the prompt scores B).
+- `on_device_share` = quick-task answers whose model version is on-device. With mocks it is 100% by construction.
+
+### 10.4 `evidence_json` (Evidence screen)
+
+Schema: `eval/schemas/evidence.schema.json` (version 1); sample: **`eval/reports/mock-sample/evidence.json`** (mock). Rates are `{value, low, high, n}` in [0, 1] with Wilson 95% intervals, or `null` when not measured. Keys: `mock`, `label` (non-null exactly when mock: "MOCK RUN — not real model results"), `runId`, `createdAt`, `gitSha`, `dataset`, `split`, `n`, `languages`, `engine`, `onDeviceModel`, `headlineConfig` (`E_redteam`), `leakRate`, `leakRateWithVault` (`F_vault`), `namesCaught`, `quality`, `onDevice`, `restoreFidelity`, `reidTwoAttrs`, `gateBlockRate`, `ablation` (B → D → E → F with labels Rules / +On-device model / +Red-team / +Your Vault), `misses` (real synthetic examples), `method`. Apps must show the mock label prominently, or refuse mock evidence in release builds; Remote Config `evidence_json` should only ever carry a live run.
+
+### 10.5 What the mock runs already showed (engine behaviour, not model quality)
+
+These come from the real TypeScript rules, merger and gate; the mock detector only decides which gold spans are "found".
+
+1. **Vault vs. email (usability bug, no leak).** With the Vault seeded (`F_vault`), the user's name inside their own email (`sophie.whitlock@example.net`) is matched by the Vault (word-bounded at `.`), and the Vault outranks the email pattern in the merger, so the draft becomes `[[PERSON_ME]].[[PERSON_ME]]@example.net`; the gate then blocks on G3 (`@example.net` still looks like contact data). Nothing leaks, but `F_vault` is gate-blocked for 52.5% of the mock-sample documents, and in the full 600-document mock run 327 of the 338 blocked `F_vault` documents failed G3 (the two cases inspected by hand were exactly this). Likely fix: a contact/ID pattern span that *contains* Vault hits should win in `merge` (all three engines). Engine change → human review; not done in WP-22.
+2. The `street_address` rule swallows a sentence-final period (`22 Stanwick Lane.` → `[[LOC_2]]`), so the sentence loses its full stop. Cosmetic.
+3. When the full name is found but a later first-name-only mention is missed, the gate blocks on G2 (partial name) instead of sending — as designed; in the app the Review screen highlights it.
+
+### 10.6 Not done yet
+
+- **Any live run** (needs the owner's permission; separate eval project; Google Quota Account timing in 11-RISKS).
+- Real on-device detection in the harness: a browser bench page driving Chrome's model through the same runner, or the Swift `Bench/AirlockBench` target. Until then `D_llm`/`E_redteam`/`F_vault` numbers can only come from mocks.
+- `C_rules_nl` (Swift-only NL tagger), `pupa-subset` (licence not checked — 👤), Model Armor block counts in reports, Looker Studio.
+- Cloud resources (bucket, dataset, job) are not created; the commands above are for the owner.

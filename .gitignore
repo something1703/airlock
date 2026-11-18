@@ -52,6 +52,8 @@ __pycache__/
 
 # --- Eval outputs (raw runs stay local / in GCS) ---
 eval/runs/
+# Bulk synthetic datasets are regenerated deterministically (npm run bench -- generate); MANIFEST.json pins their hashes.
+eval/datasets/synth-*.jsonl
 
 # --- OS / editors ---
 .DS_Store

@@ -104,10 +104,12 @@ export class FirebaseEngines implements EngineProvider {
     }
   }
 
-  model(mode: Mode, cloudModel: string, systemInstruction?: string, maxOutputTokens?: number, tools?: ModelParams["tools"]): GenerativeModel {
+  /** `tools` carries Google Search grounding (Proof); `temperature` is used only by AirlockBench's judge (`judge.v1` at 0). */
+  model(mode: Mode, cloudModel: string, systemInstruction?: string, maxOutputTokens?: number, tools?: ModelParams["tools"], temperature?: number): GenerativeModel {
+    const generationConfig = { ...(maxOutputTokens ? { maxOutputTokens } : {}), ...(temperature !== undefined ? { temperature } : {}) };
     return getGenerativeModel(this.ai, {
       mode,
-      inCloudParams: { model: cloudModel, ...(systemInstruction ? { systemInstruction } : {}), ...(maxOutputTokens ? { generationConfig: { maxOutputTokens } } : {}), ...(tools ? { tools } : {}) },
+      inCloudParams: { model: cloudModel, ...(systemInstruction ? { systemInstruction } : {}), ...(Object.keys(generationConfig).length ? { generationConfig } : {}), ...(tools ? { tools } : {}) },
     });
   }
 }

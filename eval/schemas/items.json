@@ -1,0 +1,21 @@
+[
+  {"name": "run_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "item_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "config", "type": "STRING", "mode": "REQUIRED", "description": "Ablation config (A_raw … G_naive_redact); one row per item x config"},
+  {"name": "doc_type", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "language", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "words", "type": "INT64", "mode": "NULLABLE"},
+  {"name": "gold_count", "type": "INT64", "mode": "NULLABLE"},
+  {"name": "leaked_gold", "type": "INT64", "mode": "NULLABLE"},
+  {"name": "leaked_types", "type": "STRING", "mode": "REPEATED"},
+  {"name": "over_redactions", "type": "INT64", "mode": "NULLABLE"},
+  {"name": "sdp_findings", "type": "INT64", "mode": "NULLABLE"},
+  {"name": "attacker_hits", "type": "JSON", "mode": "NULLABLE"},
+  {"name": "judge_winner", "type": "STRING", "mode": "NULLABLE", "description": "airlock | raw | tie (already un-swapped)"},
+  {"name": "judge_quality", "type": "INT64", "mode": "NULLABLE", "description": "b_quality when B was Airlock's answer"},
+  {"name": "restore_ok", "type": "BOOL", "mode": "NULLABLE"},
+  {"name": "seal_ms", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "route", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "on_device_answer", "type": "BOOL", "mode": "NULLABLE"},
+  {"name": "gate_passed", "type": "BOOL", "mode": "NULLABLE"}
+]

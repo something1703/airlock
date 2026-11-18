@@ -1,0 +1,8 @@
+[
+  {"name": "run_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "metric", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "value", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "ci_low", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "ci_high", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "slice", "type": "STRING", "mode": "NULLABLE", "description": "config=<id>[;language=<code>]"}
+]

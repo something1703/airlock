@@ -97,6 +97,7 @@ The iOS/macOS app (`App/`) never calls Firebase AI Logic directly: `App/Services
 | Proof: scam tactics + claim extraction on the raw message | `ONLY_ON_DEVICE` (`tactics.v1`) | `generateContent` on the phone engine | `FirebasePhoneEngine`; pipeline in `web/src/engine/proof.ts` (`runProof`) |
 | Proof: check each sealed claim against the web | `ONLY_IN_CLOUD` + Google Search grounding | `getGenerativeModel(ai, { mode, inCloudParams: { tools: [{ googleSearch: {} }] } })`, `candidates[0].groundingMetadata` (sources + Google's search suggestions shown unmodified) | `FirebaseClaimCheckEngine` |
 | What could Gemini still guess? (F-25) | `ONLY_IN_CLOUD`, same SealedText as the original request | `generateContent` via the sealed engine (`infer.v1`) | `web/src/engine/infer.ts` |
+| AirlockBench live evaluation — `synth.v1`, `judge.v1` (temperature 0), `attacker.v1`, raw **synthetic** baseline; answers reuse the rows above | `ONLY_IN_CLOUD` | `FirebaseEngines.model(...)`, `generateContent` | `web/bench/live.ts` → `firebaseEngines.ts`. **Not run yet:** live runs need the owner's permission (`--live --i-have-permission` + `AIRLOCK_BENCH_LIVE_OK=yes`); all runs so far used mock engines |
 
 **Android app** (`android/`, Firebase BoM 35.2.0 = `firebase-ai` 18.2.0 + `firebase-ai-ondevice` 16.0.0-beta08): every call is in `android/app/src/main/kotlin/app/airlock/android/engines/` (a test fails if Firebase AI is used anywhere else).
 

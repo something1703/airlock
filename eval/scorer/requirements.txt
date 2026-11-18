@@ -1,0 +1,4 @@
+# Live scorer job only (Cloud Run). Local `report` and the unit tests use the standard library.
+google-cloud-storage==3.16.0
+google-cloud-bigquery==3.46.0
+google-cloud-dlp==3.39.0

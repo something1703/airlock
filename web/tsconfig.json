@@ -20,6 +20,7 @@
     "jsx": "react-jsx"
   },
   "include": [
+    "bench",
     "src",
     "tests",
     "scripts"

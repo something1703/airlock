@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "sync-packs": "node scripts/sync-packs.mjs"
+    "sync-packs": "node scripts/sync-packs.mjs",
+    "bench": "vite-node bench/main.ts --"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/something1703/airlock/eval/schemas/evidence.schema.json",
+  "title": "Airlock evidence_json",
+  "description": "Benchmark numbers for the Evidence screen (docs/06-UI-UX.md §5.12), produced by eval/scorer from one run. Delivered via Remote Config key evidence_json with a bundled fallback. A mock run has mock=true and the label 'MOCK RUN — not real model results'; apps must show that label prominently or refuse to show mock evidence in release builds.",
+  "type": "object",
+  "required": ["schemaVersion", "mock", "label", "runId", "createdAt", "gitSha", "dataset", "split", "n", "languages", "engine", "onDeviceModel", "headlineConfig", "leakRate", "leakRateWithVault", "namesCaught", "quality", "onDevice", "restoreFidelity", "reidTwoAttrs", "gateBlockRate", "ablation", "misses", "method"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "mock": {"type": "boolean"},
+    "label": {"type": ["string", "null"], "description": "Non-null exactly when mock is true."},
+    "runId": {"type": "string"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "gitSha": {"type": "string"},
+    "dataset": {"type": "string"},
+    "split": {"enum": ["test", "dev", "all"]},
+    "n": {"type": "integer", "minimum": 0, "description": "Distinct documents scored."},
+    "languages": {"type": "array", "items": {"type": "string"}},
+    "engine": {"type": "string"},
+    "onDeviceModel": {"type": ["string", "null"]},
+    "headlineConfig": {"type": ["string", "null"], "description": "Config the headline tiles describe (E_redteam: out of the box)."},
+    "leakRate": {"$ref": "#/$defs/rate", "description": "Doc leak rate of the headline config."},
+    "leakRateWithVault": {"$ref": "#/$defs/rate", "description": "Doc leak rate of F_vault (after onboarding)."},
+    "namesCaught": {"$ref": "#/$defs/rate"},
+    "quality": {"$ref": "#/$defs/rate", "description": "judge win+tie vs unprotected; blocked/failed answers count as losses."},
+    "onDevice": {"$ref": "#/$defs/rate", "description": "Share of quick-task answers that ran on device."},
+    "restoreFidelity": {"$ref": "#/$defs/rate"},
+    "reidTwoAttrs": {"$ref": "#/$defs/rate"},
+    "gateBlockRate": {"$ref": "#/$defs/rate"},
+    "ablation": {
+      "type": "array",
+      "items": {"type": "object", "required": ["config", "label", "leak"], "properties": {"config": {"type": "string"}, "label": {"type": "string"}, "leak": {"$ref": "#/$defs/rate"}}}
+    },
+    "misses": {"type": "array", "items": {"type": "string"}, "maxItems": 10},
+    "method": {"type": "string", "format": "uri"}
+  },
+  "$defs": {
+    "rate": {
+      "description": "A rate in [0,1] with its Wilson 95% interval and sample size; null when not measured.",
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["value", "low", "high", "n"],
+          "properties": {"value": {"type": "number", "minimum": 0, "maximum": 1}, "low": {"type": "number", "minimum": 0, "maximum": 1}, "high": {"type": "number", "minimum": 0, "maximum": 1}, "n": {"type": "integer", "minimum": 0}}
+        }
+      ]
+    }
+  }
+}
