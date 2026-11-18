@@ -23,6 +23,16 @@
     "%@. %@": {
       "shouldTranslate": false
     },
+    "%@: %@, 95%% interval %@ to %@, %lld samples, %@. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@: %2$@, 95%% interval %3$@ to %4$@, %5$lld samples, %6$@. %7$@"
+          }
+        }
+      }
+    },
     "%lld characters sent": {},
     "(hidden code)": {},
     "(not kept)": {},
@@ -31,6 +41,16 @@
     ", possibly private": {},
     ". Can be sent as written.": {},
     "7 fixed checks, and the only way to make sealed text. If a known detail or code is left, it blocks.": {},
+    "95%% interval %@–%@ · n = %lld · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "95%% interval %1$@–%2$@ · n = %3$lld · %4$@"
+          }
+        }
+      }
+    },
     "A SHA-256 hash of exactly what left, chained to the receipt before it. Verify it any time in the Ledger.": {},
     "A placeholder Airlock doesn't know": {},
     "A reader could guess: ": {},
@@ -52,11 +72,15 @@
     "Airlock still works: it seals with strict rules and asks you to check everything. Turn on Apple Intelligence in Settings for the full experience.": {},
     "Airlock still works: it seals with strict rules and asks you to review everything before anything is sent.": {},
     "Airlock stopped this before it left": {},
+    "AirlockBench runs the same privacy engine on synthetic documents — fictional people, places and numbers — and measures what still gets through.": {},
+    "AirlockBench: leak rate, names caught, answer quality — and what we still miss.": {},
     "Aliases": {},
     "Animation: names, an address and a phone number pass through the airlock and come out as protected placeholders.": {},
     "Answer on this device": {},
     "Answer preference": {},
+    "Answer quality": {},
     "Answer to restore": {},
+    "Answers judged as good as or better than sending the raw text unprotected.": {},
     "Apple on-device model": {},
     "Apple's model is still getting ready": {},
     "Apple's model reads your text on this device before anything is sent.": {},
@@ -116,7 +140,9 @@
     "Draft a reply": {},
     "Drop text to read it on this device": {},
     "Each detail becomes a placeholder like PERSON_1, or something general like “a large hospital”.": {},
+    "Each layer lowers the leak rate": {},
     "Egress gate": {},
+    "Every miss above is from a synthetic document. This is why Review always shows you exactly what will leave, and why “Protect this” exists.": {},
     "Every request gets a receipt showing exactly what left.": {},
     "Every request that left this device has a receipt. Receipts are chained, so editing or deleting one breaks the chain.": {},
     "Exactly what left (sealed):": {},
@@ -157,6 +183,7 @@
     "Hides more and always shows you what leaves. Best for very sensitive things.": {},
     "Hides names, contact details and IDs only.": {},
     "Hides names, places and numbers; keeps dates and amounts so answers stay useful.": {},
+    "How Airlock is tested": {},
     "How Airlock works": {},
     "How Airlock works, 7 steps": {},
     "ID": {},
@@ -169,17 +196,34 @@
     "Its contents don't match its hash.": {},
     "Keep as is": {},
     "Kind": {},
+    "Leak rate": {},
+    "Leak rate by configuration: %@": {},
     "Leaves your device": {},
     "Ledger": {},
     "List actions": {},
+    "MOCK RUN — not real model results": {},
     "Made less specific: %@": {},
     "Making details less specific": {},
+    "Measured on %lld synthetic documents in %@ on %@ (%@, %@ split).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Measured on %1$lld synthetic documents in %2$@ on %3$@ (%4$@, %5$@ split)."
+          }
+        }
+      }
+    },
+    "Method and code on GitHub": {},
+    "Method and code:": {},
     "Mode: demo (no Firebase config on this build).": {},
     "Mode: demo (scripted answers).": {},
     "Mode: live (Firebase AI Logic: Apple's on-device model and Gemini).": {},
     "Name or detail": {},
     "Names and details Airlock always protects, even if the on-device model misses them. Encrypted and kept only on this device, never synced.": {},
+    "Names caught": {},
     "New Sealed Request": {},
+    "No benchmark results are bundled with this build yet.": {},
     "No details sealed yet.": {},
     "No real AI calls are made. Launch without “-demo” to use Apple's on-device model and Gemini.": {},
     "No receipts yet.": {},
@@ -227,8 +271,10 @@
     },
     "Puts the real names back into the pasted answer on this device. Nothing is sent.": {},
     "Questions to ask": {},
+    "Quick tasks answered entirely on the device — nothing sent at all.": {},
     "Quick tasks are answered on this device; harder ones go to Gemini, sealed.": {},
     "Quick tasks like summaries can be answered on this device. Then nothing leaves and no receipt is needed.": {},
+    "Quick tasks on device": {},
     "Raw text you paste is kept encrypted on this device for %lld days, then deleted.": {},
     "Reading on your device": {},
     "Reading on your device · part %lld of %lld": {
@@ -270,6 +316,7 @@
     "Review": {},
     "Role": {},
     "Runs the final check and sends only the sealed version": {},
+    "Same documents, one layer added at a time. Bars show the leak rate; whiskers its 95% interval.": {},
     "Saving is off on this build": {},
     "Seal": {},
     "Seal & Send": {},
@@ -289,9 +336,12 @@
     "Sent as written": {},
     "Settings": {},
     "Seven steps, from your words to a receipt.": {},
+    "Share of all personal names in the documents that were sealed before anything was sent.": {},
+    "Share of documents where at least one direct identifier (name, address, number) left the device.": {},
     "Show": {},
     "Show sealed": {},
     "Show what I wrote": {},
+    "Shows AirlockBench results: leak rate, names caught, answer quality and what Airlock still misses": {},
     "Shows the 7 steps from your words to a receipt": {},
     "Skip": {},
     "Some details might be private (amber dot). Decide whether to protect them.": {},
@@ -326,6 +376,7 @@
     "The on-device model declined to read part of this. Rules were used there. Please check it.": {},
     "The real names come back on your device.": {},
     "Their role to you": {},
+    "These numbers come from scripted stand-in models, to show what the report looks like. Real results are published here after the final evaluation run.": {},
     "This app couldn't prove it's genuine to Firebase (App Check). Please try again later.": {},
     "This build has no Firebase config, so answers are scripted and nothing is sent. See the README to add your config.": {},
     "This contains a code or password. It has been removed. Never share these.": {},
@@ -349,6 +400,7 @@
     "What could Gemini still guess?": {},
     "What do you want?": {},
     "What someone could still guess": {},
+    "What we still miss": {},
     "What you copied": {},
     "Where answers come from": {},
     "Who should always be protected?": {},
@@ -379,6 +431,7 @@
     "because of “": {},
     "contact detail": {},
     "contact details": {},
+    "copied, not sent": {},
     "date": {},
     "dates": {},
     "details kept off the cloud this week": {},
@@ -391,7 +444,9 @@
     "hidden code": {},
     "hidden or look-alike characters": {},
     "high confidence": {},
+    "higher is better": {},
     "low confidence": {},
+    "lower is better": {},
     "made less specific": {},
     "medium confidence": {},
     "on device": {},
