@@ -30,7 +30,7 @@ All coding work is on `main` and the web app is live on the dev project. These a
 13. **Sprint 3 quota form** (H-16) by **Wed 25 Nov, 10:00 AM PT**. Then say the word, and the live AirlockBench run happens on that separate account. The Evidence screens update from Remote Config `evidence_json` without a redeploy.
 
 **Submission**
-13. Discord question (H-13), testers (H-18), voice-over and YouTube (H-19), contact email (H-20), keep the demo live until 16 Dec (H-21), Android on real Nano hardware via Test Lab or a borrowed phone (H-10).
+14. Discord question (H-13), testers (H-18), voice-over and YouTube (H-19), contact email (H-20), keep the demo live until 16 Dec (H-21), Android on real Nano hardware via Test Lab or a borrowed phone (H-10).
 
 ### Done on 17–18 Nov
 reCAPTCHA site registered (the site key is in the gitignored `web/.env.local`), repo public on GitHub (H-17), web app deployed to Hosting on dev.
