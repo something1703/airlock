@@ -104,7 +104,8 @@ public enum CloudInference {
             sealed: sealed, threadId: threadId, route: .cloudOnly, modelVersion: result.modelVersion,
             armor: armorExpected ? .pass : .notConfigured, sealLatency: .zero, networkLatency: clock.now - start)
         let parsed = parse(result.text)
-        return InferenceResult(inferences: parsed.inferences, modelVersion: result.modelVersion, receipt: receipt, unreadable: parsed.unreadable)
+        return InferenceResult(
+            inferences: parsed.inferences, modelVersion: result.modelVersion, receipt: receipt, unreadable: parsed.unreadable)
     }
 
     /// The first balanced `{…}` in `s`, skipping braces inside JSON strings.
