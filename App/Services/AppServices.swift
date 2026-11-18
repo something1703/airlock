@@ -136,7 +136,8 @@ enum RemoteConfigLoader {
 }
 
 /// Demo-only launch arguments that script the app for screenshots:
-/// `-demoSeed` (fictional Vault + onboarded), `-demoScreen onboarding|review|thread|ledger|vault|settings`.
+/// `-demoSeed` (fictional Vault + onboarded),
+/// `-demoScreen onboarding|review|thread|guess|copy|copied|scrub|ledger|vault|settings|about`.
 struct DemoScript: Sendable {
     let seed: Bool
     let screen: String?

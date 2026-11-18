@@ -31,6 +31,8 @@ struct StoredThread: Codable, Sendable {
     var v = 1
     let id: String
     let title: String
+    /// Absent in files saved before F-27 (decodes as nil).
+    var mode: ThreadMode?
     let task: TaskOption
     let createdAt: Date
     let updatedAt: Date

@@ -32,6 +32,10 @@ struct ReviewView: View {
             .navigationBarTitleDisplayMode(.inline)
         #endif
         .sensoryFeedback(.error, trigger: session.blockCount)
+        .onChange(of: session.sealRequest) { _, _ in
+            guard session.canSealAndSend, !sending else { return }
+            Task { await sealAndSend() }
+        }
         .sensoryFeedback(.warning, trigger: session.pendingRisks.count) { old, new in new > old }
     }
 
@@ -50,66 +54,75 @@ struct ReviewView: View {
         let keptCount = entities.count - sealedCount
         let generalised = result.draft.replacements.filter { $0.kind == .generalised || $0.kind == .bucketed || $0.kind == .redteam }.count
         let risks = session.pendingRisks
-        ScreenScroll {
-            ScreenHeader(
-                title: String(localized: "Check before sending"),
-                subtitle: String(localized: "This is exactly what will leave your device. Tap a protected detail to send it as written instead."))
-            if !sideBySide {
-                Segmented(
-                    options: [
-                        .init(value: false, title: String(localized: "Leaves your device"), glyph: .shield),
-                        .init(value: true, title: String(localized: "You wrote"), glyph: .eye),
-                    ], selection: $showRaw, accessibilityTitle: String(localized: "Show"))
-            }
-            ForEach(Array(result.reasons.enumerated()), id: \.offset) { _, reason in
-                if let text = reasonText(reason, pending: risks.count) {
-                    Banner(tone: reason.isSevere ? .risk : .warn, title: text)
+        ScrollViewReader { proxy in
+            ScreenScroll {
+                ScreenHeader(
+                    title: String(localized: "Check before sending"),
+                    subtitle: String(localized: "This is exactly what will leave your device. Tap a protected detail to send it as written instead."))
+                if !sideBySide {
+                    Segmented(
+                        options: [
+                            .init(value: false, title: String(localized: "Leaves your device"), glyph: .shield),
+                            .init(value: true, title: String(localized: "You wrote"), glyph: .eye),
+                        ], selection: $showRaw, accessibilityTitle: String(localized: "Show"))
                 }
-            }
-            if let blocked = review.blocked {
-                Banner(
-                    tone: .risk, title: String(localized: "Airlock stopped this before it left"),
-                    message: String(
-                        localized:
-                            "The final check found \(Self.list(Set(blocked.map(\.check)).sorted { $0.rawValue < $1.rawValue }.map(\.blockedWords))) still in the text. Protect it above, or edit your message."
-                    ))
-            }
-            if sideBySide {
-                HStack(alignment: .top, spacing: 16) {
-                    sealedCard(result, sealed: sealedCount, generalised: generalised, kept: keptCount)
+                ForEach(Array(result.reasons.enumerated()), id: \.offset) { _, reason in
+                    if let text = reasonText(reason, pending: risks.count) {
+                        Banner(tone: reason.isSevere ? .risk : .warn, title: text)
+                    }
+                }
+                if let blocked = review.blocked {
+                    Banner(
+                        tone: .risk, title: String(localized: "Airlock stopped this before it left"),
+                        message: String(
+                            localized:
+                                "The final check found \(Self.list(Set(blocked.map(\.check)).sorted { $0.rawValue < $1.rawValue }.map(\.blockedWords))) still in the text. Protect it above, or edit your message."
+                        ))
+                }
+                if sideBySide {
+                    HStack(alignment: .top, spacing: 16) {
+                        sealedCard(result, sealed: sealedCount, generalised: generalised, kept: keptCount)
+                        rawCard(result)
+                    }
+                } else if showRaw {
                     rawCard(result)
+                } else {
+                    sealedCard(result, sealed: sealedCount, generalised: generalised, kept: keptCount)
                 }
-            } else if showRaw {
-                rawCard(result)
-            } else {
-                sealedCard(result, sealed: sealedCount, generalised: generalised, kept: keptCount)
-            }
-            if !risks.isEmpty {
-                Text("What someone could still guess").font(.title3.weight(.semibold)).foregroundStyle(Palette.text).accessibilityAddTraits(.isHeader)
-                ForEach(Array(risks.enumerated()), id: \.element.id) { i, r in
-                    RiskCard(risk: r, entities: result.draft.entities, index: i) {
-                        Task { await session.acceptRisk(r) }
-                    } keep: {
-                        session.dismissRisk(r)
+                if !risks.isEmpty {
+                    Text("What someone could still guess").font(.title3.weight(.semibold)).foregroundStyle(Palette.text).accessibilityAddTraits(.isHeader)
+                    ForEach(Array(risks.enumerated()), id: \.element.id) { i, r in
+                        RiskCard(risk: r, entities: result.draft.entities, index: i) {
+                            Task { await session.acceptRisk(r) }
+                        } keep: {
+                            session.dismissRisk(r)
+                        }
                     }
                 }
-            }
-            if !entities.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Details").font(.headline).foregroundStyle(Palette.text).accessibilityAddTraits(.isHeader)
-                    ForEach(entities) { e in
-                        EntityRow(entity: e) { Task { await session.toggleEntity(e.id) } }
+                if !entities.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Details").font(.headline).foregroundStyle(Palette.text).accessibilityAddTraits(.isHeader)
+                        ForEach(entities) { e in
+                            EntityRow(entity: e) { Task { await session.toggleEntity(e.id) } }
+                        }
                     }
+                    .card()
+                    .enter(2)
                 }
-                .card()
-                .enter(2)
+                TaskPills(selection: Binding(get: { review.task }, set: { session.setReviewTask($0) }))
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { sendButtons }
+                    VStack(alignment: .leading, spacing: 10) { sendButtons }
+                }
+                Text("Gemini sees only the sealed version. Real names come back on your device.").font(.footnote).foregroundStyle(Palette.text2)
+                    .id("actions")
             }
-            TaskPills(selection: Binding(get: { review.task }, set: { session.setReviewTask($0) }))
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) { sendButtons }
-                VStack(alignment: .leading, spacing: 10) { sendButtons }
+            .task {
+                // Demo screenshots of Scrub & copy start at the buttons.
+                guard session.revealReviewActions else { return }
+                try? await Task.sleep(for: .milliseconds(900))
+                proxy.scrollTo("actions", anchor: .bottom)
             }
-            Text("Gemini sees only the sealed version. Real names come back on your device.").font(.footnote).foregroundStyle(Palette.text2)
         }
     }
 
@@ -121,8 +134,19 @@ struct ReviewView: View {
         }
         .buttonStyle(.primary)
         .disabled(sending)
-        .keyboardShortcut(.return, modifiers: .command)
+        .touchKeyboardShortcut(.return, modifiers: .command)
         .accessibilityHint(Text("Runs the final check and sends only the sealed version"))
+        if session.review?.threadID == nil {
+            Button {
+                Task { await session.copySealedVersion() }
+            } label: {
+                IconLabel(title: "Copy sealed version", glyph: .copy)
+            }
+            .buttonStyle(.secondary)
+            .disabled(sending)
+            .touchKeyboardShortcut("c", modifiers: [.command, .shift])
+            .accessibilityHint(Text("Copies the sealed text to use with any other AI or person. Airlock sends nothing."))
+        }
         Button("Cancel") { session.cancelReview() }.buttonStyle(.ghost)
     }
 

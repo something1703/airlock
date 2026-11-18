@@ -5,7 +5,7 @@ import Foundation
 /// Preview fixtures: an in-memory session on demo engines with fictional data only.
 @MainActor
 enum PreviewSession {
-    enum Scenario { case empty, seeded, review, thread, ledger }
+    enum Scenario { case empty, seeded, review, thread, ledger, guess, scrub }
 
     static let vault = [
         VaultEntry(id: "v-me", canonical: "Maya Chen", aliases: ["Maya"], category: .person, roleHint: "me", isUser: true),
@@ -28,6 +28,14 @@ enum PreviewSession {
                 await session.startReview("Raj says he can only come next Tuesday. Is that reasonable?", task: .help, threadID: session.threads.first?.id)
                 await session.send()
                 if scenario == .ledger { await session.verifyChain() }
+            case .guess:
+                await session.startReview(AirlockSession.sample, task: .reply)
+                await session.send()
+                if let id = session.threads.first?.id { await session.inferGuesses(id) }
+            case .scrub:
+                await session.startReview(AirlockSession.sample, task: .reply)
+                await session.copySealedVersion()
+                if let id = session.threads.first?.id { await session.restorePasted(id, text: AirlockSession.samplePasted) }
             default: break
             }
         }

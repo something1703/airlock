@@ -21,6 +21,10 @@ struct BootView: View {
             }
         }
         .background(Palette.bg.ignoresSafeArea())
+        #if os(macOS)
+            // docs/06-UI-UX.md §8: the window never gets smaller than 900×600 (with .contentMinSize).
+            .frame(minWidth: 900, minHeight: 600)
+        #endif
         .task { await boot.start() }
     }
 }
@@ -44,9 +48,6 @@ struct RootView: View {
             }
         }
         .tint(Palette.seal)
-        #if os(macOS)
-            .frame(minWidth: 900, minHeight: 600)
-        #endif
     }
 }
 
@@ -144,7 +145,7 @@ struct Sidebar: View {
                         Label {
                             Text(verbatim: t.title).lineLimit(1)
                         } icon: {
-                            Icon(t.lastAnswer?.summary?.ranOnDevice == true ? .device : .cloud, size: 16)
+                            Icon(t.mode == .scrub ? .copy : t.lastAnswer?.summary?.ranOnDevice == true ? .device : .cloud, size: 16)
                         }
                         .tag(SidebarItem.thread(t.id))
                         .accessibilityLabel(Text(verbatim: t.title))
