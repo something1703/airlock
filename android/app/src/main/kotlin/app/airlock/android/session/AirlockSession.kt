@@ -55,7 +55,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.UUID
 
-enum class Screen { ONBOARDING, ASK, REVIEW, THREAD, LEDGER, VAULT, SETTINGS }
+enum class Screen { ONBOARDING, ASK, REVIEW, THREAD, LEDGER, VAULT, SETTINGS, EVIDENCE }
 
 /** One conversation turn. User turns keep what was written locally; only `sealed` can ever be sent again. */
 sealed interface Turn {
