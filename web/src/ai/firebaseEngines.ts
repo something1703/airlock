@@ -250,7 +250,8 @@ class FirebaseClaimCheckEngine implements ClaimCheckEngine {
     let last: EngineError | null = null;
     for (const model of [...new Set([cfg.modelCloudProof, cfg.modelCloudFallback])]) {
       try {
-        return await withRetry(() => this.once(model, text));
+        // One retry per model: a grounded request that gets 429 is usually a quota, not a blip (seen live 18 Nov).
+        return await withRetry(() => this.once(model, text), 1);
       } catch (e) {
         last = mapError(e);
         if (!last.isTransientCloud) throw last;
@@ -282,15 +283,15 @@ export function grounding(meta: GroundingMetadata | undefined): Pick<GroundedRes
   return { sources, supports, searchEntryPointHtml: html && html.trim() ? html : null, webSearchQueries: [...(meta?.webSearchQueries ?? [])] };
 }
 
-/** Exponential backoff ×3 (0.5 s, 1 s, 2 s) for 429/503. */
-async function withRetry<T>(op: () => Promise<T>): Promise<T> {
+/** Exponential backoff (default ×3: 0.5 s, 1 s, 2 s) for 429/503. */
+async function withRetry<T>(op: () => Promise<T>, maxRetries = 3): Promise<T> {
   let delay = 500;
   for (let attempt = 0; ; attempt++) {
     try {
       return await op();
     } catch (e) {
       const err = mapError(e);
-      if (!err.isTransientCloud || attempt >= 3) throw err;
+      if (!err.isTransientCloud || attempt >= maxRetries) throw err;
       await new Promise((r) => setTimeout(r, delay));
       delay *= 2;
     }

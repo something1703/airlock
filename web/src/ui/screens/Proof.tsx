@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useAirlock, useSession } from "../../app/context";
 import { PROOF_SAMPLES } from "../../app/proofSamples";
-import { engineErrorMessage, type ProofState } from "../../app/session";
-import { EngineError } from "../../engine/engines";
+import type { ProofState } from "../../app/session";
+import type { EngineErrorCode } from "../../engine/engines";
 import { TACTIC_LABEL, TACTIC_WHY, type CitedItem, type ClaimOutcome, type ClaimVerdict, type ProofResult, type ProofStage, type TacticFlag, type Verdict } from "../../engine/proof";
 import type { RestoredSegment } from "../../engine/restore";
 import type { EntityMap } from "../../engine/types";
@@ -23,22 +23,33 @@ const FINDING: Record<ClaimVerdict, { label: string; tone: "scam" | "unsure" | "
   LIKELY_LEGIT: { label: "Matches normal messages", tone: "legit" },
 };
 
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+/** Why a claim couldn't be checked, in plain words with one next step (never the raw error). */
+function checkErrorMessage(code: EngineErrorCode | null): string {
+  switch (code) {
+    case "offline": return "You're offline. Connect to check this claim against the web.";
+    case "quota": return "Gemini's web check has reached its limit for now. Try again later.";
+    case "serviceUnavailable": return "Gemini is busy right now. Try again in a moment.";
+    case "armorBlocked": return "Google's safety check stopped this request, so nothing was answered.";
+    case "cloudBlocked": return "Gemini declined to check this claim.";
+    case "appCheck": return "This app couldn't prove it's genuine to Firebase. Please reload.";
+    default: return "Gemini couldn't check this claim. Try again in a moment.";
+  }
+}
 
 /** One plain sentence under the verdict, honest about what was (and wasn't) checked. */
 function summary(r: ProofResult, online: boolean): string {
-  const flags = plural(r.flags.length, "red flag");
+  const flags = r.flags.length === 0 ? "No red flags found on your device." : `We found ${r.flags.length} red flag${r.flags.length === 1 ? "" : "s"} on your device.`;
   switch (r.mode) {
     case "checked":
       if (r.verdict === "likelyScam") return "This looks like a scam. Here's why.";
       if (r.verdict === "looksLegit") return "Nothing here matches a known scam. Airlock can't be sure, so stay alert.";
       return "Airlock couldn't tell for sure. Treat this message with care.";
-    case "offline": return `We found ${flags} on your device. Connect to check against the web.`;
-    case "onDeviceUnavailable": return `We found ${flags} using rules on your device. Turn on on-device AI so Airlock can pick out the claims to check on the web.`;
-    case "noClaims": return `We found ${flags} on your device. There were no claims to check on the web.`;
-    case "allKept": return `We found ${flags} on your device. The claims still looked private after sealing, so they stayed here.`;
-    case "cloudFailed": return `We found ${flags} on your device. ${online ? "Gemini couldn't check the web right now — try again in a moment." : "Connect to check against the web."}`;
-    case "noCloud": return `We found ${flags} on your device. Checking against the web needs Gemini, which isn't set up here.`;
+    case "offline": return `${flags} Connect to check against the web.`;
+    case "onDeviceUnavailable": return `${flags} Airlock used rules only. Turn on on-device AI so it can pick out the claims to check on the web.`;
+    case "noClaims": return `${flags} There were no claims to check on the web.`;
+    case "allKept": return `${flags} The claims still looked private after sealing, so they stayed here.`;
+    case "cloudFailed": return `${flags} ${online ? checkErrorMessage(r.cloudError) : "Connect to check against the web."}`;
+    case "noCloud": return `${flags} Checking against the web needs Gemini, which isn't set up here.`;
   }
 }
 
@@ -230,7 +241,7 @@ function ClaimBlock({ outcome, index, entities }: { outcome: ClaimOutcome; index
         </button>
       )}
       {outcome.status === "kept" && <p className="small">This claim still looked private after sealing, so Airlock didn’t send it.</p>}
-      {outcome.status === "failed" && <p className="small">{engineErrorMessage(new EngineError(outcome.error))}</p>}
+      {outcome.status === "failed" && <p className="small">{checkErrorMessage(outcome.error)}</p>}
       {outcome.status === "checked" && <Finding outcome={outcome} />}
     </article>
   );
