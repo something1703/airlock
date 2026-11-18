@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 560" width="1280" height="560" role="img" aria-labelledby="t d">
+  <title id="t">How Airlock works</title>
+  <desc id="d">On the device: detect private details with the Vault, pattern rules and on-device AI; seal them into placeholders; red-team the draft; then a deterministic egress gate checks it. Only sealed text crosses to Gemini in the cloud. The answer comes back with placeholders, the device restores the real details, and a hash-chained receipt records exactly what left.</desc>
+  <defs>
+    <style>
+      :root { --bg:#ffffff; --zone:#f6f7f9; --zone2:#e7eefd; --ink:#0e1726; --ink2:#4a5568; --stroke:#e2e6ec; --seal:#0fa97e; --sealtint:#e3f7f0; --cloud:#3366e8; --cloudtint:#d9e4fc; --amber:#b7791f; --ambertint:#fdf3e2; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg:#0b111c; --zone:#141c2b; --zone2:#17264a; --ink:#eef2f8; --ink2:#a3aec2; --stroke:#24304a; --seal:#2bd9a6; --sealtint:#123a30; --cloud:#6e97ff; --cloudtint:#1d3260; --amber:#ffc062; --ambertint:#3a2c12; }
+      }
+      .f { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
+      .h { font-size: 15px; font-weight: 700; letter-spacing: 1.6px; fill: var(--ink2); }
+      .t { font-size: 18px; font-weight: 700; fill: var(--ink); }
+      .s { font-size: 14px; fill: var(--ink2); }
+      .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; fill: var(--ink); }
+      .card { fill: var(--bg); stroke: var(--stroke); stroke-width: 1.5; }
+      .num { fill: var(--seal); }
+      .numt { font-size: 13px; font-weight: 800; fill: var(--bg); }
+      .arrow { stroke: var(--ink2); stroke-width: 2; fill: none; marker-end: url(#a); }
+      .arrowc { stroke: var(--cloud); stroke-width: 2.5; fill: none; marker-end: url(#ac); }
+      .chip { font-size: 12px; font-weight: 700; }
+    </style>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#8a94a6"/></marker>
+    <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#6e97ff"/></marker>
+  </defs>
+
+  <rect width="1280" height="560" rx="24" fill="var(--bg)"/>
+
+  <!-- Zones -->
+  <rect x="24" y="24" width="900" height="512" rx="20" fill="var(--zone)"/>
+  <rect x="948" y="24" width="308" height="512" rx="20" fill="var(--zone2)"/>
+  <text class="f h" x="48" y="58">ON YOUR DEVICE — RAW TEXT NEVER LEAVES</text>
+  <text class="f h" x="972" y="58">IN THE CLOUD</text>
+
+  <!-- Row 1: detect → seal → red-team → gate -->
+  <g class="f">
+    <!-- 1 Detect -->
+    <rect class="card" x="48" y="84" width="200" height="190" rx="16"/>
+    <circle class="num" cx="74" cy="110" r="13"/><text class="numt" x="74" y="115" text-anchor="middle">1</text>
+    <text class="t" x="96" y="116">Detect</text>
+    <text class="s" x="64" y="148">Your Vault (names you</text>
+    <text class="s" x="64" y="166">always protect)</text>
+    <text class="s" x="64" y="192">Pattern rules: phones,</text>
+    <text class="s" x="64" y="210">emails, IDs, cards, codes</text>
+    <text class="s" x="64" y="236">On-device AI: people,</text>
+    <text class="s" x="64" y="254">places, employers, health</text>
+
+    <!-- 2 Seal -->
+    <rect class="card" x="272" y="84" width="200" height="190" rx="16"/>
+    <circle class="num" cx="298" cy="110" r="13"/><text class="numt" x="298" y="115" text-anchor="middle">2</text>
+    <text class="t" x="320" y="116">Seal</text>
+    <text class="s" x="288" y="148">Details become</text>
+    <text class="s" x="288" y="166">placeholders:</text>
+    <rect x="288" y="180" width="94" height="24" rx="7" fill="var(--sealtint)"/><text class="chip" x="296" y="197" fill="var(--seal)">PERSON_1</text>
+    <rect x="388" y="180" width="64" height="24" rx="7" fill="var(--sealtint)"/><text class="chip" x="396" y="197" fill="var(--seal)">LOC_1</text>
+    <text class="s" x="288" y="232">or something general:</text>
+    <text class="s" x="288" y="252" font-style="italic">“a large hospital”</text>
+
+    <!-- 3 Red-team -->
+    <rect class="card" x="496" y="84" width="200" height="190" rx="16"/>
+    <circle class="num" cx="522" cy="110" r="13"/><text class="numt" x="522" y="115" text-anchor="middle">3</text>
+    <text class="t" x="544" y="116">Red-team</text>
+    <text class="s" x="512" y="148">The device attacks its</text>
+    <text class="s" x="512" y="166">own draft: “what could</text>
+    <text class="s" x="512" y="184">a stranger still guess?”</text>
+    <rect x="512" y="204" width="168" height="48" rx="10" fill="var(--ambertint)"/>
+    <text class="s" x="524" y="224" fill="var(--amber)">Risk card + safer</text>
+    <text class="s" x="524" y="242" fill="var(--amber)">rewrite you can accept</text>
+
+    <!-- 4 Gate -->
+    <rect class="card" x="720" y="84" width="180" height="190" rx="16" stroke="var(--seal)" stroke-width="2.5"/>
+    <circle class="num" cx="746" cy="110" r="13"/><text class="numt" x="746" y="115" text-anchor="middle">4</text>
+    <text class="t" x="768" y="116">Egress gate</text>
+    <text class="s" x="736" y="148">7 deterministic checks.</text>
+    <text class="s" x="736" y="166">The ONLY way to make</text>
+    <text class="mono" x="736" y="186">SealedText</text>
+    <text class="s" x="736" y="212">Fails closed: blocks if</text>
+    <text class="s" x="736" y="230">any known detail, look-</text>
+    <text class="s" x="736" y="248">alike or code is left.</text>
+  </g>
+
+  <path class="arrow" d="M250 179h18"/>
+  <path class="arrow" d="M474 179h18"/>
+  <path class="arrow" d="M698 179h18"/>
+
+  <!-- Review band -->
+  <g class="f">
+    <rect x="48" y="296" width="852" height="56" rx="14" fill="var(--bg)" stroke="var(--stroke)" stroke-dasharray="6 6"/>
+    <text class="t" x="68" y="330" font-size="16">You review</text>
+    <text class="s" x="168" y="330">exactly what will leave — tap a chip to send it as written, or “Protect this” to seal something missed.</text>
+  </g>
+
+  <!-- Cloud -->
+  <g class="f">
+    <rect class="card" x="972" y="84" width="260" height="190" rx="16" stroke="var(--cloud)" stroke-width="2"/>
+    <circle cx="998" cy="110" r="13" fill="var(--cloud)"/><text class="numt" x="998" y="115" text-anchor="middle">5</text>
+    <text class="t" x="1020" y="116">Gemini answers</text>
+    <text class="s" x="988" y="148">Sees only sealed text, e.g.</text>
+    <text class="mono" x="988" y="172">“Hi [[PERSON_1]], the</text>
+    <text class="mono" x="988" y="190">heater at [[LOC_1]]…”</text>
+    <text class="s" x="988" y="222">via Firebase AI Logic,</text>
+    <text class="s" x="988" y="240">with App Check and a</text>
+    <text class="s" x="988" y="258">model fallback chain</text>
+  </g>
+  <path class="arrowc" d="M902 160h66"/>
+  <text class="f s" x="906" y="150" fill="var(--cloud)" font-weight="700">sealed</text>
+
+  <!-- Row 2: restore, receipt -->
+  <g class="f">
+    <rect class="card" x="700" y="376" width="200" height="136" rx="16"/>
+    <circle class="num" cx="726" cy="402" r="13"/><text class="numt" x="726" y="407" text-anchor="middle">6</text>
+    <text class="t" x="748" y="408">Restore</text>
+    <text class="s" x="716" y="440">Real names go back in,</text>
+    <text class="s" x="716" y="458">locally, as the answer</text>
+    <text class="s" x="716" y="476">streams. Secrets are</text>
+    <text class="s" x="716" y="494">never put back.</text>
+
+    <rect class="card" x="496" y="376" width="180" height="136" rx="16"/>
+    <circle class="num" cx="522" cy="402" r="13"/><text class="numt" x="522" y="407" text-anchor="middle">7</text>
+    <text class="t" x="544" y="408">Receipt</text>
+    <text class="s" x="512" y="440">SHA-256 of exactly</text>
+    <text class="s" x="512" y="458">what left, chained to</text>
+    <text class="s" x="512" y="476">the previous receipt.</text>
+    <text class="s" x="512" y="494">Verify any time.</text>
+  </g>
+  <path class="arrowc" d="M1102 276 V444 H904" />
+  <text class="f s" x="1112" y="372" fill="var(--cloud)" font-weight="700">answer with</text>
+  <text class="f s" x="1112" y="390" fill="var(--cloud)" font-weight="700">placeholders</text>
+  <path class="arrow" d="M698 444h-18"/>
+
+  <!-- Quick tasks note -->
+  <g class="f">
+    <rect x="48" y="376" width="424" height="136" rx="16" fill="var(--sealtint)"/>
+    <text class="t" x="68" y="408" fill="var(--seal)">Quick tasks stay on the device</text>
+    <text class="s" x="68" y="438" fill="var(--ink)">Summaries, rewrites and explanations can be</text>
+    <text class="s" x="68" y="456" fill="var(--ink)">answered by the on-device model itself — then</text>
+    <text class="s" x="68" y="474" fill="var(--ink)">nothing is sent at all, and no receipt is needed.</text>
+    <text class="s" x="68" y="498" fill="var(--ink2)">No on-device AI? Rules + your review — never the cloud.</text>
+  </g>
+</svg>

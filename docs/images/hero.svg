@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 460" width="1280" height="460" role="img" aria-labelledby="t d">
+  <title id="t">Airlock — the best AI, without giving yourself away</title>
+  <desc id="d">A message with a name, an address and a phone number passes through the Airlock gate on the device. On the other side only placeholders reach Gemini: Person 1, Place 1, Contact 1.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b111c"/>
+      <stop offset="1" stop-color="#101a2b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.55" r="0.5">
+      <stop offset="0" stop-color="#2bd9a6" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#2bd9a6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="door" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2bd9a6"/>
+      <stop offset="1" stop-color="#2bd9a6" stop-opacity="0"/>
+    </linearGradient>
+    <style>
+      .ui { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif; }
+      .title { font-size: 64px; font-weight: 800; fill: #eef2f8; letter-spacing: -1.5px; }
+      .tag { font-size: 24px; fill: #a3aec2; }
+      .lane { font-size: 15px; fill: #a3aec2; letter-spacing: 1.5px; font-weight: 600; }
+      .raw { font-size: 17px; font-weight: 600; fill: #eef2f8; }
+      .chip { font-size: 16px; font-weight: 700; }
+      .arc { fill: none; stroke: #2bd9a6; stroke-width: 6; stroke-linecap: round; }
+      .sill { stroke: #a3aec2; stroke-width: 5; stroke-linecap: round; opacity: .6; }
+      .draw { stroke-dasharray: 160; stroke-dashoffset: 160; animation: draw 1.2s cubic-bezier(.22,1,.36,1) forwards; }
+      .draw2 { animation-delay: .25s; }
+      .breathe { animation: draw 1.2s .25s cubic-bezier(.22,1,.36,1) forwards, breathe 3.6s 1.6s ease-in-out infinite; }
+      .flow1, .flow2, .flow3 { animation: flow 6s linear infinite; }
+      .flow2 { animation-delay: -2s; } .flow3 { animation-delay: -4s; }
+      .before { animation: swapA 6s linear infinite; }
+      .after { animation: swapB 6s linear infinite; opacity: 0; }
+      .flow2 .before, .flow2 .after { animation-delay: -2s; } .flow3 .before, .flow3 .after { animation-delay: -4s; }
+      @keyframes draw { to { stroke-dashoffset: 0; } }
+      @keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+      @keyframes flow { from { transform: translateX(0); } to { transform: translateX(1020px); } }
+      @keyframes swapA { 0%, 47% { opacity: 1; } 51%, 100% { opacity: 0; } }
+      @keyframes swapB { 0%, 47% { opacity: 0; } 53%, 100% { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) {
+        .draw, .breathe { animation: none; stroke-dashoffset: 0; }
+        .flow1, .flow2, .flow3 { animation: none; transform: translateX(800px); }
+        .before { animation: none; opacity: 0; } .after { animation: none; opacity: 1; }
+      }
+    </style>
+  </defs>
+
+  <rect width="1280" height="460" rx="28" fill="url(#bg)"/>
+  <rect x="490" y="200" width="300" height="260" fill="url(#glow)"/>
+
+  <!-- Brand -->
+  <g class="ui" transform="translate(64 88)">
+    <g transform="translate(0 -46) scale(1.1)">
+      <path class="arc draw" d="M12 42a20 20 0 0 1 40 0"/>
+      <path class="arc draw draw2 breathe" d="M21 42a11 11 0 0 1 22 0"/>
+      <path class="sill" d="M10 50h44"/>
+    </g>
+    <text class="title" x="86" y="2">Airlock</text>
+    <text class="tag" x="2" y="56">The best AI, without giving yourself away.</text>
+  </g>
+
+  <!-- Lanes -->
+  <g class="ui">
+    <text class="lane" x="64" y="214">ON YOUR DEVICE</text>
+    <text class="lane" x="1216" y="214" text-anchor="end">WHAT GEMINI SEES</text>
+    <line x1="64" y1="226" x2="1216" y2="226" stroke="#24304a" stroke-width="1.5"/>
+  </g>
+
+  <!-- The gate -->
+  <g transform="translate(640 0)">
+    <rect x="-46" y="240" width="4" height="168" rx="2" fill="url(#door)"/>
+    <rect x="42" y="240" width="4" height="168" rx="2" fill="url(#door)"/>
+    <g transform="translate(-32 250) scale(1)">
+      <path class="arc" d="M12 42a20 20 0 0 1 40 0" stroke-width="5"/>
+      <path class="arc" d="M21 42a11 11 0 0 1 22 0" stroke-width="5"/>
+    </g>
+    <text class="ui lane" x="0" y="436" text-anchor="middle">EGRESS GATE</text>
+  </g>
+
+  <!-- Flowing details: raw on the left, sealed chips after the gate -->
+  <g class="ui">
+    <g class="flow1" transform="translate(0 0)">
+      <g transform="translate(130 300)">
+        <g class="before"><rect x="0" y="0" width="128" height="34" rx="10" fill="#3a2c12"/><text class="raw" x="16" y="23">Raj Patel</text></g>
+        <g class="after"><rect x="0" y="0" width="178" height="34" rx="10" fill="#123a30"/><text class="chip" x="14" y="23" fill="#2bd9a6">Person 1 · landlord</text></g>
+      </g>
+    </g>
+    <g class="flow2">
+      <g transform="translate(130 348)">
+        <g class="before"><rect x="0" y="0" width="186" height="34" rx="10" fill="#3a2c12"/><text class="raw" x="16" y="23">14 Elm St, Apt 3B</text></g>
+        <g class="after"><rect x="0" y="0" width="96" height="34" rx="10" fill="#0f3440"/><text class="chip" x="14" y="23" fill="#4cc9db">Place 1</text></g>
+      </g>
+    </g>
+    <g class="flow3">
+      <g transform="translate(130 396)">
+        <g class="before"><rect x="0" y="0" width="150" height="34" rx="10" fill="#3a2c12"/><text class="raw" x="16" y="23">312-555-0147</text></g>
+        <g class="after"><rect x="0" y="0" width="116" height="34" rx="10" fill="#17264a"/><text class="chip" x="14" y="23" fill="#6e97ff">Contact 1</text></g>
+      </g>
+    </g>
+  </g>
+</svg>

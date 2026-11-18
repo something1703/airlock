@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-labelledby="t d">
+  <title id="t">Airlock architecture</title>
+  <desc id="d">Three apps — iPhone and Mac in SwiftUI, the web in React, Android in Jetpack Compose — each run the same privacy engine, written in Swift, TypeScript and Kotlin and held together by one shared conformance suite. Each uses its platform's on-device model through Firebase AI Logic hybrid inference: Apple Foundation Models, Chrome's Gemini Nano, and Gemini Nano on Android. In the cloud: Gemini via Firebase AI Logic, App Check, Remote Config, anonymous Auth, a Firestore backup of sealed history, Cloud Functions and Hosting.</desc>
+  <defs>
+    <style>
+      :root { --bg:#ffffff; --zone:#f6f7f9; --ink:#0e1726; --ink2:#4a5568; --stroke:#e2e6ec; --seal:#0fa97e; --sealtint:#e3f7f0; --cloud:#3366e8; --cloudtint:#e7eefd; --org:#5b5bd6; --orgtint:#ececfb; --amber:#b7791f; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg:#0b111c; --zone:#141c2b; --ink:#eef2f8; --ink2:#a3aec2; --stroke:#24304a; --seal:#2bd9a6; --sealtint:#123a30; --cloud:#6e97ff; --cloudtint:#17264a; --org:#9c9cff; --orgtint:#20204a; --amber:#ffc062; }
+      }
+      .f { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
+      .h { font-size: 14px; font-weight: 700; letter-spacing: 1.6px; fill: var(--ink2); }
+      .t { font-size: 19px; font-weight: 800; fill: var(--ink); }
+      .s { font-size: 14px; fill: var(--ink2); }
+      .k { font-size: 14px; font-weight: 700; fill: var(--ink); }
+      .card { fill: var(--bg); stroke: var(--stroke); stroke-width: 1.5; }
+      .eng { fill: var(--orgtint); }
+      .dev { fill: var(--sealtint); }
+      .line { stroke: var(--stroke); stroke-width: 2; }
+      .icon { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+  <rect width="1280" height="640" rx="24" fill="var(--bg)"/>
+
+  <!-- Apps -->
+  <g class="f">
+    <text class="h" x="40" y="48">THREE APPS</text>
+
+    <rect class="card" x="40" y="64" width="384" height="112" rx="18"/>
+    <g transform="translate(64 92)"><rect class="icon" x="0" y="0" width="22" height="38" rx="5"/><path class="icon" d="M8 33h6"/><rect class="icon" x="30" y="4" width="36" height="26" rx="3"/><path class="icon" d="M26 36h44"/></g>
+    <text class="t" x="150" y="104">iPhone &amp; Mac</text>
+    <text class="s" x="150" y="128">SwiftUI · one target, two platforms</text>
+    <text class="s" x="150" y="150">TabView / NavigationSplitView</text>
+
+    <rect class="card" x="448" y="64" width="384" height="112" rx="18"/>
+    <g transform="translate(472 92)"><rect class="icon" x="0" y="0" width="60" height="40" rx="5"/><path class="icon" d="M0 10h60"/><circle cx="7" cy="5" r="1.6" fill="var(--ink)"/><circle cx="13" cy="5" r="1.6" fill="var(--ink)"/></g>
+    <text class="t" x="558" y="104">Web</text>
+    <text class="s" x="558" y="128">React · Firebase Hosting</text>
+    <text class="s" x="558" y="150">try it in Chrome, no install</text>
+
+    <rect class="card" x="856" y="64" width="384" height="112" rx="18"/>
+    <g transform="translate(888 88)"><rect class="icon" x="0" y="0" width="26" height="46" rx="6"/><path class="icon" d="M9 41h8"/></g>
+    <text class="t" x="966" y="104">Android</text>
+    <text class="s" x="966" y="128">Jetpack Compose · APK</text>
+    <text class="s" x="966" y="150">share sheet → Airlock</text>
+  </g>
+
+  <path class="line" d="M232 176v24M640 176v24M1048 176v24"/>
+
+  <!-- Engines -->
+  <g class="f">
+    <text class="h" x="40" y="222">ONE PRIVACY ENGINE, THREE LANGUAGES</text>
+    <rect class="eng" x="40" y="236" width="384" height="84" rx="16"/>
+    <text class="k" x="64" y="268" fill="var(--org)">Swift · AirlockKit</text>
+    <text class="s" x="64" y="292">detect · seal · red-team · gate · restore · ledger</text>
+    <rect class="eng" x="448" y="236" width="384" height="84" rx="16"/>
+    <text class="k" x="472" y="268" fill="var(--org)">TypeScript · web/src/engine</text>
+    <text class="s" x="472" y="292">same stages, same placeholders, same hashes</text>
+    <rect class="eng" x="856" y="236" width="384" height="84" rx="16"/>
+    <text class="k" x="880" y="268" fill="var(--org)">Kotlin · android/core</text>
+    <text class="s" x="880" y="292">differential-tested against TypeScript</text>
+
+    <rect x="40" y="332" width="1200" height="40" rx="12" fill="var(--zone)" stroke="var(--org)" stroke-dasharray="6 5"/>
+    <text class="s" x="640" y="357" text-anchor="middle" fill="var(--ink)"><tspan font-weight="700">spec/fixtures</tspan> — one conformance suite all three must pass byte-for-byte · shared pattern packs and prompts · UTF-16 spans everywhere</text>
+  </g>
+
+  <path class="line" d="M232 372v24M640 372v24M1048 372v24"/>
+
+  <!-- On-device models -->
+  <g class="f">
+    <text class="h" x="40" y="418">ON-DEVICE MODEL VIA FIREBASE AI LOGIC (HYBRID)</text>
+    <rect class="dev" x="40" y="432" width="384" height="64" rx="16"/>
+    <text class="k" x="64" y="460" fill="var(--seal)">Apple Foundation Models</text>
+    <text class="s" x="64" y="482">firebase-ios-sdk 12.19.0 · HybridModel</text>
+    <rect class="dev" x="448" y="432" width="384" height="64" rx="16"/>
+    <text class="k" x="472" y="460" fill="var(--seal)">Chrome built-in Gemini Nano</text>
+    <text class="s" x="472" y="482">firebase 13.3.0 · InferenceMode.*</text>
+    <rect class="dev" x="856" y="432" width="384" height="64" rx="16"/>
+    <text class="k" x="880" y="460" fill="var(--seal)">Gemini Nano (ML Kit / AICore)</text>
+    <text class="s" x="880" y="482">firebase-ai 18.2.0 + firebase-ai-ondevice</text>
+  </g>
+
+  <!-- Cloud -->
+  <g class="f">
+    <rect x="40" y="516" width="1200" height="100" rx="18" fill="var(--cloudtint)"/>
+    <text class="h" x="64" y="546" fill="var(--cloud)">FIREBASE — ONLY SEALED DATA EVER ARRIVES HERE</text>
+    <g font-size="14" font-weight="700">
+      <rect x="64" y="562" width="176" height="36" rx="10" fill="var(--bg)"/><text x="152" y="585" text-anchor="middle" fill="var(--cloud)">Gemini (AI Logic)</text>
+      <rect x="252" y="562" width="120" height="36" rx="10" fill="var(--bg)"/><text x="312" y="585" text-anchor="middle" fill="var(--ink)">App Check</text>
+      <rect x="384" y="562" width="150" height="36" rx="10" fill="var(--bg)"/><text x="459" y="585" text-anchor="middle" fill="var(--ink)">Remote Config</text>
+      <rect x="546" y="562" width="160" height="36" rx="10" fill="var(--bg)"/><text x="626" y="585" text-anchor="middle" fill="var(--ink)">Anonymous Auth</text>
+      <rect x="718" y="562" width="200" height="36" rx="10" fill="var(--bg)"/><text x="818" y="585" text-anchor="middle" fill="var(--ink)">Firestore (sealed backup)</text>
+      <rect x="930" y="562" width="150" height="36" rx="10" fill="var(--bg)"/><text x="1005" y="585" text-anchor="middle" fill="var(--ink)">Cloud Functions</text>
+      <rect x="1092" y="562" width="124" height="36" rx="10" fill="var(--bg)"/><text x="1154" y="585" text-anchor="middle" fill="var(--ink)">Hosting</text>
+    </g>
+  </g>
+</svg>
