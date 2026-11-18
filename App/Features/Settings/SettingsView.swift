@@ -6,8 +6,24 @@ import SwiftUI
 struct SettingsView: View {
     let session: AirlockSession
     @State private var confirm = false
+    @State private var showDiagram = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        ScrollViewReader { proxy in
+            screen
+                .onAppear {
+                    guard session.showAbout else { return }
+                    showDiagram = true
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(200))
+                        proxy.scrollTo("about", anchor: .top)
+                    }
+                }
+        }
+    }
+
+    private var screen: some View {
         ScreenScroll {
             ScreenHeader(title: String(localized: "Settings"))
             OnDeviceStatus(session: session)
@@ -31,6 +47,7 @@ struct SettingsView: View {
             }
             .card()
             .enter()
+            about.id("about").enter(1)
             VStack(alignment: .leading, spacing: 8) {
                 Text("What Airlock does and doesn't do").font(.headline).foregroundStyle(Palette.text)
                 Text(
@@ -42,7 +59,7 @@ struct SettingsView: View {
                 Text(verbatim: modeLine).font(.footnote).foregroundStyle(Palette.text2)
             }
             .card()
-            .enter(1)
+            .enter(2)
             VStack(alignment: .leading, spacing: 10) {
                 Text("Delete everything").font(.headline).foregroundStyle(Palette.text)
                 Text("Removes your Vault, conversations, receipts and the encryption key from this device.").font(.footnote).foregroundStyle(Palette.text2)
@@ -56,10 +73,39 @@ struct SettingsView: View {
                 }
             }
             .card()
-            .enter(2)
+            .enter(3)
         }
         .navigationTitle(Text("Settings"))
         .hidesNavigationBarOnPhone()
+    }
+
+    /// "How Airlock works": a one-line summary that opens the 7-step diagram.
+    private var about: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(Motion.animation(Motion.easeOut(Motion.med), reduce: reduceMotion)) { showDiagram.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("How Airlock works").font(.headline).foregroundStyle(Palette.text)
+                        Text("Seven steps, from your words to a receipt.").font(.footnote).foregroundStyle(Palette.text2)
+                    }
+                    Spacer(minLength: 8)
+                    Icon(.chevron, size: 14).foregroundStyle(Palette.text2).rotationEffect(.degrees(showDiagram ? 90 : 0))
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("How Airlock works"))
+            .accessibilityValue(Text(showDiagram ? "Expanded" : "Collapsed"))
+            .accessibilityHint(Text("Shows the 7 steps from your words to a receipt"))
+            .accessibilityAddTraits(.isHeader)
+            if showDiagram {
+                HowItWorksDiagram().transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .card()
     }
 
     private var preferenceLine: String {
@@ -81,4 +127,10 @@ struct SettingsView: View {
 
 #Preview("Settings") {
     NavigationStack { SettingsView(session: PreviewSession.make()) }
+}
+
+#Preview("Settings · How Airlock works") {
+    let session = PreviewSession.make()
+    session.showAbout = true
+    return NavigationStack { SettingsView(session: session) }
 }

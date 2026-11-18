@@ -169,6 +169,8 @@ struct AssistantTurn: Identifiable, Sendable {
     var failure: AnswerFailure?
     /// Restored names animate in (false for reloaded answers).
     var animate: Bool
+    /// F-27: the placeholder text the user pasted back (an answer they got elsewhere), before restore.
+    var pasted: String?
 }
 
 enum Turn: Identifiable, Sendable {
@@ -183,10 +185,19 @@ enum Turn: Identifiable, Sendable {
     }
 }
 
+/// How a conversation started.
+enum ThreadMode: String, Codable, Sendable {
+    /// F-27 Scrub & copy: the user copied the sealed text to use elsewhere; Airlock sent nothing.
+    /// Answers are pasted back and restored on this device.
+    case scrub
+}
+
 /// One conversation. The entity map stays on device (INV-6).
 struct ChatThread: Identifiable, Sendable {
     let id: String
     var title: String
+    /// nil for an ordinary Seal & send conversation.
+    var mode: ThreadMode?
     var task: TaskOption
     var entities: EntityMap
     var turns: [Turn]
@@ -200,6 +211,20 @@ struct ChatThread: Identifiable, Sendable {
         for t in turns.reversed() { if case .assistant(let a) = t { return a } }
         return nil
     }
+}
+
+/// F-25 "What could Gemini still guess?" for one conversation (kept by the session so it
+/// survives navigation; reset when the conversation gets a new turn).
+struct GuessState: Sendable {
+    enum Phase: Sendable {
+        case asking
+        case done(inferences: [Inference], unreadable: Bool, receiptID: String)
+        case failed(AnswerFailure)
+    }
+
+    /// `turns.count` when the guess was asked.
+    let turnCount: Int
+    var phase: Phase
 }
 
 /// The Review screen's state.

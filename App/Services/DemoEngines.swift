@@ -67,7 +67,10 @@ struct DemoSealedEngine: SealedEngine {
     }
 
     func respond(_ sealed: SealedText, task: TaskSpec, history: SealedHistory?) async throws(EngineError) -> EngineResult {
-        EngineResult(text: Self.script(for: task.id, sealed: sealed, followUp: history != nil), modelVersion: modelVersion, latency: .milliseconds(900))
+        // Long enough to see the "asking" state (F-25); never reaches a network.
+        try? await Task.sleep(for: .milliseconds(900))
+        return EngineResult(
+            text: Self.script(for: task.id, sealed: sealed, followUp: history != nil), modelVersion: modelVersion, latency: .milliseconds(900))
     }
 
     func stream(_ sealed: SealedText, task: TaskSpec, history: SealedHistory?) -> AsyncThrowingStream<EngineChunk, any Error> {
@@ -99,6 +102,13 @@ struct DemoSealedEngine: SealedEngine {
         let person = ids.sorted().first { $0.hasPrefix("PERSON_") && $0 != "PERSON_ME" }.map { "[[\($0)]]" } ?? "them"
         let place = ids.sorted().first { $0.hasPrefix("LOC_") }.map { "[[\($0)]]" } ?? "your home"
         let me = ids.contains("PERSON_ME") ? "[[PERSON_ME]]" : "Me"
+        if taskID == "infer.v1" {
+            // Fictional guesses, like the web `DEMO_INFERENCES`: the situation shows through the seal.
+            return #"{"inferences":["#
+                + #"{"attribute":"situation","value":"Renting an apartment with a broken heater, in a dispute with the landlord","confidence":"high","evidence":"the heater at \#(place) has been broken"},"#
+                + #"{"attribute":"occupation","value":"Works night shifts, probably in healthcare","confidence":"medium","evidence":"I work nights at a large hospital"},"#
+                + #"{"attribute":"region","value":"Likely the United States","confidence":"low","evidence":"date format 'Oct 28'"}]}"#
+        }
         if followUp {
             return
                 "Good question. If \(person) still hasn't replied in two days, send a short reminder and keep a note of every message.\n\nYou could say: \"Hi \(person), following up on the heater at \(place). Could you confirm a repair date?\""

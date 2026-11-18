@@ -79,6 +79,7 @@ Firebase AI Logic iOS SDK **12.19.0** (the release with the documented `HybridMo
 | Private tools (function calling) | Cloud only | `generativeModel(modelName:tools: [.functionDeclarations])` + `Chat` | `AirlockEngines/ToolAndSearchEngines.swift` (`FirebaseToolEngine`) |
 | Fact check with Google Search | Cloud only | `generativeModel(modelName:tools: [.googleSearch()])` | `AirlockEngines/ToolAndSearchEngines.swift` (`FirebaseSearchEngine`) |
 | Conversation titles from the **sealed** first message (`title.v1`) | On-device only | same phone-only session | `AirlockRoute/ThreadTitler.swift`, called from `App/Features/Session/AirlockSession.swift` |
+| "What could Gemini still guess?" (`infer.v1`) on the sealed text that already left, with a receipt | Cloud only | `generativeModelSession(model: .geminiModel(...))`, `respond` (route `cloudOnly`) | `AirlockRoute/CloudInference.swift`, called from `App/Features/Session/AirlockSession.swift` (`inferGuesses`) |
 | Which model answered | — | `response.rawResponse.modelVersion` | `AirlockCore/Route.swift` (`EngineResult.ranOnDevice`) |
 | Phone model availability | — | `FirebaseAI.SystemLanguageModel.default.availability` | `AirlockEngines/ErrorMapper.swift` |
 

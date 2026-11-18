@@ -1,11 +1,6 @@
 import AirlockCore
+import AirlockRoute
 import SwiftUI
-
-#if canImport(UIKit)
-    import UIKit
-#elseif canImport(AppKit)
-    import AppKit
-#endif
 
 /// A conversation: what Gemini saw, the restored answer, receipts, follow-ups.
 struct ThreadView: View {
@@ -13,6 +8,8 @@ struct ThreadView: View {
     let threadID: String
     @State private var followUp = ""
     @State private var confirmDelete = false
+    @State private var copiedAgain = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -46,14 +43,20 @@ struct ThreadView: View {
     private func content(_ thread: ChatThread) -> some View {
         ScrollViewReader { proxy in
             ScreenScroll {
+                if thread.mode == .scrub { scrubBanner(thread) }
                 ForEach(thread.turns) { turn in
                     switch turn {
-                    case .user(let u): UserBubble(turn: u, entities: thread.entities)
+                    case .user(let u): UserBubble(turn: u, entities: thread.entities, copiedOnly: thread.mode == .scrub)
                     case .assistant(let a):
                         AssistantBubble(turn: a, retry: { onDevice in Task { await session.retry(thread.id, onDeviceOnly: onDevice) } })
                     }
                 }
-                followUpBox(thread).id("followUp")
+                if thread.mode == .scrub {
+                    PasteBackCard(session: session, threadID: thread.id).id("followUp")
+                } else {
+                    if session.guessableSealed(in: thread) != nil { GuessCard(session: session, thread: thread).id("guess") }
+                    followUpBox(thread).id("followUp")
+                }
             }
             .confirmationDialog(Text("Delete this conversation from this device?"), isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button("Delete", role: .destructive) { Task { await session.deleteThread(thread.id) } }
@@ -64,9 +67,47 @@ struct ThreadView: View {
                 )
             }
             .onChange(of: thread.turns.count) { _, _ in
-                withAnimation { proxy.scrollTo("followUp", anchor: .bottom) }
+                withAnimation(Motion.animation(.default, reduce: reduceMotion)) { proxy.scrollTo("followUp", anchor: .bottom) }
+            }
+            .onChange(of: guessReceipt(thread), initial: true) { _, new in
+                // Show Gemini's guesses as soon as they arrive.
+                guard new != nil else { return }
+                withAnimation(Motion.animation(Motion.easeOut(Motion.med), reduce: reduceMotion)) { proxy.scrollTo("guess", anchor: .top) }
             }
         }
+    }
+
+    /// F-27: nothing was sent; the copy is the user's.
+    private func scrubBanner(_ thread: ChatThread) -> some View {
+        Banner(
+            tone: .ok, title: String(localized: "Sealed version copied"),
+            message: String(localized: "Airlock didn't send anything. The text you copied has your private details replaced, and the real ones stay here.")
+        ) {
+            if let sealed = firstSealed(thread) {
+                Button {
+                    Clipboard.copy(ScrubCopy.clipboardText(sealed))
+                    copiedAgain = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Icon(.copy, size: 14)
+                        Text(copiedAgain ? "Copied" : "Copy again")
+                    }
+                }
+                .buttonStyle(AirlockButtonStyle(kind: .secondary, compact: true))
+                .padding(.top, 6)
+                .accessibilityHint(Text("Copies the sealed version again. Airlock sends nothing."))
+            }
+        }
+    }
+
+    private func guessReceipt(_ thread: ChatThread) -> String? {
+        if case .done(_, _, let id)? = session.guess(for: thread)?.phase { return id }
+        return nil
+    }
+
+    private func firstSealed(_ thread: ChatThread) -> SealedText? {
+        for t in thread.turns { if case .user(let u) = t, let s = u.sealed { return s } }
+        return nil
     }
 
     private func followUpBox(_ thread: ChatThread) -> some View {
@@ -99,13 +140,24 @@ struct ThreadView: View {
 struct UserBubble: View {
     let turn: UserTurn
     let entities: EntityMap
+    /// F-27: the sealed text was copied by the user, not sent.
+    var copiedOnly = false
     @State private var showRaw = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Icon(showRaw ? .eye : .shield, size: 14)
-                Text(showRaw ? "You wrote · never sent" : "What Gemini saw").lineLimit(1).minimumScaleFactor(0.85)
+                Group {
+                    if showRaw {
+                        Text("You wrote · never sent")
+                    } else if copiedOnly {
+                        Text("What you copied")
+                    } else {
+                        Text("What Gemini saw")
+                    }
+                }
+                .lineLimit(1).minimumScaleFactor(0.85)
                 Spacer(minLength: 8)
                 Button(showRaw ? "Show sealed" : "Show what I wrote") { showRaw.toggle() }
                     .buttonStyle(AirlockButtonStyle(kind: .ghost, compact: true))
@@ -137,7 +189,7 @@ struct AssistantBubble: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            RouteBadge(summary: turn.summary, status: turn.status)
+            RouteBadge(summary: turn.summary, status: turn.status, pasted: turn.pasted != nil)
             if turn.status == .error {
                 Banner(tone: .risk, title: (turn.failure ?? .other).message) {
                     HStack {
@@ -154,7 +206,11 @@ struct AssistantBubble: View {
                 InlineText(pieces: Pieces.restored(turn.segments), unsealNew: turn.animate)
                     .textSelection(.enabled)
             }
-            if let s = turn.summary { receiptLine(s) }
+            if let s = turn.summary {
+                receiptLine(s)
+            } else if turn.pasted != nil {
+                pastedLine
+            }
         }
         .card(padding: 16)
         .padding(.trailing, 20)
@@ -175,31 +231,41 @@ struct AssistantBubble: View {
                 }
                 if !s.fidelity.guessedEntities.isEmpty { Text("Gemini wrote a real detail it guessed. Check the answer.").foregroundStyle(Palette.review) }
                 if !s.fidelity.unknownIDs.isEmpty { Text("The answer mentioned a placeholder Airlock doesn't know.").foregroundStyle(Palette.review) }
-                Button {
-                    copy(Pieces.plain(turn.segments))
-                    copied = true
-                } label: {
-                    HStack(spacing: 4) { Icon(.copy, size: 14); Text(copied ? "Copied" : "Copy answer") }
-                }
-                .buttonStyle(AirlockButtonStyle(kind: .ghost, compact: true))
-                .accessibilityHint(Text("Copies the answer with the real names, on this device"))
+                copyButton
             }
             .font(.footnote).foregroundStyle(Palette.text2)
         }
     }
 
-    private func copy(_ text: String) {
-        #if canImport(UIKit)
-            UIPasteboard.general.string = text
-        #elseif canImport(AppKit)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-        #endif
+    /// F-27: a pasted answer — restored here; Airlock sent nothing, so there is no receipt.
+    private var pastedLine: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider().overlay(Palette.stroke)
+            Text("Airlock sent nothing for this answer, so no receipt was needed.")
+                .font(.footnote).foregroundStyle(Palette.text2)
+                .fixedSize(horizontal: false, vertical: true)
+            copyButton.font(.footnote).foregroundStyle(Palette.text2)
+        }
+    }
+
+    private var copyButton: some View {
+        Button {
+            Clipboard.copy(Pieces.plain(turn.segments))
+            copied = true
+        } label: {
+            HStack(spacing: 4) { Icon(.copy, size: 14); Text(copied ? "Copied" : "Copy answer") }
+        }
+        .buttonStyle(AirlockButtonStyle(kind: .ghost, compact: true))
+        .accessibilityHint(Text("Copies the answer with the real names, on this device"))
     }
 }
 
 #Preview("Thread") {
     PreviewThreadHost(session: PreviewSession.make(scenario: .thread))
+}
+
+#Preview("Scrub & copy") {
+    PreviewThreadHost(session: PreviewSession.make(scenario: .scrub))
 }
 
 /// Shows the preview session's first conversation once the scripted send has run.

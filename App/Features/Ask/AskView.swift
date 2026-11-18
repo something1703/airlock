@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Compose: paste anything, pick what you want, seal it on this device.
 struct AskView: View {
@@ -6,6 +7,8 @@ struct AskView: View {
     @State private var text = ""
     @State private var task: TaskOption = .help
     @FocusState private var focused: Bool
+    @State private var dropTargeted = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScreenScroll {
@@ -16,6 +19,26 @@ struct AskView: View {
                 accessibilityTitle: String(localized: "Your message"), minHeight: 200
             )
             .focused($focused)
+            .overlay {
+                if dropTargeted {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Palette.seal, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                        .background(Palette.sealTint.opacity(0.35), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay {
+                            Text("Drop text to read it on this device").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.seal)
+                        }
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+            .animation(Motion.animation(Motion.easeOut(Motion.fast), reduce: reduceMotion), value: dropTargeted)
+            .dropDestination(for: DroppedText.self) { items, _ in
+                let dropped = items.map(\.text).filter { !$0.isEmpty }.joined(separator: "\n\n")
+                guard !dropped.isEmpty else { return false }
+                text = text.isEmpty ? dropped : text + "\n\n" + dropped
+                return true
+            } isTargeted: { dropTargeted = $0 }
+            .accessibilityHint(Text("You can also drop text or a .txt file here"))
             .enter(1)
             TaskPills(selection: $task)
             ViewThatFits(in: .horizontal) {
@@ -26,19 +49,27 @@ struct AskView: View {
         }
         .navigationTitle(Text("Ask"))
         .hidesNavigationBarOnPhone()
+        .onChange(of: session.sealRequest) { _, _ in
+            if session.section == .ask && session.askPath.isEmpty { seal() }
+        }
+    }
+
+    private func seal() {
+        let t = text
+        guard !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        focused = false
+        Task { await session.startReview(t, task: task) }
     }
 
     private var sealButton: some View {
         Button {
-            focused = false
-            let t = text
-            Task { await session.startReview(t, task: task) }
+            seal()
         } label: {
             IconLabel(title: "Seal on this device", glyph: .arrow, trailing: true)
         }
         .buttonStyle(.primary)
         .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .keyboardShortcut(.return, modifiers: .command)
+        .touchKeyboardShortcut(.return, modifiers: .command)
         .accessibilityHint(Text("Finds and seals private details on this device. Nothing is sent yet."))
     }
 
@@ -78,7 +109,10 @@ struct ThreadRow: View {
                 Text(verbatim: thread.title).font(.body).foregroundStyle(Palette.text).lineLimit(2).multilineTextAlignment(.leading)
                 Spacer(minLength: 8)
                 HStack(spacing: 4) {
-                    if thread.lastAnswer?.summary?.ranOnDevice == true {
+                    if thread.mode == .scrub {
+                        Icon(.copy, size: 14)
+                        Text("copied, not sent")
+                    } else if thread.lastAnswer?.summary?.ranOnDevice == true {
                         Icon(.device, size: 14)
                         Text("on device")
                     } else {
@@ -95,6 +129,21 @@ struct ThreadRow: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text(verbatim: thread.title))
         .accessibilityHint(Text("Opens the conversation"))
+    }
+}
+
+/// Text dragged onto the compose area: a text selection or a plain-text file (.txt), read locally.
+/// Anything larger than 200 000 characters is cut (the egress gate's size check would block it anyway).
+struct DroppedText: Transferable {
+    let text: String
+
+    static let maxCharacters = 200_000
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(importedContentType: .plainText) { data in
+            DroppedText(text: String(String(decoding: data, as: UTF8.self).prefix(maxCharacters)))
+        }
+        ProxyRepresentation(importing: { (s: String) in DroppedText(text: String(s.prefix(maxCharacters))) })
     }
 }
 

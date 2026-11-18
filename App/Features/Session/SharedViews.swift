@@ -5,6 +5,8 @@ import SwiftUI
 struct RouteBadge: View {
     let summary: AnswerSummary?
     let status: AssistantTurn.Status
+    /// F-27: an answer the user pasted back and Airlock restored locally.
+    var pasted = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -25,7 +27,10 @@ struct RouteBadge: View {
     }
 
     @ViewBuilder private var content: some View {
-        if status == .error && summary == nil {
+        if pasted {
+            ScaledIcon(.device, size: 14, relativeTo: .footnote)
+            Text("Pasted answer · restored on this device")
+        } else if status == .error && summary == nil {
             ScaledIcon(.alert, size: 14, relativeTo: .footnote)
             Text("Not answered")
         } else if let s = summary {
@@ -46,6 +51,7 @@ struct RouteBadge: View {
     }
 
     private var colors: (fg: Color, bg: Color) {
+        if pasted { return (Palette.seal, Palette.sealTint) }
         if status == .error && summary == nil { return (Palette.risk, Palette.riskTint) }
         guard let s = summary else { return (Palette.cloud, Palette.cloudTint) }
         if s.fellBackToPhone { return (Palette.review, Palette.reviewTint) }
@@ -157,6 +163,7 @@ struct SealDoorOverlay: View {
     VStack(spacing: 12) {
         RouteBadge(summary: nil, status: .streaming)
         RouteBadge(summary: nil, status: .error)
+        RouteBadge(summary: nil, status: .done, pasted: true)
     }
     .padding()
     .background(Palette.bg)

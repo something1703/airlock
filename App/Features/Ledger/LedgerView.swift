@@ -6,7 +6,23 @@ import SwiftUI
 struct LedgerView: View {
     let session: AirlockSession
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
+        ScrollViewReader { proxy in
+            screen
+                .onChange(of: session.receiptFocusRun, initial: true) { _, _ in
+                    guard let id = session.focusedReceiptID else { return }
+                    Task {
+                        // Let the row expand before scrolling to it.
+                        try? await Task.sleep(for: .milliseconds(150))
+                        withAnimation(Motion.animation(Motion.easeOut(Motion.med), reduce: reduceMotion)) { proxy.scrollTo(id, anchor: .top) }
+                    }
+                }
+        }
+    }
+
+    private var screen: some View {
         ScreenScroll {
             ScreenHeader(
                 title: String(localized: "Ledger"),
@@ -22,7 +38,11 @@ struct LedgerView: View {
                 } else {
                     let rows = Array(session.receipts.reversed())
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, r in
-                        ReceiptRow(receipt: r, order: rows.count - 1 - i, run: session.chainRun, chain: session.chain)
+                        ReceiptRow(
+                            receipt: r, order: rows.count - 1 - i, run: session.chainRun, chain: session.chain,
+                            focusRun: session.focusedReceiptID == r.id ? session.receiptFocusRun : 0
+                        )
+                        .id(r.id)
                     }
                 }
             }
@@ -117,6 +137,8 @@ struct ReceiptRow: View {
     let order: Int
     let run: Int
     let chain: ChainVerification?
+    /// Non-zero when ⌘R or "See receipt" asked for this receipt: it opens.
+    var focusRun = 0
     @State private var open = false
     @State private var lit = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -170,6 +192,9 @@ struct ReceiptRow: View {
             RoundedRectangle(cornerRadius: 8).fill(broken ? Palette.riskTint : lit ? Palette.sealTint : .clear)
         )
         .onChange(of: run) { _, _ in light() }
+        .onChange(of: focusRun, initial: true) { _, new in
+            if new > 0 { open = true }
+        }
     }
 
     private var modelName: String {

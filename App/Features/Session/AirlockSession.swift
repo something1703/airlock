@@ -38,6 +38,18 @@ final class AirlockSession {
     private(set) var isLoaded = false
     /// Set when the egress gate blocks a send (drives the error haptic).
     private(set) var blockCount = 0
+    /// F-25 guesses per conversation id.
+    private(set) var guesses: [String: GuessState] = [:]
+    /// The receipt the Ledger should open and scroll to (⌘R, "see receipt"), and a counter that
+    /// changes on every request so the same receipt can be shown twice.
+    private(set) var focusedReceiptID: String?
+    private(set) var receiptFocusRun = 0
+    /// Bumped by the Seal menu command (⌘↩); Ask and Review run their own seal action on change.
+    private(set) var sealRequest = 0
+    /// Settings opens on "How Airlock works" (demo screenshots).
+    var showAbout = false
+    /// Review opens scrolled to its buttons (demo screenshots of Scrub & copy).
+    var revealReviewActions = false
 
     @ObservationIgnored private var ledger = ReceiptLedger()
     @ObservationIgnored private var answers: AnswerService
@@ -107,6 +119,26 @@ final class AirlockSession {
     }
 
     func thread(_ id: String) -> ChatThread? { threads.first { $0.id == id } }
+
+    /// The Ask stack's top screen.
+    var isReviewShowing: Bool { section == .ask && askPath.last == .review }
+
+    /// Review is finished sealing and on screen (menu commands).
+    var canSealAndSend: Bool { isReviewShowing && review?.result != nil }
+
+    /// Scrub & copy is offered for a new request only (a follow-up belongs to its conversation).
+    var canCopySealed: Bool { canSealAndSend && review?.threadID == nil }
+
+    /// ⌘↩ from the menu: Ask seals its draft, Review seals and sends.
+    func requestSeal() { sealRequest += 1 }
+
+    /// Opens the Ledger on one receipt (the latest when `id` is nil).
+    func openReceipt(_ id: String? = nil) {
+        guard let target = id ?? receipts.last?.id else { return }
+        focusedReceiptID = target
+        receiptFocusRun += 1
+        go(.ledger)
+    }
 
     // MARK: Preferences and onboarding
 
@@ -267,6 +299,108 @@ final class AirlockSession {
         return true
     }
 
+    // MARK: Scrub & copy (F-27): Airlock sends nothing
+
+    /// The sealed version for the user to paste into any other tool — through the egress gate exactly
+    /// like sending (blocked → the same banner). Opens a `scrub` conversation where an answer can be
+    /// pasted back. No receipt: nothing left through Airlock; the copy is the user's own action.
+    /// Returns the copied text, or nil if the gate blocked it.
+    @discardableResult
+    func copySealedVersion() async -> String? {
+        guard let r = review, r.threadID == nil, let result = r.result else { return nil }
+        let draft = result.draft
+        let sealed: SealedText
+        do {
+            sealed = try EgressGate(patterns: services.patterns, vault: vault).seal(draft)
+        } catch {
+            review?.blocked = error.hits
+            blockCount += 1
+            return nil
+        }
+        let text = ScrubCopy.clipboardText(sealed)
+        Clipboard.copy(text)
+        let entities = draft.entities
+        let threadID = UUID().uuidString
+        let stored = StoredSealed(
+            text: draft.text, legend: draft.legend, revealedVaultIDs: Array(draft.revealedVaultIDs).sorted(), keptValues: Array(draft.keptValues).sorted())
+        threads.insert(
+            ChatThread(
+                id: threadID, title: Self.title(from: sealed.value), mode: .scrub, task: r.task, entities: entities,
+                turns: [.user(UserTurn(raw: r.raw, display: sealed.value, sealed: sealed, stored: stored))], createdAt: Date()),
+            at: 0)
+        do { try await services.stores.saveEntities(entities, thread: threadID) } catch { Self.log.error("Entity map save failed") }
+        review = nil
+        reviewPipeline = nil
+        askPath = [.thread(threadID)]
+        await nameThread(threadID, sealed: sealed)
+        await persist(threadID)
+        Self.log.notice("Sealed version copied (\(text.count, privacy: .public) characters); nothing sent")
+        return text
+    }
+
+    /// Restores an answer the user got elsewhere, on this device, with this conversation's placeholders.
+    func restorePasted(_ threadID: String, text: String) async {
+        guard let t = thread(threadID) else { return }
+        let ctx = RestoreContext(entities: t.entities, userFirstName: userFirstName, writingAsUser: t.task.kind.writesAsUser)
+        guard let restored = ScrubCopy.restorePasted(text, context: ctx) else { return }
+        updateThread(threadID) {
+            $0.turns.append(.assistant(AssistantTurn(task: t.task, status: .done, segments: restored.segments, animate: true, pasted: text)))
+        }
+        await persist(threadID)
+    }
+
+    // MARK: What could Gemini still guess? (F-25)
+
+    /// The newest sealed turn that already went to Gemini (its answer has a receipt), so asking
+    /// sends nothing Gemini hasn't seen. nil for scrub conversations and on-device-only answers.
+    func guessableSealed(in thread: ChatThread) -> SealedText? {
+        guard thread.mode == nil, !thread.isStreaming, prefs.preference != .phoneOnly else { return nil }
+        var answered = false
+        for turn in thread.turns.reversed() {
+            switch turn {
+            case .assistant(let a): answered = a.summary?.receipt != nil
+            case .user(let u):
+                if answered, let s = u.sealed { return s }
+                answered = false
+            }
+        }
+        return nil
+    }
+
+    /// The guess card's state for a conversation (nil = not asked since its last turn).
+    func guess(for thread: ChatThread) -> GuessState? {
+        guard let g = guesses[thread.id], g.turnCount == thread.turns.count else { return nil }
+        return g
+    }
+
+    /// Asks Gemini (cloudOnly) what it can infer from the exact sealed text it already saw. Writes a receipt.
+    func inferGuesses(_ threadID: String) async {
+        guard let t = thread(threadID), let sealed = guessableSealed(in: t) else { return }
+        if case .asking? = guess(for: t)?.phase { return }
+        let count = t.turns.count
+        guesses[threadID] = GuessState(turnCount: count, phase: .asking)
+        let phase: GuessState.Phase
+        do {
+            let r = try await CloudInference.run(
+                engines: services.engines, prompts: services.prompts, ledger: ledger, sealed: sealed, threadId: threadID,
+                armorExpected: services.config.bool("armor_expected"))
+            phase = .done(inferences: r.inferences, unreadable: r.unreadable, receiptID: r.receipt.id)
+            Self.log.notice("Inference answered: \(r.inferences.count, privacy: .public) items")
+        } catch {
+            let failure = AnswerFailure(error)
+            Self.log.notice("Inference failed: \(failure.rawValue, privacy: .public)")
+            phase = .failed(failure)
+        }
+        guesses[threadID] = GuessState(turnCount: count, phase: phase)
+        receipts = await ledger.receipts
+        do { try await services.conversations.saveReceipts(receipts) } catch { Self.log.error("Receipt save failed") }
+        await refreshStats()
+    }
+
+    private var userFirstName: String? {
+        vault.first(where: \.isUser).flatMap { $0.canonical.split(whereSeparator: \.isWhitespace).first.map(String.init) }
+    }
+
     /// Re-asks the last sealed question (after an error), optionally on this device only.
     func retry(_ threadID: String, onDeviceOnly: Bool = false) async {
         guard let t = thread(threadID), case .assistant(let last)? = t.turns.last, last.status == .error else { return }
@@ -348,7 +482,7 @@ final class AirlockSession {
                 guard a.status != .streaming else { return nil }
                 let s = a.summary
                 return .assistant(
-                    task: a.task, status: a.status, modelText: s?.modelText ?? "", failure: a.failure,
+                    task: a.task, status: a.status, modelText: s?.modelText ?? a.pasted ?? "", failure: a.failure,
                     outcome: s.map {
                         StoredOutcome(
                             route: $0.route, modelVersion: $0.modelVersion, ranOnDevice: $0.ranOnDevice, fellBackToPhone: $0.fellBackToPhone,
@@ -356,7 +490,7 @@ final class AirlockSession {
                     })
             }
         }
-        let record = StoredThread(id: t.id, title: t.title, task: t.task, createdAt: t.createdAt, updatedAt: Date(), turns: turns)
+        let record = StoredThread(id: t.id, title: t.title, mode: t.mode, task: t.task, createdAt: t.createdAt, updatedAt: Date(), turns: turns)
         do { try await services.conversations.save(record) } catch { Self.log.error("Conversation save failed") }
     }
 
@@ -385,11 +519,15 @@ final class AirlockSession {
                             stored: o, modelText: modelText, receipt: receipts.first { $0.id == o.receiptID },
                             fidelity: FidelityCheck.check(modelOutput: modelText, context: ctx))
                     }
+                    // No outcome but text: an answer the user pasted back (F-27).
+                    let pasted = outcome == nil && status == .done && !modelText.isEmpty ? modelText : nil
                     turns.append(
-                        .assistant(AssistantTurn(task: task, status: status, segments: restored.segments, summary: summary, failure: failure, animate: false)))
+                        .assistant(
+                            AssistantTurn(
+                                task: task, status: status, segments: restored.segments, summary: summary, failure: failure, animate: false, pasted: pasted)))
                 }
             }
-            out.append(ChatThread(id: rec.id, title: rec.title, task: rec.task, entities: entities, turns: turns, createdAt: rec.createdAt))
+            out.append(ChatThread(id: rec.id, title: rec.title, mode: rec.mode, task: rec.task, entities: entities, turns: turns, createdAt: rec.createdAt))
         }
         return out
     }
@@ -403,6 +541,7 @@ final class AirlockSession {
             Self.log.error("Conversation delete failed")
         }
         threads.removeAll { $0.id == id }
+        guesses[id] = nil
         if askPath.contains(.thread(id)) { askPath = [] }
     }
 
@@ -433,6 +572,8 @@ final class AirlockSession {
         receipts = []
         review = nil
         chain = nil
+        guesses = [:]
+        focusedReceiptID = nil
         prefs = Prefs(dial: services.config.dialDefault)
         askPath = []
         section = .ask
@@ -488,6 +629,10 @@ final class AirlockSession {
     static let sample =
         "Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I've texted you four times. I work nights at Mercy General Hospital and need to sleep during the day — please send someone this week. You can reach me on 312-555-0147. Thanks, Maya Chen"
 
+    /// A fictional answer "from another tool", for the Scrub & copy demo.
+    static let samplePasted =
+        "Hi [[PERSON_1]], the heater at [[LOC_1]] is still broken. Please send someone to repair it this week.\n\nThanks,\n[[PERSON_ME]]"
+
     private func runDemoScript() async {
         guard let script = services.demoScript else { return }
         if script.seed {
@@ -515,6 +660,27 @@ final class AirlockSession {
             await send()
             go(.ledger)
             await verifyChain()
+        case "guess":
+            // F-25: a sent request, then "What could Gemini still guess?" asked once.
+            await startReview(Self.sample, task: .reply)
+            await send()
+            if let id = threads.first?.id { await inferGuesses(id) }
+        case "copy":
+            // F-27: Review with "Copy sealed version" (the screenshot shows the button).
+            revealReviewActions = true
+            await startReview(Self.sample, task: .reply)
+        case "copied":
+            // F-27: just copied: the conversation waits for a pasted answer.
+            await startReview(Self.sample, task: .reply)
+            await copySealedVersion()
+        case "scrub":
+            // F-27: copied, then an answer from elsewhere pasted back and restored.
+            await startReview(Self.sample, task: .reply)
+            await copySealedVersion()
+            if let id = threads.first?.id { await restorePasted(id, text: Self.samplePasted) }
+        case "about":
+            go(.settings)
+            showAbout = true
         case "vault": go(.vault)
         case "settings": go(.settings)
         default: break

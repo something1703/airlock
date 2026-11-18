@@ -6,6 +6,7 @@ import SwiftUI
 enum Glyph: String, CaseIterable, Sendable {
     case ask, ledger, vault, settings, person, org, place, contact, id, date, health, secret, sparkle, device, cloud, check, shield
     case eye, trash, plus, arrow, link, alert, question, chevron, close, copy
+    case detect, target, gate, restore
 
     fileprivate enum Element {
         case path(String)
@@ -47,6 +48,11 @@ enum Glyph: String, CaseIterable, Sendable {
         case .chevron: [.path("m9.5 6 6 6-6 6")]
         case .close: [.path("M6.5 6.5l11 11M17.5 6.5l-11 11")]
         case .copy: [.rect(x: 8.5, y: 8.5, w: 11, h: 11, r: 2.2), .path("M15.5 8.5V6.7a2.2 2.2 0 0 0-2.2-2.2H6.7a2.2 2.2 0 0 0-2.2 2.2v6.6a2.2 2.2 0 0 0 2.2 2.2h1.8")]
+        // "How Airlock works" steps (Detect, Red-team, Egress gate, Restore).
+        case .detect: [.circle(cx: 10.5, cy: 10.5, r: 6), .path("m15 15 5 5"), .path("M8 10.5h5")]
+        case .target: [.circle(cx: 12, cy: 12, r: 7.5), .circle(cx: 12, cy: 12, r: 3), .path("M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3")]
+        case .gate: [.path("M5 20.5V11a7 7 0 0 1 14 0v9.5"), .path("M3 20.5h18"), .path("M12 4v16.5"), .path("M9.5 13.5h.01M14.5 13.5h.01")]
+        case .restore: [.path("M4.5 12a7.5 7.5 0 1 0 2.2-5.3"), .path("M4.5 4.5v3.8h3.8"), .path("m9 12.5 2 2 4-4")]
         }
     }
 

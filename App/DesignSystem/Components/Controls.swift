@@ -29,6 +29,17 @@ extension View {
 
     /// Entrance: fade + rise 10 pt, staggered by `index` × 60 ms (web `.enter`).
     func enter(_ index: Int = 0) -> some View { modifier(EnterModifier(index: index)) }
+
+    /// A keyboard shortcut on the button itself on iPhone and iPad. On the Mac the menu bar command
+    /// (`AirlockCommands`) owns the shortcut, so the two never compete.
+    @ViewBuilder
+    func touchKeyboardShortcut(_ key: KeyEquivalent, modifiers: EventModifiers = .command) -> some View {
+        #if os(macOS)
+            self
+        #else
+            keyboardShortcut(key, modifiers: modifiers)
+        #endif
+    }
 }
 
 struct HidesBarOnPhone: ViewModifier {
