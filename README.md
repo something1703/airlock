@@ -113,6 +113,7 @@ The iOS/macOS app (`App/`) never calls Firebase AI Logic directly: `App/Services
 | Preparing Chrome's model (user click) | `ONLY_ON_DEVICE` | `initializeDeviceModel(onProgress)` | `FirebaseEngines.initializeOnDevice` |
 | Quick tasks on sealed text | `PREFER_ON_DEVICE` | `generateContentStream` | `FirebaseSealedEngine` |
 | Deep answers on sealed text | `PREFER_IN_CLOUD` / `ONLY_IN_CLOUD`, model fallback chain | `generateContentStream(text, { signal, timeout })`, unary last resort | `FirebaseSealedEngine.stream` |
+| Private tools (function calling): today's date, a placeholder's role, free time from an imported .ics — each consented, every result through `EgressGate.sealToolResult` (INV-5) | `ONLY_IN_CLOUD` (function responses never run on device) | `getGenerativeModel(ai, { mode, inCloudParams: { tools: [{ functionDeclarations }], toolConfig: AUTO } })`, `startChat()`, `sendMessageStream`, `functionCalls()`, `FunctionResponsePart` | `FirebaseToolEngine` / `FirebaseToolChat`; loop in `web/src/engine/tools.ts` (`runToolLoop`) |
 | Which side answered | — | `response.inferenceSource` (`on_device` / `in_cloud`) | `FirebaseSealedEngine` |
 
 **Android app** (`android/`, Firebase BoM 35.2.0 = `firebase-ai` 18.2.0 + `firebase-ai-ondevice` 16.0.0-beta08): every call is in `android/app/src/main/kotlin/app/airlock/android/engines/` (a test fails if Firebase AI is used anywhere else).
