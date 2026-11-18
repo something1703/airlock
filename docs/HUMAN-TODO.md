@@ -6,12 +6,34 @@ Google Cloud / Firebase account for Airlock: the team's Google account (decided 
 
 ---
 
-## ▶︎ Still to do (17 Nov)
+## ▶︎ Start here (18 Nov) — everything still waiting on a person, in order
 
-1. **Turn on Firebase Authentication** (≈30 s): Firebase console → project `airlock-hybrid-dev` → Build → **Authentication → Get started** → Sign-in method → **Anonymous → Enable → Save**. (The CLI can't do this without upgrading the project to Identity Platform.)
-2. **Chrome Gemini Nano** (H-12) — see below.
-3. **Discord questions** (H-13), **Sprint 3 quota form** from Mon 23 Nov (H-16).
-4. *Optional:* delete the two unused Cloud projects `airlock-hybrid-dev` and `airlock-hybrid-demo` (no `-xxxxx` suffix) created on 16 Nov; Firebase made its own (`-f1bb0`, `-feb30`). They cost nothing.
+All coding work is on `main` and the web app is live on the dev project. These are the only things left that an agent can't do.
+
+**Quick (minutes, free)**
+1. **App Check, web** (project `airlock-hybrid-dev-f1bb0`, not the other one): Firebase console → App Check → Apps → the web app → reCAPTCHA → paste the reCAPTCHA **secret** key → Save. Keep enforcement **off** for now.
+2. **App Check debug tokens** (H-07): run each app once; it prints a debug token (browser console on localhost, Xcode console for the Simulator and the Mac, `adb logcat` for Android). Add each under App Check → Manage debug tokens. Never commit them.
+3. **Optional but sensible:** the reCAPTCHA secret was pasted into a chat once. Rotate it at google.com/recaptcha/admin, then repeat step 1 with the new secret.
+4. **Mac signing** (for the Keychain on macOS): Xcode → the Airlock target → Signing & Capabilities → Team → your free Apple ID. Tell the agent the Team ID (it isn't secret).
+5. **Mac screenshots:** System Settings → Privacy & Security → Screen & System Audio Recording → allow Terminal (or the app running the agent).
+6. **Chrome Gemini Nano** (H-12) and **Apple Intelligence on this Mac** (H-05): needed to see real on-device inference rather than the demo engines.
+7. **Rate limit + key restrictions** (H-08, H-09) before sharing the web link widely.
+8. **Check Anonymous sign-in is on** (sealed-history backup needs it): Authentication → Sign-in method → Anonymous → Enabled.
+
+**Decisions only you can make**
+9. **Proof mode's Search grounding returns 429** on the free tier. Options: leave Proof's claim-check on the demo engines for judges, or enable billing on the demo project (see 11).
+10. **Publish the Android APK** as a GitHub release (public content; the agent will do it once you say yes).
+11. **Demo project on Blaze** (H-14), with a $100 budget and alerts. This unlocks Model Armor, Cloud Functions deploy (already built and emulator-tested) and Sensitive Data Protection. The agent waits for your OK on the cost check.
+12. **Swift "Protect this"**: web and Android have it. On iOS it touches `AirlockSeal`, so the agent needs you to approve a plan first.
+
+**Benchmark (last, your explicit permission only)**
+13. **Sprint 3 quota form** (H-16) by **Wed 25 Nov, 10:00 AM PT**. Then say the word, and the live AirlockBench run happens on that separate account. The Evidence screens update from Remote Config `evidence_json` without a redeploy.
+
+**Submission**
+13. Discord question (H-13), testers (H-18), voice-over and YouTube (H-19), contact email (H-20), keep the demo live until 16 Dec (H-21), Android on real Nano hardware via Test Lab or a borrowed phone (H-10).
+
+### Done on 17–18 Nov
+reCAPTCHA site registered (the site key is in the gitignored `web/.env.local`), repo public on GitHub (H-17), web app deployed to Hosting on dev.
 
 ### Done on 17 Nov
 Xcode 27.2 + iOS 27.2 Simulator, Temurin 21 + Android command-line tools, Firebase projects, AI Logic (Gemini Developer API) on dev, `firebase login`. The agent then registered the iOS/Mac/Android/Web apps, downloaded their configs to gitignored paths, enabled the App Check and Firestore APIs, created the Firestore database (`nam5`) and deployed Remote Config (26 parameters, verified).
@@ -63,7 +85,7 @@ Xcode 27.2 + iOS 27.2 Simulator, Temurin 21 + Android command-line tools, Fireba
 
 | # | Task | When | Status |
 |---|------|------|--------|
-| H-17 | Push the repo to GitHub (public, Apache-2.0 visible in About). Pick the account and repo name | When the agent asks to commit/push | ☐ |
+| H-17 | Push the repo to GitHub (public, Apache-2.0 visible in About). Pick the account and repo name | When the agent asks to commit/push | ✅ 17 Nov |
 | H-18 | Recruit 3–5 testers for 20-minute sessions (`docs/07-EVALUATION.md` §8) | 27–28 Nov | ☐ |
 | H-19 | Voice-over, YouTube upload (public, ≤ 3:00, English captions) | 29 Nov | ☐ |
 | H-20 | A team contact email for judges (debug-token registration offer) | Before submission | ☐ |
