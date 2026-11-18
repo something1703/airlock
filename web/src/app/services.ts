@@ -1,5 +1,5 @@
 import { AppConfig } from "../core/appConfig";
-import { CHROME_ON_DEVICE_MODEL, EngineError, type EngineProvider, type PhoneAvailability, type PhoneOnlyEngine, type SealedEngine } from "../engine/engines";
+import { CHROME_ON_DEVICE_MODEL, EngineError, type EngineProvider, type PhoneAvailability, type PhoneOnlyEngine, type SealedEngine, type ToolEngine } from "../engine/engines";
 import { MockEngines, MockPhoneEngine, MockSealedEngine } from "../engine/mocks";
 import { PatternDetector } from "../engine/patterns";
 import { PromptLibrary } from "../engine/prompts";
@@ -38,6 +38,10 @@ class NoCloudEngines implements EngineProvider {
         throw new EngineError("other", "no-firebase");
       },
     };
+  }
+  tools(): ToolEngine {
+    const fail = (): Promise<never> => Promise.reject(new EngineError("other", "no-firebase"));
+    return { route: "cloudOnly", chat: () => ({ send: fail, respond: fail }) };
   }
 }
 

@@ -118,3 +118,83 @@ describe("cloud stream guards", () => {
     expect(calls).toEqual(["stream"]);
   }, 10_000);
 });
+
+describe("private tools over Firebase AI Logic (function calling)", () => {
+  const c = new AppConfig();
+  const sealedReq = { value: "Hi [[PERSON_1]]", legend: [{ placeholder: "PERSON_1", description: "the writer's landlord" }], gateReport: {} } as never;
+  const result = (value: string, id?: string) => ({ ...(id ? { id } : {}), name: "today_context" as const, sealed: { value } as never });
+
+  async function toolEngineWith(fakeChat: (model: string) => object) {
+    const { initializeApp } = await import("firebase/app");
+    const { FirebaseEngines } = await import("../src/ai/firebaseEngines");
+    const { PromptLibrary } = await import("../src/engine/prompts");
+    const app = initializeApp({ apiKey: "test", projectId: "test", appId: "1:1:web:1" }, `t-${Math.random()}`);
+    const engines = new FirebaseEngines(app, c, new PromptLibrary());
+    const models: { model: string; system: string; names: string[] }[] = [];
+    (engines as unknown as { toolModel: unknown }).toolModel = (model: string, system: string, decls: { name: string }[]) => {
+      models.push({ model, system, names: decls.map((d) => d.name) });
+      return { startChat: () => fakeChat(model) };
+    };
+    return { engine: engines.tools("auto"), models, real: engines };
+  }
+  const turn = (text: string, calls?: object[]) => ({
+    stream: (async function* () { if (text) yield { text: () => text }; })(),
+    response: Promise.resolve({ text: () => text, functionCalls: () => calls, inferenceSource: "in_cloud" }),
+  });
+
+  it("declarations carry no functionReference (the SDK never runs a tool itself); responses are FunctionResponseParts", async () => {
+    const { toFunctionDeclaration, functionResponsePart } = await import("../src/ai/firebaseEngines");
+    const { TOOL_DECLARATIONS } = await import("../src/engine/tools");
+    const d = toFunctionDeclaration(TOOL_DECLARATIONS.find_free_slots);
+    expect(d).not.toHaveProperty("functionReference");
+    expect(d.parameters).toMatchObject({ type: "object", required: ["start_date", "end_date", "min_minutes"], properties: { min_minutes: { type: "integer" } } });
+    expect(toFunctionDeclaration(TOOL_DECLARATIONS.today_context)).toEqual({ name: "today_context", description: TOOL_DECLARATIONS.today_context.description });
+    expect(functionResponsePart(result('{"error":"user_declined"}', "c1"))).toEqual({ type: "functionResponse", functionResponse: { id: "c1", name: "today_context", response: { error: "user_declined" } } });
+  });
+
+  it("one ChatSession per request: function calls out, gate-sealed responses back on the same chat; system = cloud-system + addendum", async () => {
+    const sent: unknown[] = [];
+    const chat = {
+      sendMessageStream: async (req: unknown) => {
+        sent.push(req);
+        return sent.length === 1 ? turn("", [{ id: "c1", name: "today_context", args: {} }]) : turn("Hi [[PERSON_1]], how about Tuesday?");
+      },
+    };
+    const { engine, models } = await toolEngineWith(() => chat);
+    expect(engine.route).toBe("cloudOnly");
+    const tc = engine.chat([{ name: "today_context", description: "d" }], "ADDENDUM");
+    const t1 = await tc.send(sealedReq, { id: "task.reply.v1", instruction: "Draft a reply." }, undefined);
+    expect(t1.calls).toEqual([{ id: "c1", name: "today_context", args: {} }]);
+    expect(typeof sent[0]).toBe("string");
+    const streamed: string[] = [];
+    const t2 = await tc.respond([result('{"today":"2026-11-18"}', "c1")], (t) => streamed.push(t));
+    expect(sent[1]).toEqual([{ type: "functionResponse", functionResponse: { id: "c1", name: "today_context", response: { today: "2026-11-18" } } }]);
+    expect(t2).toMatchObject({ text: "Hi [[PERSON_1]], how about Tuesday?", calls: [], modelVersion: c.modelCloudDeep, ranOnDevice: false });
+    expect(streamed).toEqual(["Hi [[PERSON_1]], how about Tuesday?"]);
+    expect(models).toHaveLength(1);
+    expect(models[0]!.system.endsWith("\n\nADDENDUM")).toBe(true);
+  });
+
+  it("the first turn falls back to the stable model on 503; later turns stay on the model that started", async () => {
+    const used: string[] = [];
+    const { engine } = await toolEngineWith((model) => ({
+      sendMessageStream: async () => {
+        used.push(model);
+        if (model === c.modelCloudDeep) throw new AIError("fetch-error" as never, "overloaded", { status: 503 } as never);
+        return turn("", [{ name: "today_context", args: {} }]);
+      },
+    }));
+    const tc = engine.chat([], "");
+    await tc.send(sealedReq, { id: "x", instruction: "" }, undefined);
+    await tc.respond([result("{}")]);
+    expect(used).toEqual([c.modelCloudDeep, c.modelCloudFallback, c.modelCloudFallback]);
+  });
+
+  it("the real toolModel is ONLY_IN_CLOUD with AUTO function calling", async () => {
+    const { real } = await toolEngineWith(() => ({}));
+    const m = (real as unknown as { constructor: { prototype: { toolModel: (...a: unknown[]) => { tools?: unknown[]; toolConfig?: unknown; _apiSettings: { inferenceMode?: string } } } } }).constructor.prototype.toolModel.call(real, "m", "sys", [{ name: "today_context", description: "d" }]);
+    expect(m._apiSettings.inferenceMode).toBe(InferenceMode.ONLY_IN_CLOUD);
+    expect(m.tools).toEqual([{ functionDeclarations: [{ name: "today_context", description: "d" }] }]);
+    expect(m.toolConfig).toEqual({ functionCallingConfig: { mode: "AUTO" } });
+  });
+});
