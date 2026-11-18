@@ -1,0 +1,27 @@
+{
+  "generator": "synth-tpl.v1",
+  "seed": 20261118,
+  "files": {
+    "synth-v1.jsonl": {
+      "items": 600,
+      "dropped": 0,
+      "test": 120,
+      "dev": 480,
+      "sha256": "9e2e48d1296c262442e5cce07af17e6a9344c85308e4f6cb1054a2c05b0ad90e"
+    },
+    "synth-hard.jsonl": {
+      "items": 120,
+      "dropped": 0,
+      "test": 24,
+      "dev": 96,
+      "sha256": "56020a0fcea4372d0bec3b0ec267151462a253c70800ca0dcd9036b6bab16d47"
+    },
+    "demo-set.jsonl": {
+      "items": 5,
+      "dropped": 0,
+      "test": 5,
+      "dev": 0,
+      "sha256": "3762c0e03a434640b63b2dd3dc0906e790f0c674b8966bef4a66a98bdaf67a76"
+    }
+  }
+}
