@@ -2,6 +2,55 @@ import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import { createServices } from "../src/app/services";
 import { AirlockSession, cleanTitle, titleFrom } from "../src/app/session";
+import { PROOF_SAMPLES } from "../src/app/proofSamples";
+
+describe("Proof mode (demo engines, end to end)", () => {
+  it("scam sample → 'Likely a scam' with sources and receipts; only sealed claims left; nothing stored", async () => {
+    const s = await demoSession();
+    const sample = PROOF_SAMPLES[0]!;
+    const stages: string[] = [];
+    const unsub = s.subscribe(() => { const st = s.getState().proof?.stage; if (st && stages.at(-1) !== st) stages.push(st); });
+    s.openProof(sample.message);
+    expect(s.getState().screen).toBe("proof");
+    await new Promise((r) => setTimeout(r, 0));
+    while (s.getState().proof?.stage !== "done") await new Promise((r) => setTimeout(r, 50));
+    unsub();
+    expect(stages).toEqual(["scanning", "sealing", "checking", "done"]);
+    const r = s.getState().proof!.result!;
+    expect(r.mode).toBe("checked");
+    expect(r.verdict).toBe("likelyScam");
+    expect(r.flags.map((f) => f.tactic)).toEqual(expect.arrayContaining(["credential_request", "urgency", "fear", "secrecy"]));
+    const checked = r.claims.filter((c) => c.status === "checked");
+    expect(checked).toHaveLength(2);
+    for (const c of checked) if (c.status === "checked") expect(c.finding.sources.length).toBe(2);
+    const outbound = s.ledger.receipts.map((x) => x.outboundText ?? "").join("\n");
+    expect(s.ledger.receipts).toHaveLength(2);
+    for (const raw of ["Lakeview", "740", "6-digit", sample.message]) expect(outbound).not.toContain(raw);
+    expect(await s.services.stores.captures()).toHaveLength(0);
+    expect(s.proofShareText()).toMatch(/^Heads up: I got a message that looks like a scam\./);
+    s.resetProof();
+    expect(s.getState().proof).toBeNull();
+  });
+
+  it("legitimate sample → 'Looks legitimate' and no share warning", async () => {
+    const s = await demoSession();
+    await s.startProof(PROOF_SAMPLES[2]!.message);
+    expect(s.getState().proof!.result!.verdict).toBe("looksLegit");
+    expect(s.proofShareText()).toBeNull();
+  });
+
+  it("offline → tactics-only card, nothing sent", async () => {
+    const services = await createServices("?demo=1");
+    const s = new AirlockSession({ ...services, online: () => false }, { dial: "balanced", preference: "auto", onboarded: true, backup: false });
+    await s.load();
+    const before = s.ledger.receipts.length;
+    await s.startProof(PROOF_SAMPLES[0]!.message);
+    const r = s.getState().proof!.result!;
+    expect(r.mode).toBe("offline");
+    expect(r.flags.length).toBeGreaterThanOrEqual(3);
+    expect(s.ledger.receipts.length).toBe(before);
+  });
+});
 
 const SAMPLE = "Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I work nights at Mercy General Hospital. You can reach me on 312-555-0147. Thanks, Maya Chen";
 
