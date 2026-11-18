@@ -42,7 +42,7 @@ Quick tasks (summaries, rewrites, explanations) can be answered by the on-device
 - **Hybrid inference everywhere.** Apple Foundation Models (iOS/macOS, `firebase-ios-sdk` 12.19.0), Chrome's built-in Gemini Nano (web, `firebase` 13.3.0) and Gemini Nano via ML Kit / AICore (Android, `firebase-ai` 18.2.0 + `firebase-ai-ondevice`), each with Gemini in the cloud — all through Firebase AI Logic.
 - **Cloud answers degrade gracefully.** A first-chunk guard and a model fallback chain (planned model → stable fallback → one unary call) keep answers coming when a model is overloaded; the badge always names the model that actually answered.
 
-## Privacy guarantees (enforced in code, not just promised)
+## Privacy invariants (enforced in code, not just promised)
 
 | | Guarantee | How it's enforced |
 |---|---|---|
