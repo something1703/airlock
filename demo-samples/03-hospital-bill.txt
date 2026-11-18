@@ -1,0 +1,6 @@
+Statement for: Daniel Okafor   Account #: 88213-4471   Date of service: 09/14/2026
+Provider: Riverside Community Clinic, 1200 Harbor Rd
+Procedure: MRI lumbar spine w/o contrast (CPT 72148) ... $2,840.00
+Insurance (Claim No. CLM-55190372) paid ........... $1,120.00
+Patient responsibility ............................ $1,720.00
+Questions? Call billing at 415-555-0199 or email billing@example.org. Payment due by 11/30/2026.
