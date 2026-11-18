@@ -57,9 +57,9 @@ Full list: [`AGENTS.md`](AGENTS.md) §2.
 
 ## Evidence
 
-- **Tests:** Swift package (150), web (259), Kotlin core (80) + Android app (48), Firestore rules & Cloud Functions in the emulator (14), benchmark scorer (34) — all in CI on every push.
+- **Tests:** Swift package (155), web (259), Kotlin core (80) + Android app (48), Firestore rules & Cloud Functions in the emulator (14), benchmark scorer (34) — all in CI on every push.
 - **Conformance:** one fixture suite, three implementations, byte-identical placeholders, legends and hash chains.
-- **Benchmark:** AirlockBench (`eval/`) measures leak rate, over-redaction and answer utility. Published numbers come only from the final run on the evaluation project — never from mock runs. The web and Android apps show the latest report under **Settings → How Airlock is tested** (tiles with 95% intervals and a per-layer leak-rate chart); until the final run, it shows the mock report under a "MOCK RUN" banner.
+- **Benchmark:** AirlockBench (`eval/`) measures leak rate, over-redaction and answer utility. Published numbers come only from the final run on the evaluation project — never from mock runs. The web, iPhone/Mac and Android apps show the latest report under **Settings → How Airlock is tested** (tiles with 95% intervals and a per-layer leak-rate chart); until the final run, it shows the mock report under a "MOCK RUN" banner.
 
 ---
 
