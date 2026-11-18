@@ -357,4 +357,41 @@
     <string name="settings_delete_body">Removes your Vault, conversations, receipts and the encryption key from this phone.</string>
     <string name="settings_delete_button">Delete everything…</string>
     <string name="settings_delete_confirm">Yes, delete everything</string>
+    <string name="settings_evidence_title">How Airlock is tested</string>
+    <string name="settings_evidence_body">AirlockBench: leak rate, names caught, answer quality — and what we still miss.</string>
+
+    <!-- Evidence (docs/06-UI-UX.md §5.12) -->
+    <string name="ev_title">How Airlock is tested</string>
+    <string name="ev_sub">AirlockBench runs the same privacy engine on synthetic documents — fictional people, places and numbers — and measures what still gets through.</string>
+    <string name="ev_none">No benchmark results are bundled with this build yet.</string>
+    <string name="ev_mock_fallback">MOCK RUN — not real model results</string>
+    <string name="ev_mock_body">These numbers come from scripted stand-in models, to show what the report looks like. Real results are published here after the final evaluation run.</string>
+    <string name="ev_leak">Leak rate</string>
+    <string name="ev_leak_def">Share of documents where at least one direct identifier (name, address, number) left the device.</string>
+    <string name="ev_names">Names caught</string>
+    <string name="ev_names_def">Share of all personal names in the documents that were sealed before anything was sent.</string>
+    <string name="ev_quality">Answer quality</string>
+    <string name="ev_quality_def">Answers judged as good as or better than sending the raw text unprotected.</string>
+    <string name="ev_device">Quick tasks on device</string>
+    <string name="ev_device_def">Quick tasks answered entirely on the device — nothing sent at all.</string>
+    <string name="ev_lower">lower is better</string>
+    <string name="ev_higher">higher is better</string>
+    <!-- 1: interval low, 2: interval high, 3: n, 4: "lower/higher is better" -->
+    <string name="ev_interval">95%% interval %1$s–%2$s · n = %3$d · %4$s</string>
+    <!-- 1: label, 2: value, 3: low, 4: high, 5: n, 6: better, 7: definition -->
+    <string name="ev_tile_a11y">%1$s: %2$s. 95%% interval %3$s to %4$s, sample size %5$d, %6$s. %7$s</string>
+    <string name="ev_mock_a11y">Mock run.</string>
+    <string name="ev_chart_title">Each layer lowers the leak rate</string>
+    <string name="ev_chart_sub" formatted="false">Same documents, one layer added at a time. Bars show the leak rate; whiskers its 95% interval.</string>
+    <!-- 1: "Rules 98%, +On-device model 42%, …" -->
+    <string name="ev_chart_a11y">Leak rate by configuration: %1$s</string>
+    <!-- 1: label, 2: value, 3: low, 4: high -->
+    <string name="ev_chart_row_a11y">%1$s %2$s (95%% interval %3$s to %4$s)</string>
+    <string name="ev_misses_title">What we still miss</string>
+    <string name="ev_misses_note">Every miss above is from a synthetic document. This is why Review always shows you exactly what will leave, and why “Protect this” exists.</string>
+    <!-- 1: n, 2: languages, 3: date, 4: dataset, 5: split -->
+    <plurals name="ev_footer">
+        <item quantity="one">Measured on %1$d synthetic document in %2$s on %3$s (%4$s, %5$s split). Method and code:</item>
+        <item quantity="other">Measured on %1$d synthetic documents in %2$s on %3$s (%4$s, %5$s split). Method and code:</item>
+    </plurals>
 </resources>

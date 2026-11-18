@@ -46,6 +46,40 @@ android {
 
 kotlin { jvmToolchain(21) }
 
+/**
+ * AirlockBench reports for the Evidence screen: eval/reports/<run>/evidence.json → Java resources
+ * `airlock/evidence/<run>.json`, plus `index.txt` (run ids, sorted) because resources can't be listed on Android.
+ * Same idea as :core's copy of the pattern packs and prompts — one source of truth, read at build time.
+ */
+abstract class BundleEvidence : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val reports: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun bundle() {
+        val dir = outputDir.get().asFile.resolve("airlock/evidence")
+        dir.deleteRecursively()
+        dir.mkdirs()
+        val runs = reports.files.filter { it.isFile && it.name == "evidence.json" }.sortedBy { it.parentFile.name }
+        for (f in runs) f.copyTo(dir.resolve("${f.parentFile.name}.json"), overwrite = true)
+        dir.resolve("index.txt").writeText(runs.joinToString("") { it.parentFile.name + "\n" })
+    }
+}
+
+val bundleEvidence by tasks.registering(BundleEvidence::class) {
+    reports.from(fileTree(rootDir.resolve("../eval/reports")) { include("*/evidence.json") })
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.resources?.addGeneratedSourceDirectory(bundleEvidence, BundleEvidence::outputDir)
+    }
+}
+
 dependencies {
     implementation(project(":core"))
 

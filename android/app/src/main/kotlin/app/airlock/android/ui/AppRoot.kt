@@ -72,6 +72,7 @@ import app.airlock.android.R
 import app.airlock.android.session.AirlockSession
 import app.airlock.android.session.Screen
 import app.airlock.android.ui.screens.AskScreen
+import app.airlock.android.ui.screens.EvidenceScreen
 import app.airlock.android.ui.screens.LedgerScreen
 import app.airlock.android.ui.screens.Onboarding
 import app.airlock.android.ui.screens.ReviewScreen
@@ -110,6 +111,7 @@ fun AppRoot(session: AirlockSession) {
         BackHandler(enabled = s.screen != Screen.ASK) {
             when (s.screen) {
                 Screen.REVIEW -> session.cancelReview()
+                Screen.EVIDENCE -> session.go(Screen.SETTINGS)
                 else -> session.go(Screen.ASK)
             }
         }
@@ -140,6 +142,7 @@ fun AppRoot(session: AirlockSession) {
                             Screen.LEDGER -> LedgerScreen(session, s)
                             Screen.VAULT -> VaultScreen(session, s)
                             Screen.SETTINGS -> SettingsScreen(session, s)
+                            Screen.EVIDENCE -> EvidenceScreen(session)
                             Screen.ONBOARDING -> {}
                         }
                     }
@@ -156,7 +159,12 @@ fun AppRoot(session: AirlockSession) {
                     door = false
                 }
             }
-            BottomBar(if (s.screen == Screen.REVIEW || s.screen == Screen.THREAD) Screen.ASK else s.screen) { session.go(it) }
+            val tab = when (s.screen) {
+                Screen.REVIEW, Screen.THREAD -> Screen.ASK
+                Screen.EVIDENCE -> Screen.SETTINGS
+                else -> s.screen
+            }
+            BottomBar(tab) { session.go(it) }
         }
     }
 }

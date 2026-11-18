@@ -32,6 +32,7 @@ import app.airlock.android.LocalAirlock
 import app.airlock.android.R
 import app.airlock.android.session.AirlockSession
 import app.airlock.android.session.AppMode
+import app.airlock.android.session.Screen
 import app.airlock.android.session.State
 import app.airlock.android.ui.AirButton
 import app.airlock.android.ui.AirlockIcons
@@ -149,13 +150,14 @@ fun SettingsScreen(session: AirlockSession, s: State) {
             )
             Small(stringResource(R.string.settings_pref_note))
         }
-        Card(Modifier.enter(2)) {
+        EvidenceLink({ session.go(Screen.EVIDENCE) }, Modifier.enter(2))
+        Card(Modifier.enter(3)) {
             H2(stringResource(R.string.settings_honest_title))
             Small(stringResource(R.string.settings_honest))
             Small(stringResource(R.string.settings_storage, session.services.config.rawPurgeDays))
             Small(stringResource(if (session.services.mode == AppMode.LIVE) R.string.settings_mode_live else R.string.settings_mode_demo))
         }
-        Card(Modifier.enter(3)) {
+        Card(Modifier.enter(4)) {
             H2(stringResource(R.string.settings_delete_title))
             Small(stringResource(R.string.settings_delete_body))
             AnimatedContent(confirm, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) }, label = "confirm") { asking ->
