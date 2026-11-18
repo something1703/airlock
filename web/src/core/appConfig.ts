@@ -33,6 +33,7 @@ export const DEFAULTS: Record<string, ConfigValue> = {
   armor_force_unary: { type: "BOOLEAN", value: false },
   cloud_first_chunk_ms: { type: "NUMBER", value: 15000 },
   cloud_timeout_ms: { type: "NUMBER", value: 90000 },
+  tool_max_rounds: { type: "NUMBER", value: 3 },
 };
 
 /** Remote Config's string form of a value. */
@@ -86,6 +87,10 @@ export class AppConfig {
   get cloudFirstChunkMs(): number { return Math.max(1000, this.int("cloud_first_chunk_ms")); }
   /** Hard limit for one cloud answer. */
   get cloudTimeoutMs(): number { return Math.max(5000, this.int("cloud_timeout_ms")); }
+  /** Private tools: rounds of tool calls per answer (each round may hold parallel calls). Clamped 1–5. */
+  get toolMaxRounds(): number { return Math.min(Math.max(1, this.int("tool_max_rounds")), 5); }
+  /** The calendar free-time tool (on the web: a user-imported .ics only). */
+  get calendarToolEnabled(): boolean { return this.bool("feature_tools_calendar"); }
   get disabledPatternPacks(): Set<string> {
     try {
       const arr: unknown = JSON.parse(this.string("pattern_packs_disabled"));

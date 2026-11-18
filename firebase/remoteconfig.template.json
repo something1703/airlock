@@ -202,6 +202,13 @@
       },
       "description": "Stable cloud model used when the planned one stalls or is overloaded before answering",
       "valueType": "STRING"
+    },
+    "tool_max_rounds": {
+      "defaultValue": {
+        "value": "3"
+      },
+      "description": "Private tools: max rounds of on-device tool calls per answer before Gemini must answer",
+      "valueType": "NUMBER"
     }
   }
 }

@@ -20,6 +20,10 @@ import type { SealDraft } from "../engine/sealer";
 import type { SyncBatch } from "../ai/sync";
 import { assistantTurnDto, receiptDto, threadDto, userTurnDto, type ReceiptDto } from "./syncDto";
 import type { PrivacyCategory, Route } from "../engine/types";
+import type { ToolName } from "../engine/engines";
+import { CalendarTool, DateContextTool, EntityRoleTool, parseIcs, type CalendarData, type ConsentBroker, type ConsentDecision, type ConsentRequest, type PrivateTool, type ToolActivity } from "../engine/tools";
+import type { ToolSetup } from "../engine/answer";
+import { sampleCalendarIcs } from "./sampleCalendar";
 
 export type Screen = "onboarding" | "ask" | "review" | "thread" | "ledger" | "vault" | "settings";
 
@@ -29,6 +33,21 @@ export interface Prefs {
   onboarded: boolean;
   /** Back up sealed history (only turns that already went to Gemini) to Firestore. */
   backup: boolean;
+  /** Private tools the user chose "Always allow" for (no consent card). */
+  toolsAlwaysAllow: ToolName[];
+}
+
+/** What the UI shows about the imported calendar (never its contents). */
+export interface CalendarInfo {
+  events: number;
+  skipped: number;
+  importedAt: number;
+  sample: boolean;
+}
+
+/** A tool call waiting for the user's decision (shown as a consent card in its conversation). */
+export interface PendingConsent extends ConsentRequest {
+  threadId: string;
 }
 
 export interface UserTurn {
@@ -51,6 +70,8 @@ export interface AssistantTurn {
   error: string | null;
   /** F-27: the text the user pasted (placeholders) before restore. */
   pasted?: string;
+  /** Private tool calls made for this answer. */
+  tools: ToolActivity[];
 }
 export interface Thread {
   id: string;
@@ -88,10 +109,12 @@ export interface State {
   currentThreadId: string | null;
   review: Review | null;
   chain: ChainVerification | null;
+  calendar: CalendarInfo | null;
+  consents: PendingConsent[];
 }
 
 const prefsKey = (mode: string): string => (mode === "demo" ? "airlock.prefs.demo.v1" : "airlock.prefs.v1");
-const defaultPrefs: Prefs = { dial: "balanced", preference: "auto", onboarded: false, backup: true };
+const defaultPrefs: Prefs = { dial: "balanced", preference: "auto", onboarded: false, backup: true, toolsAlwaysAllow: [] };
 
 function loadPrefs(mode: string): Prefs {
   try {
@@ -132,8 +155,9 @@ export class AirlockSession {
   private readonly listeners = new Set<() => void>();
   readonly ledger: ReceiptLedger;
 
-  constructor(readonly services: Services, prefs: Prefs = loadPrefs(services.mode)) {
-    this.state = { screen: prefs.onboarded ? "ask" : "onboarding", prefs, availability: "checking", downloadProgress: null, vault: [], threads: [], currentThreadId: null, review: null, chain: null };
+  constructor(readonly services: Services, initialPrefs: Partial<Prefs> = loadPrefs(services.mode)) {
+    const prefs: Prefs = { ...defaultPrefs, ...initialPrefs };
+    this.state = { screen: prefs.onboarded ? "ask" : "onboarding", prefs, availability: "checking", downloadProgress: null, vault: [], threads: [], currentThreadId: null, review: null, chain: null, calendar: null, consents: [] };
     this.ledger = new ReceiptLedger([], (r) => services.stores.saveReceipt(r));
   }
 
@@ -168,6 +192,8 @@ export class AirlockSession {
     const [vault, receipts] = await Promise.all([this.services.stores.loadVault(), this.services.stores.receipts()]);
     this.ledger.receipts.push(...receipts);
     this.set({ vault, threads: await this.loadThreads(vault) });
+    const cal = await this.services.stores.loadCalendar().catch(() => null);
+    if (cal) this.setCalendar(cal.data, cal.sample);
     await this.services.stores.purgeCaptures(this.services.config.rawPurgeDays);
     await this.refreshAvailability();
   }
@@ -215,6 +241,85 @@ export class AirlockSession {
   async saveVault(vault: VaultEntry[]): Promise<void> {
     await this.services.stores.saveVault(vault);
     this.set({ vault });
+  }
+
+  // MARK: Private tools
+
+  private calendarData: CalendarData | null = null;
+  private readonly consentWaiters = new Map<string, (d: ConsentDecision) => void>();
+
+  private setCalendar(data: CalendarData | null, sample: boolean): void {
+    this.calendarData = data;
+    this.set({ calendar: data ? { events: data.events.length, skipped: data.skipped, importedAt: data.importedAt, sample } : null });
+  }
+
+  /**
+   * Imports an .ics file's text. Parsed here; only busy times are kept (titles, places and people are never
+   * read) and stored encrypted on this device. Nothing is uploaded. Returns false if no events were found.
+   */
+  async importCalendar(icsText: string, sample = false): Promise<boolean> {
+    const data = parseIcs(icsText);
+    if (data.events.length === 0) return false;
+    await this.services.stores.saveCalendar({ data, sample });
+    this.setCalendar(data, sample);
+    return true;
+  }
+
+  /** Loads the built-in fictional calendar (for trying "Propose a meeting time"). */
+  useSampleCalendar(): Promise<boolean> {
+    return this.importCalendar(sampleCalendarIcs(), true);
+  }
+
+  async removeCalendar(): Promise<void> {
+    await this.services.stores.deleteCalendar();
+    this.setCalendar(null, false);
+  }
+
+  /** The consent card's buttons. "Always" also skips the card for this tool from now on. */
+  answerConsent(id: string, decision: ConsentDecision, always = false): void {
+    const pending = this.state.consents.find((c) => c.id === id);
+    if (always && pending && decision === "allow" && !this.state.prefs.toolsAlwaysAllow.includes(pending.tool)) {
+      this.setPrefs({ toolsAlwaysAllow: [...this.state.prefs.toolsAlwaysAllow, pending.tool] });
+    }
+    this.set({ consents: this.state.consents.filter((c) => c.id !== id) });
+    const waiter = this.consentWaiters.get(id);
+    this.consentWaiters.delete(id);
+    waiter?.(decision);
+  }
+
+  resetAlwaysAllow(): void {
+    this.setPrefs({ toolsAlwaysAllow: [] });
+  }
+
+  private consentBroker(threadId: string): ConsentBroker {
+    return {
+      request: (req) =>
+        new Promise<ConsentDecision>((resolve) => {
+          const id = `${threadId}:${req.id}:${crypto.randomUUID().slice(0, 8)}`;
+          this.consentWaiters.set(id, resolve);
+          this.set({ consents: [...this.state.consents, { ...req, id, threadId }] });
+        }),
+    };
+  }
+
+  /** Pending cards of a thread are declined when its answer ends or the thread goes away. */
+  private dropConsents(threadId: string): void {
+    for (const c of this.state.consents.filter((x) => x.threadId === threadId)) this.answerConsent(c.id, "deny");
+  }
+
+  /** Tools for an answer: dates and roles always; free time only with an imported calendar and the flag on. Never offline. */
+  private toolSetup(threadId: string, entities: EntityMap): ToolSetup | undefined {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return undefined;
+    const tools: PrivateTool[] = [DateContextTool, EntityRoleTool];
+    if (this.calendarData && this.services.config.calendarToolEnabled) tools.push(CalendarTool);
+    return {
+      tools,
+      context: { now: Date.now(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", entities, calendar: this.calendarData },
+      gate: new EgressGate(this.services.patterns, this.state.vault),
+      broker: this.consentBroker(threadId),
+      maxRounds: this.services.config.toolMaxRounds,
+      alwaysAllow: new Set(this.state.prefs.toolsAlwaysAllow),
+    };
   }
 
   // MARK: Seal
@@ -334,7 +439,7 @@ export class AirlockSession {
     await this.services.stores.saveEntities(threadId, entities);
     const history = historyOf(this.state.threads.find((t) => t.id === threadId));
     const stored: StoredSealed = { text: draft.text, legend: [...draft.legend], revealedVaultIds: [...draft.revealedVaultIds], keptValues: [...draft.keptValues] };
-    this.setThread(threadId, (t) => ({ ...t, entities, turns: [...t.turns, { kind: "user", raw: r.raw, display: sealed.value, sealed, stored }, { kind: "assistant", task: r.task, status: "streaming", text: "", segments: [], outcome: null, error: null }] }));
+    this.setThread(threadId, (t) => ({ ...t, entities, turns: [...t.turns, { kind: "user", raw: r.raw, display: sealed.value, sealed, stored }, { kind: "assistant", task: r.task, status: "streaming", text: "", segments: [], outcome: null, error: null, tools: [] }] }));
     this.set({ review: null, currentThreadId: threadId, screen: "thread" });
     await this.stream(threadId, sealed, r.task, entities, history, r.result.sealMs);
     if (isNew) await this.nameThread(threadId, sealed);
@@ -422,7 +527,7 @@ export class AirlockSession {
     if (!t || !text.trim()) return;
     const me = this.state.vault.find((v) => v.isUser);
     const restored = restore(text, { entities: t.entities, userFirstName: me?.canonical.split(" ")[0] ?? null, writingAsUser: writesAsUser(t.task) });
-    this.setThread(threadId, (x) => ({ ...x, turns: [...x.turns, { kind: "assistant", task: t.task, status: "done", text: restored.text, segments: restored.segments, outcome: null, error: null, pasted: text }] }));
+    this.setThread(threadId, (x) => ({ ...x, turns: [...x.turns, { kind: "assistant", task: t.task, status: "done", text: restored.text, segments: restored.segments, outcome: null, error: null, pasted: text, tools: [] }] }));
     await this.persistThread(threadId);
   }
 
@@ -445,7 +550,7 @@ export class AirlockSession {
       else if (turn.status !== "streaming")
         turns.push({
           kind: "assistant", task: turn.task, status: turn.status, modelText: turn.outcome?.modelText ?? turn.pasted ?? "", error: turn.error,
-          outcome: turn.outcome ? { route: turn.outcome.route, modelVersion: turn.outcome.modelVersion, ranOnDevice: turn.outcome.ranOnDevice, fellBackToPhone: turn.outcome.fellBackToPhone, latencyMs: turn.outcome.latencyMs, receiptId: turn.outcome.receipt?.id ?? null } : null,
+          outcome: turn.outcome ? { route: turn.outcome.route, modelVersion: turn.outcome.modelVersion, ranOnDevice: turn.outcome.ranOnDevice, fellBackToPhone: turn.outcome.fellBackToPhone, latencyMs: turn.outcome.latencyMs, receiptId: turn.outcome.receipt?.id ?? null, ...(turn.tools.length ? { tools: turn.tools } : {}) } : null,
         });
     }
     try {
@@ -482,7 +587,7 @@ export class AirlockSession {
           const restored = restore(st.modelText, ctx);
           const o = st.outcome;
           turns.push({
-            kind: "assistant", task: st.task, status: st.status, text: restored.text, segments: restored.segments, error: st.error, ...(st.outcome ? {} : { pasted: st.modelText }),
+            kind: "assistant", task: st.task, status: st.status, text: restored.text, segments: restored.segments, error: st.error, tools: st.outcome?.tools ?? [], ...(st.outcome ? {} : { pasted: st.modelText }),
             outcome: o ? { modelText: st.modelText, restored, fidelity: fidelityCheck(st.modelText, ctx), route: o.route, modelVersion: o.modelVersion, ranOnDevice: o.ranOnDevice, fellBackToPhone: o.fellBackToPhone, latencyMs: o.latencyMs, receipt: this.ledger.receipts.find((x) => x.id === o.receiptId) ?? null } : null,
           });
         }
@@ -494,6 +599,7 @@ export class AirlockSession {
 
   /** Deletes a conversation, its entity map and captures. Its receipts stay: the chain must stay verifiable. */
   async deleteThread(id: string): Promise<void> {
+    this.dropConsents(id);
     await this.services.stores.deleteThread(id);
     void this.services.sync?.deleteThread(id).catch(() => {});
     this.set({ threads: this.state.threads.filter((t) => t.id !== id), ...(this.state.currentThreadId === id ? { currentThreadId: null, screen: "ask" as Screen } : {}) });
@@ -512,13 +618,16 @@ export class AirlockSession {
       for await (const ev of answer({
         engines: this.services.engines, prompts: this.services.prompts, ledger: this.ledger, sealed, task, history: history.turns.length ? history : undefined,
         restore: { entities, userFirstName: me?.canonical.split(" ")[0] ?? null }, preference: this.state.prefs.preference, threadId, sealMs,
-        armorExpected: this.services.config.armorExpected,
+        armorExpected: this.services.config.armorExpected, tools: this.toolSetup(threadId, entities),
       })) {
         if (ev.kind === "partial") updateLast({ text: ev.text, segments: ev.segments });
-        if (ev.kind === "finished") updateLast({ status: "done", outcome: ev.outcome, text: ev.outcome.restored.text, segments: ev.outcome.restored.segments });
+        if (ev.kind === "tools") updateLast({ tools: ev.activity });
+        if (ev.kind === "finished") updateLast({ status: "done", outcome: ev.outcome, text: ev.outcome.restored.text, segments: ev.outcome.restored.segments, tools: ev.outcome.tools ?? [] });
       }
     } catch (e) {
       updateLast({ status: "error", error: engineErrorMessage(e) });
+    } finally {
+      this.dropConsents(threadId);
     }
   }
 
@@ -541,7 +650,9 @@ export class AirlockSession {
     } catch {
       // ignore
     }
-    this.set({ vault: [], threads: [], currentThreadId: null, review: null, chain: null, prefs: defaultPrefs, screen: "onboarding" });
+    for (const c of this.state.consents) this.answerConsent(c.id, "deny");
+    this.calendarData = null;
+    this.set({ vault: [], threads: [], currentThreadId: null, review: null, chain: null, calendar: null, consents: [], prefs: defaultPrefs, screen: "onboarding" });
   }
 }
 

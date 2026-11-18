@@ -100,6 +100,7 @@ class AppConfig(remote: Map<String, String> = emptyMap()) {
             "armor_force_unary" to ConfigValue.Bool(false),
             "cloud_first_chunk_ms" to ConfigValue.Num(15000.0),
             "cloud_timeout_ms" to ConfigValue.Num(90000.0),
+            "tool_max_rounds" to ConfigValue.Num(3.0),
         )
 
         /** Defaults as Remote Config strings (for `setDefaultsAsync`). */

@@ -175,6 +175,13 @@ Declared with `FunctionDeclaration`. Descriptions matter — the model reads the
 
 Rules: every tool call shows a consent card unless the user ticked "Always allow" for that tool. Every result passes the egress gate. Tool config mode `AUTO`.
 
+**As built on the web (WP-17, 18 Nov)** — declarations in `web/src/engine/tools.ts` (`TOOL_DECLARATIONS`):
+- `today_context` returns `{"today","weekday","this_week","next_week","upcoming":[14 days]}` and **no time zone**: a zone name is a location quasi-identifier, and dates in the user's zone are all the model needs. Description updated to say so.
+- `find_free_slots` reads only a user-imported `.ics` (parsed in the browser; SUMMARY/LOCATION/ATTENDEE are never read), Mon–Fri 9:00–17:00 local, never within 1 h of now, ≤ 31 days, 15–240 min, 1–5 results, one slot per day first. Returns `{"slots":[…],"duration_minutes","note"}`. Not declared at all when no calendar is imported.
+- `get_entity_role` returns `{"placeholder","kind","role"}` from the entity's role hint, rewritten to third person ("my landlord" → "the user's landlord").
+- Refusal `{"error":"user_declined"}` (a declined tool is auto-declined for the rest of that answer); gate block `{"error":"withheld",…}`; round limit (`tool_max_rounds`, default 3) `{"error":"tool_limit_reached",…}`. All of these pass the gate too.
+- "Propose a meeting time" reuses `task.reply.v1` with tone `friendly and clear, proposing 2 specific meeting times that work for me` (no new prompt id); `tools-addendum.v1` is appended to `cloud-system.v1` as the system instruction.
+
 Tool-loop system addendum (`tools-addendum.v1`):
 
 ```

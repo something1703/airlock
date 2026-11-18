@@ -5,6 +5,7 @@ import { EntityMap, type Entity, type LegendLine, type Route } from "../engine/t
 import type { TaskKind } from "../engine/answer";
 import type { Receipt } from "../engine/hashchain";
 import type { VaultEntry } from "../engine/vault";
+import type { CalendarData, ToolActivity } from "../engine/tools";
 
 export class StoreError extends Error {
   constructor(readonly code: "decryptionFailed" | "notFound" | "invalidName" | "io" | "unsupportedVersion") {
@@ -148,6 +149,13 @@ export interface StoredOutcome {
   fellBackToPhone: boolean;
   latencyMs: number;
   receiptId: string | null;
+  /** Private tool calls (the gate-checked JSON that was returned to Gemini). */
+  tools?: ToolActivity[];
+}
+export interface StoredCalendar {
+  data: CalendarData;
+  /** The built-in fictional calendar rather than a user file. */
+  sample: boolean;
 }
 export type StoredTurn =
   | { kind: "user"; raw: string; sealed: StoredSealed }
@@ -246,6 +254,23 @@ export class AirlockStores {
     await this.store.delete(`thread-${safe(thread)}`);
     await this.store.delete(`entities-${safe(thread)}`);
     for (const c of await this.captures()) if (c.threadId === thread) await this.store.delete(`capture-${safe(c.id)}`);
+  }
+
+  /** The imported calendar's busy blocks only (no titles, places or people — see `parseIcs`). Never synced. */
+  saveCalendar(cal: StoredCalendar): Promise<void> {
+    return this.store.writeJson("calendar", cal);
+  }
+  async loadCalendar(): Promise<StoredCalendar | null> {
+    try {
+      const c = await this.store.readJson<StoredCalendar>("calendar");
+      return c.data?.v === 1 ? c : null;
+    } catch (e) {
+      if (e instanceof StoreError && (e.code === "notFound" || e.code === "decryptionFailed")) return null;
+      throw e;
+    }
+  }
+  deleteCalendar(): Promise<void> {
+    return this.store.delete("calendar");
   }
 
   saveReceipt(r: Receipt): Promise<void> {

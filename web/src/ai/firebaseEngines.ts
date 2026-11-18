@@ -1,10 +1,14 @@
 // The ONLY web code that calls Firebase AI Logic (lint-enforced, ADR-08).
-import { AgentPlatformBackend, getAI, getGenerativeModel, GoogleAIBackend, InferenceMode, InferenceSource, type AI, type GenerativeModel } from "firebase/ai";
+import {
+  AgentPlatformBackend, FunctionCallingMode, getAI, getGenerativeModel, GoogleAIBackend, InferenceMode, InferenceSource,
+  type AI, type ChatSession, type FunctionDeclaration, type FunctionResponsePart, type GenerativeModel,
+} from "firebase/ai";
 import type { FirebaseApp } from "firebase/app";
 import type { AppConfig } from "../core/appConfig";
 import {
   CHROME_ON_DEVICE_MODEL, EngineError, type AnswerQuality, type EngineChunk, type EngineProvider, type EngineResult, type PhoneAvailability,
-  type PhoneOnlyEngine, type PhoneOptions, type PhonePrompt, type SealedEngine, type SealedHistory, type TaskSpec,
+  type PhoneOnlyEngine, type PhoneOptions, type PhonePrompt, type SealedEngine, type SealedHistory, type SealedToolResponse, type TaskSpec,
+  type ToolCall, type ToolChat, type ToolDeclaration, type ToolEngine, type ToolTurn,
 } from "../engine/engines";
 import type { PromptLibrary } from "../engine/prompts";
 import type { Route, SealedText } from "../engine/types";
@@ -65,6 +69,24 @@ export class FirebaseEngines implements EngineProvider {
 
   sealed(route: Route, quality: AnswerQuality): SealedEngine {
     return new FirebaseSealedEngine(this, planFor(route, this.config, quality));
+  }
+
+  /** Function calling for private tools. Always ONLY_IN_CLOUD: the SDK never sends function responses on device. */
+  tools(quality: AnswerQuality): ToolEngine {
+    return new FirebaseToolEngine(this, planFor("cloudOnly", this.config, quality));
+  }
+
+  /** A cloud-only model that may call the declared tools (`FunctionCallingMode.AUTO`, no automatic execution). */
+  toolModel(cloudModel: string, systemInstruction: string, declarations: readonly ToolDeclaration[], maxOutputTokens?: number): GenerativeModel {
+    return getGenerativeModel(this.ai, {
+      mode: InferenceMode.ONLY_IN_CLOUD,
+      inCloudParams: {
+        model: cloudModel, systemInstruction,
+        tools: [{ functionDeclarations: declarations.map(toFunctionDeclaration) }],
+        toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } },
+        ...(maxOutputTokens ? { generationConfig: { maxOutputTokens } } : {}),
+      },
+    });
   }
 
   /** Must be called from a user gesture (click/keypress): may trigger Chrome's model download. */
@@ -222,6 +244,116 @@ class FirebaseSealedEngine implements SealedEngine {
       const err = mapError(e);
       if (err.isTransientCloud) return "skip";
       throw err;
+    } finally {
+      clearTimeout(firstTimer);
+      clearTimeout(totalTimer);
+    }
+  }
+}
+
+/**
+ * Our plain declaration → the SDK's `FunctionDeclaration`. No `functionReference`: the SDK must never run a
+ * tool itself (that would skip consent and the egress gate) — `ChatSession` only auto-calls functions that
+ * have one (verified in @firebase/ai 3.1.0 `_getCallableFunctionCalls`).
+ */
+export function toFunctionDeclaration(d: ToolDeclaration): FunctionDeclaration {
+  if (!d.parameters) return { name: d.name, description: d.description };
+  const properties = Object.fromEntries(Object.entries(d.parameters.properties).map(([k, p]) => [k, { type: p.type, description: p.description }]));
+  return { name: d.name, description: d.description, parameters: { type: "object", properties, required: [...d.parameters.required] } };
+}
+
+/** Sealed JSON → the `response` object of a FunctionResponse (always an object, as the API requires). */
+export function functionResponsePart(r: SealedToolResponse): FunctionResponsePart {
+  let response: object;
+  try {
+    const v: unknown = JSON.parse(r.sealed.value);
+    response = v && typeof v === "object" && !Array.isArray(v) ? v : { result: v };
+  } catch {
+    response = { result: r.sealed.value };
+  }
+  return { type: "functionResponse", functionResponse: { ...(r.id ? { id: r.id } : {}), name: r.name, response } };
+}
+
+class FirebaseToolEngine implements ToolEngine {
+  constructor(
+    private readonly engines: FirebaseEngines,
+    private readonly plan: WebModelPlan,
+  ) {}
+  get route(): Route {
+    return this.plan.route;
+  }
+  chat(declarations: readonly ToolDeclaration[], addendum: string): ToolChat {
+    return new FirebaseToolChat(this.engines, this.plan, declarations, addendum);
+  }
+}
+
+/**
+ * One `ChatSession` per sealed request (INV-4). The SDK keeps the model's own parts — including Gemini 3
+ * thought signatures — in chat history, which multi-turn function calling needs. The first turn may fall
+ * back to `model_cloud_fallback` (nothing has been said yet); later turns stay on the model that started.
+ */
+class FirebaseToolChat implements ToolChat {
+  private session: ChatSession | null = null;
+  private model = "";
+
+  constructor(
+    private readonly engines: FirebaseEngines,
+    private readonly plan: WebModelPlan,
+    private readonly declarations: readonly ToolDeclaration[],
+    private readonly addendum: string,
+  ) {}
+
+  async send(sealed: SealedText, task: TaskSpec, history: SealedHistory | undefined, onText?: (t: string) => void): Promise<ToolTurn> {
+    const text = this.engines.prompts.cloudUserTurn(sealed, task, history);
+    const system = `${this.engines.prompts.template(this.plan.instructionsId)}\n\n${this.addendum}`;
+    let last: EngineError | null = null;
+    for (const model of [...new Set([this.plan.cloudModel, this.engines.config.modelCloudFallback])]) {
+      const chat = this.engines.toolModel(model, system, this.declarations, task.maxOutputTokens).startChat();
+      try {
+        const turn = await this.turn(chat, text, model, onText, true);
+        this.session = chat;
+        this.model = model;
+        return turn;
+      } catch (e) {
+        last = mapError(e);
+        if (!last.isTransientCloud) throw last;
+      }
+    }
+    throw last ?? new EngineError("serviceUnavailable");
+  }
+
+  async respond(results: readonly SealedToolResponse[], onText?: (t: string) => void): Promise<ToolTurn> {
+    if (!this.session) throw new EngineError("other", "respond-before-send");
+    return this.turn(this.session, results.map(functionResponsePart), this.model, onText, false);
+  }
+
+  private async turn(chat: ChatSession, request: string | FunctionResponsePart[], model: string, onText: ((t: string) => void) | undefined, guardFirstChunk: boolean): Promise<ToolTurn> {
+    const cfg = this.engines.config;
+    const ctl = new AbortController();
+    let gotChunk = false;
+    let stalled = false;
+    const firstTimer = guardFirstChunk ? setTimeout(() => { if (!gotChunk) { stalled = true; ctl.abort(); } }, cfg.cloudFirstChunkMs) : undefined;
+    const totalTimer = setTimeout(() => ctl.abort(), cfg.cloudTimeoutMs);
+    try {
+      const { stream, response } = await chat.sendMessageStream(request, { signal: ctl.signal, timeout: cfg.cloudTimeoutMs });
+      response.catch(() => {});
+      let acc = "";
+      for await (const chunk of stream) {
+        gotChunk = true;
+        const t = chunk.text();
+        if (t) {
+          acc += t;
+          onText?.(acc);
+        }
+      }
+      const final = await response;
+      if (final.inferenceSource === InferenceSource.ON_DEVICE) throw new EngineError("other", "tool-turn-on-device");
+      const calls: ToolCall[] = (final.functionCalls() ?? []).map((c) => ({ ...(c.id ? { id: c.id } : {}), name: c.name, args: (c.args && typeof c.args === "object" ? c.args : {}) as Record<string, unknown> }));
+      return { text: acc || final.text(), calls, modelVersion: model, ranOnDevice: false };
+    } catch (e) {
+      if (stalled || (ctl.signal.aborted && !gotChunk)) throw new EngineError("serviceUnavailable", stalled ? "stall" : "timeout");
+      if (ctl.signal.aborted) throw new EngineError("serviceUnavailable", "timeout");
+      throw mapError(e);
     } finally {
       clearTimeout(firstTimer);
       clearTimeout(totalTimer);

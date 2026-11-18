@@ -7,6 +7,7 @@ import type { Entity } from "../../engine/types";
 import type { Inference } from "../../engine/infer";
 import { engineErrorMessage } from "../../app/session";
 import type { CSSProperties } from "react";
+import { ConsentCard, ToolLog } from "../tools";
 
 /** F-25: what the cloud can still infer from the sealed text it already saw — the honest limit of sealing. */
 function GuessCard({ threadId, entities }: { threadId: string; entities: { get(id: string): Entity | undefined } }) {
@@ -86,12 +87,16 @@ function UserBubble({ turn, entities }: { turn: UserTurn; entities: { get(id: st
   );
 }
 
-function AssistantBubble({ turn }: { turn: AssistantTurn }) {
+function AssistantBubble({ turn, waitingForYou }: { turn: AssistantTurn; waitingForYou: boolean }) {
   const o = turn.outcome;
   return (
     <div className="bubble ai" aria-live="polite" aria-busy={turn.status === "streaming"}>
       <div style={{ marginBottom: 8 }}>{turn.pasted !== undefined ? <span className="badge phone"><IconDevice size={14} /> Pasted answer · restored on this device</span> : <RouteBadge outcome={o} streaming={turn.status === "streaming"} />}</div>
-      {turn.status === "error" ? <Banner tone="risk" title={turn.error ?? "Something went wrong."} /> : turn.segments.length ? <div className={turn.status === "streaming" ? "caret" : undefined}><RestoredAnswer segments={turn.segments} /></div> : <span className="typing" aria-label="Waiting for the answer"><i /><i /><i /></span>}
+      <ToolLog tools={turn.tools} />
+      {turn.status === "error" ? <Banner tone="risk" title={turn.error ?? "Something went wrong."} />
+        : turn.segments.length ? <div className={turn.status === "streaming" ? "caret" : undefined}><RestoredAnswer segments={turn.segments} /></div>
+        : waitingForYou ? <span className="small">Gemini is waiting for your answer below.</span>
+        : <span className="typing" aria-label="Waiting for the answer"><i /><i /><i /></span>}
       {o && (
         <div className="receipt-line">
           {o.receipt ? <><span className="row" style={{ gap: 4 }}><IconLedger size={14} /> Receipt {o.receipt.id}</span><span className="mono">{o.receipt.outboundSha256.slice(0, 12)}…</span><span>{o.receipt.outboundChars} characters sent</span></> : <span>Nothing left this device — no receipt needed.</span>}
@@ -105,12 +110,13 @@ function AssistantBubble({ turn }: { turn: AssistantTurn }) {
 
 export function ThreadScreen() {
   const s = useSession();
-  const { threads, currentThreadId } = useAirlock();
+  const { threads, currentThreadId, consents } = useAirlock();
   const [text, setText] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const thread = threads.find((t) => t.id === currentThreadId);
   if (!thread) return <div className="stack"><h1>Not found</h1><button className="btn" onClick={() => s.go("ask")}>Back to Ask</button></div>;
   const busy = thread.turns.some((t) => t.kind === "assistant" && t.status === "streaming");
+  const asking = consents.filter((c) => c.threadId === thread.id);
 
   return (
     <div className="stack">
@@ -125,7 +131,8 @@ export function ThreadScreen() {
         </Banner>
       )}
       {thread.mode === "scrub" && <Banner tone="ok" title="Sealed version copied">Airlock didn't send anything. The text you copied has your private details replaced, and the real ones stay here.</Banner>}
-      {thread.turns.map((t, i) => (t.kind === "user" ? <UserBubble key={i} turn={t} entities={thread.entities} /> : <AssistantBubble key={i} turn={t} />))}
+      {thread.turns.map((t, i) => (t.kind === "user" ? <UserBubble key={i} turn={t} entities={thread.entities} /> : <AssistantBubble key={i} turn={t} waitingForYou={t.status === "streaming" && asking.length > 0} />))}
+      {asking.length > 0 && <div className="stack" style={{ gap: 10 }} aria-live="polite">{asking.map((c, i) => <ConsentCard key={c.id} consent={c} index={i} />)}</div>}
       {thread.mode === "scrub" && <PasteBack threadId={thread.id} />}
       {thread.mode !== "scrub" && !busy && s.services.mode !== "noCloud" && thread.turns.some((t) => t.kind === "assistant" && t.outcome?.receipt) && <GuessCard key={thread.turns.length} threadId={thread.id} entities={thread.entities} />}
       {thread.mode !== "scrub" && <div className="card stack" style={{ gap: 10 }}>

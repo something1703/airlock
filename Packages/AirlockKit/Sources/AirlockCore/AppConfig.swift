@@ -65,6 +65,7 @@ public struct AppConfig: Sendable, Hashable {
         "armor_force_unary": .bool(false),
         "cloud_first_chunk_ms": .number(15000),
         "cloud_timeout_ms": .number(90000),
+        "tool_max_rounds": .number(3),
     ]
 
     private let values: [String: ConfigValue]

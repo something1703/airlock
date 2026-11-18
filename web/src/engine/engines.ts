@@ -83,7 +83,65 @@ export interface SealedEngine {
   stream(sealed: SealedText, task: TaskSpec, history?: SealedHistory): AsyncIterable<EngineChunk>;
 }
 
+// MARK: Private tools (function calling) — docs/02-ARCHITECTURE.md §6.3, docs/04-PROMPTS.md §6
+
+export type ToolName = "today_context" | "find_free_slots" | "get_entity_role";
+
+export interface ToolParam {
+  type: "string" | "integer";
+  description: string;
+}
+
+/** A function the cloud model may call. Plain data: the Firebase engine maps it to a `FunctionDeclaration`. */
+export interface ToolDeclaration {
+  name: ToolName;
+  description: string;
+  parameters?: { properties: Record<string, ToolParam>; required: string[] };
+}
+
+/** A function call the model asked for. `args` came from the cloud: untrusted input. */
+export interface ToolCall {
+  id?: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
+/**
+ * A function response that passed `EgressGate.sealToolResult` (INV-5). `sealed.value` is the JSON object
+ * sent back to the model — the type makes it impossible to hand an engine an unchecked tool result.
+ */
+export interface SealedToolResponse {
+  id?: string;
+  name: string;
+  sealed: SealedText;
+}
+
+/** One model turn in a tool conversation: text so far, and any function calls it asked for. */
+export interface ToolTurn {
+  text: string;
+  calls: ToolCall[];
+  modelVersion: string;
+  ranOnDevice: boolean;
+}
+
+/**
+ * One multi-turn tool conversation about one sealed request (INV-4: never reused for another request).
+ * `onText` receives cumulative text while a turn streams.
+ */
+export interface ToolChat {
+  send(sealed: SealedText, task: TaskSpec, history: SealedHistory | undefined, onText?: (cumulative: string) => void): Promise<ToolTurn>;
+  respond(results: readonly SealedToolResponse[], onText?: (cumulative: string) => void): Promise<ToolTurn>;
+}
+
+/** Cloud-only engine with function calling. Accepts only SealedText and SealedToolResponse (INV-1, INV-5). */
+export interface ToolEngine {
+  readonly route: Route;
+  chat(declarations: readonly ToolDeclaration[], addendum: string): ToolChat;
+}
+
 export interface EngineProvider {
   readonly phone: PhoneOnlyEngine;
   sealed(route: Route, quality: AnswerQuality): SealedEngine;
+  /** Function-calling engine for private tools (always cloud-only: function responses can't run on device). */
+  tools(quality: AnswerQuality): ToolEngine;
 }

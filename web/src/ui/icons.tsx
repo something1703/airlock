@@ -39,6 +39,18 @@ export const IconLink = (p: P) => <Svg {...p}><path d="M10 14a4 4 0 0 0 5.7 0l3-
 export const IconAlert = (p: P) => <Svg {...p}><path d="M12 4 2.8 19.5h18.4Z" /><path d="M12 10v4.5M12 17v.2" /></Svg>;
 export const IconQuestion = (p: P) => <Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4M12 16.8v.2" /></Svg>;
 
+// Private tools
+/** Calendar page with a tick — "your free time". */
+export const IconFreeTime = (p: P) => <Svg {...p}><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" /><path d="M4 10h16M8.5 3.5v3.5M15.5 3.5v3.5" /><path d="m9.2 14.6 1.9 1.9 3.8-3.9" /></Svg>;
+/** Calendar page with today's dot. */
+export const IconToday = (p: P) => <Svg {...p}><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" /><path d="M4 10h16M8.5 3.5v3.5M15.5 3.5v3.5" /><circle cx="12" cy="15" r="1.7" /></Svg>;
+/** A luggage tag — the role behind a placeholder. */
+export const IconRole = (p: P) => <Svg {...p}><path d="M3.8 11.6V5a1.2 1.2 0 0 1 1.2-1.2h6.6l8.2 8.2a1.6 1.6 0 0 1 0 2.3l-5.7 5.7a1.6 1.6 0 0 1-2.3 0Z" /><circle cx="8.3" cy="8.3" r="1.5" /></Svg>;
+/** A hand raised over a small door — "Gemini asks first". */
+export const IconAskFirst = (p: P) => <Svg {...p}><path d="M5 20.5V9a7 7 0 0 1 14 0v11.5" /><path d="M3 20.5h18" /><path d="M10 20.5v-5.2a2 2 0 0 1 4 0v5.2" /></Svg>;
+export const IconUpload = (p: P) => <Svg {...p}><path d="M12 15V4.5M7.5 9 12 4.5 16.5 9" /><path d="M5 14.5v4A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-4" /></Svg>;
+export const IconBlocked = (p: P) => <Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="m6 6 12 12" /></Svg>;
+
 export const CATEGORY_ICON: Record<PrivacyCategory, (p: P) => ReactNode> = {
   person: IconPerson, org: IconOrg, location: IconPlace, contact: IconContact, id: IconId, date: IconDate, health: IconHealth, secret: IconSecret, quasi: IconSparkle,
 };

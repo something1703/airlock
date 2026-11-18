@@ -1,4 +1,7 @@
-import { CHROME_ON_DEVICE_MODEL, EngineError, type EngineChunk, type EngineProvider, type EngineResult, type PhoneAvailability, type PhoneOnlyEngine, type PhoneOptions, type PhonePrompt, type SealedEngine, type SealedHistory, type TaskSpec, type AnswerQuality } from "./engines";
+import {
+  CHROME_ON_DEVICE_MODEL, EngineError, type AnswerQuality, type EngineChunk, type EngineProvider, type EngineResult, type PhoneAvailability, type PhoneOnlyEngine, type PhoneOptions,
+  type PhonePrompt, type SealedEngine, type SealedHistory, type SealedToolResponse, type TaskSpec, type ToolCall, type ToolChat, type ToolDeclaration, type ToolEngine, type ToolTurn,
+} from "./engines";
 import type { Route, SealedText } from "./types";
 
 /** Scriptable on-device engine. Records every call so tests can prove what reached which engine. */
@@ -57,13 +60,78 @@ export class MockSealedEngine implements SealedEngine {
   }
 }
 
+export interface ScriptedToolTurn {
+  text?: string;
+  calls?: ToolCall[];
+}
+/** `round` 0 answers the sealed request; round n answers the n-th batch of function responses. */
+export type ToolScript = (
+  round: number,
+  ctx: { sealed: SealedText; task: TaskSpec; results: readonly SealedToolResponse[]; declarations: readonly ToolDeclaration[] },
+) => ScriptedToolTurn | Promise<ScriptedToolTurn>;
+
+/**
+ * Scriptable function-calling engine. Records every sealed request and every batch of function responses,
+ * so tests can prove exactly what reached the "cloud" (INV-5).
+ */
+export class MockToolEngine implements ToolEngine {
+  readonly route: Route = "cloudOnly";
+  readonly received: SealedText[] = [];
+  readonly responses: SealedToolResponse[][] = [];
+  readonly declarations: ToolDeclaration[][] = [];
+  readonly addenda: string[] = [];
+
+  constructor(
+    private readonly script: ToolScript,
+    private readonly modelVersion = "mock-gemini",
+  ) {}
+
+  chat(declarations: readonly ToolDeclaration[], addendum: string): ToolChat {
+    this.declarations.push([...declarations]);
+    this.addenda.push(addendum);
+    let round = 0;
+    let request: { sealed: SealedText; task: TaskSpec } | null = null;
+    const turn = async (results: readonly SealedToolResponse[], onText?: (t: string) => void): Promise<ToolTurn> => {
+      if (!request) throw new EngineError("other", "respond-before-send");
+      const out = await this.script(round++, { ...request, results, declarations });
+      const text = out.text ?? "";
+      if (text && onText) {
+        onText(text.slice(0, Math.ceil(text.length / 2)));
+        onText(text);
+      }
+      return { text, calls: out.calls ?? [], modelVersion: this.modelVersion, ranOnDevice: false };
+    };
+    return {
+      send: (sealed, task, _history, onText) => {
+        this.received.push(sealed);
+        request = { sealed, task };
+        return turn([], onText);
+      },
+      respond: (results, onText) => {
+        this.responses.push([...results]);
+        return turn(results, onText);
+      },
+    };
+  }
+
+  /** Every function-response JSON that was returned to the model. */
+  get sentResults(): string[] {
+    return this.responses.flat().map((r) => r.sealed.value);
+  }
+}
+
 export class MockEngines implements EngineProvider {
   constructor(
     readonly phone: PhoneOnlyEngine = MockPhoneEngine.answering('{"items":[]}'),
     private readonly sealedEngines: Partial<Record<Route, SealedEngine>> = {},
+    readonly toolEngine: ToolEngine = new MockToolEngine(() => ({ text: "Here's a reply for [[PERSON_1]]." })),
   ) {}
 
   sealed(route: Route, _quality: AnswerQuality): SealedEngine {
     return this.sealedEngines[route] ?? new MockSealedEngine(route, () => "Here's a reply for [[PERSON_1]].");
+  }
+
+  tools(_quality: AnswerQuality): ToolEngine {
+    return this.toolEngine;
   }
 }
