@@ -1,0 +1,10 @@
+[
+  {"name": "run_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "created_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "git_sha", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "prompt_ids", "type": "STRING", "mode": "NULLABLE", "description": "JSON object prompt id -> sha256 prefix of the template"},
+  {"name": "dial", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "config", "type": "JSON", "mode": "NULLABLE", "description": "configs, engines, models, mode (mock|live)"},
+  {"name": "n_items", "type": "INT64", "mode": "NULLABLE"},
+  {"name": "notes", "type": "STRING", "mode": "NULLABLE"}
+]
