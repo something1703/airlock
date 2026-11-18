@@ -3,6 +3,7 @@ package app.airlock.android.session
 import app.airlock.android.AppConfig
 import app.airlock.android.engines.DemoEngines
 import app.airlock.android.engines.DemoSealedEngine
+import app.airlock.android.engines.DownloadEvent
 import app.airlock.android.store.AirlockStores
 import app.airlock.android.store.EncryptedStore
 import app.airlock.android.store.SoftwareKeyProvider
@@ -25,6 +26,7 @@ import app.airlock.core.VaultEntry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
@@ -270,6 +272,37 @@ class SessionTest {
         assertFalse(result.draft.text.contains("Willowbrook"), "the late red-team result keeps the user's mark")
         assertTrue(s.send())
         assertFalse(rec.sent.joinToString().contains("Willowbrook"))
+    }
+
+    @Test fun aFailedModelDownloadOffersRetryAndASuccessfulOneClearsIt() = runTest {
+        var avail = PhoneAvailability.DOWNLOADABLE
+        var fail = true
+        var seen: Float? = null
+        lateinit var s: AirlockSession
+        val base = services().first
+        val svc = Services(
+            base.config, base.prompts, base.patterns, base.engines, base.stores, base.prefs, AppMode.LIVE,
+            availability = { avail },
+            download = {
+                flow {
+                    emit(DownloadEvent.Progress(0f))
+                    emit(DownloadEvent.Progress(0.5f))
+                    seen = s.current.downloadProgress
+                    if (fail) emit(DownloadEvent.Failed) else { avail = PhoneAvailability.AVAILABLE; emit(DownloadEvent.Done) }
+                }
+            },
+        )
+        s = session(svc, backgroundScope)
+        s.enableOnDevice()
+        assertEquals(0.5f, seen, "progress is reported")
+        assertFalse(s.current.downloading)
+        assertTrue(s.current.downloadFailed)
+        assertEquals(PhoneAvailability.DOWNLOADABLE, s.current.availability)
+
+        fail = false
+        s.enableOnDevice()
+        assertFalse(s.current.downloadFailed)
+        assertEquals(PhoneAvailability.AVAILABLE, s.current.availability)
     }
 
     @Test fun titlesAreCleanAndPlaceholderFree() {

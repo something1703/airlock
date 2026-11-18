@@ -108,6 +108,8 @@ data class State(
     val availability: PhoneAvailability?,
     val downloadProgress: Float?,
     val downloading: Boolean,
+    /** The last Gemini Nano download didn't finish (shown with a Retry button). */
+    val downloadFailed: Boolean,
     val vault: List<VaultEntry>,
     val threads: List<Thread>,
     val currentThreadId: String?,
@@ -125,7 +127,7 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
     private val _state = MutableStateFlow(
         State(
             screen = if (initialPrefs.onboarded) Screen.ASK else Screen.ONBOARDING, prefs = initialPrefs, availability = null, downloadProgress = null,
-            downloading = false, vault = emptyList(), threads = emptyList(), currentThreadId = null, review = null, chain = null, receipts = emptyList(),
+            downloading = false, downloadFailed = false, vault = emptyList(), threads = emptyList(), currentThreadId = null, review = null, chain = null, receipts = emptyList(),
             draft = "", draftFromShare = false, loaded = false,
         ),
     )
@@ -164,24 +166,34 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
         set { it.copy(availability = a) }
     }
 
-    /** "Download on-device model": starts Gemini Nano's download and tracks progress. */
+    /**
+     * "Download on-device model" (also "Retry" and "Show progress" when the system is already downloading): starts or
+     * joins Gemini Nano's download and tracks progress. Must follow a user action. A failed or abandoned download sets
+     * `downloadFailed` unless the model turned out to be ready anyway.
+     */
     suspend fun enableOnDevice() {
         val download = services.download ?: return
-        set { it.copy(downloading = true, downloadProgress = null) }
+        if (current.downloading) return
+        set { it.copy(downloading = true, downloadProgress = null, downloadFailed = false) }
+        var failed = false
         try {
             download().collect { ev ->
                 when (ev) {
                     is DownloadEvent.Progress -> set { it.copy(downloadProgress = ev.fraction) }
-                    else -> {}
+                    DownloadEvent.Failed -> failed = true
+                    DownloadEvent.Done -> {}
                 }
             }
         } catch (e: CancellationException) {
+            set { it.copy(downloading = false, downloadProgress = null) }
             throw e
         } catch (_: Exception) {
-            // Reflected by the availability check below.
+            failed = true
         }
         set { it.copy(downloading = false, downloadProgress = null) }
         refreshAvailability()
+        val ready = current.availability == PhoneAvailability.AVAILABLE
+        if (!ready && (failed || current.availability != PhoneAvailability.DOWNLOADING)) set { it.copy(downloadFailed = true) }
     }
 
     fun go(screen: Screen) = set { it.copy(screen = screen) }
