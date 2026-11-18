@@ -3,8 +3,8 @@
   "mock": true,
   "label": "MOCK RUN — not real model results",
   "runId": "mock-sample",
-  "createdAt": "2026-11-18T08:22:52.763Z",
-  "gitSha": "2b913af3286c339c77b3eda0a5d7751d24902f59",
+  "createdAt": "2026-11-18T08:29:50.369Z",
+  "gitSha": "ea4ddfa5e5a07b54cd51a378a84e0bb55260419e",
   "dataset": "synth-v1",
   "split": "test",
   "n": 120,
@@ -23,9 +23,9 @@
     "n": 120
   },
   "leakRateWithVault": {
-    "value": 0.1417,
-    "low": 0.0904,
-    "high": 0.2152,
+    "value": 0.3,
+    "low": 0.2253,
+    "high": 0.3872,
     "n": 120
   },
   "namesCaught": {
@@ -99,9 +99,9 @@
       "config": "F_vault",
       "label": "+Your Vault",
       "leak": {
-        "value": 0.1417,
-        "low": 0.0904,
-        "high": 0.2152,
+        "value": 0.3,
+        "low": 0.2253,
+        "high": 0.3872,
         "n": 120
       }
     }

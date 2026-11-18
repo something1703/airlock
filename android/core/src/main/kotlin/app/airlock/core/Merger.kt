@@ -48,7 +48,21 @@ object Merger {
         return assignIds(cluster(accepted, vault), existing, vault)
     }
 
-    private fun resolveOverlaps(candidates: List<Candidate>, text: String): List<Accepted> {
+    /** Categories that are one identifier as a whole: a name inside an email address is part of the address. */
+    private val ATOMIC_PATTERN = setOf(PrivacyCategory.CONTACT, PrivacyCategory.ID, PrivacyCategory.SECRET)
+
+    /**
+     * Drops any candidate of a different category lying strictly inside a contact / ID / secret pattern hit.
+     * Without this, a Vault name inside the user's own email ("maya" in maya.chen@example.net) outranks the email
+     * pattern and the draft becomes `[[PERSON_ME]].chen@…`, which the gate then blocks (found by AirlockBench).
+     */
+    fun dropInsideAtomicPatterns(candidates: List<Candidate>): List<Candidate> {
+        val atoms = candidates.filter { it.detector == DetectorId.PATTERN && it.category in ATOMIC_PATTERN }
+        return candidates.filter { c -> atoms.none { a -> a !== c && a.category != c.category && a.span.contains(c.span) && a.span != c.span } }
+    }
+
+    private fun resolveOverlaps(input: List<Candidate>, text: String): List<Accepted> {
+        val candidates = dropInsideAtomicPatterns(input)
         val ordered = candidates.sortedWith { a, b ->
             when {
                 a.detector.priority != b.detector.priority -> a.detector.priority - b.detector.priority

@@ -69,7 +69,21 @@ public enum Merger {
         var extraForms: Set<String> = []
     }
 
-    static func resolveOverlaps(_ candidates: [Candidate], in text: String) -> [Accepted] {
+    /// Categories that are one identifier as a whole: a name inside an email address is part of the address.
+    static let atomicPatternCategories: Set<PrivacyCategory> = [.contact, .id, .secret]
+
+    /// Drops any candidate of a different category lying strictly inside a contact / ID / secret pattern hit.
+    /// Without this, a Vault name inside the user's own email ("maya" in maya.chen@example.net) outranks the
+    /// email pattern and the draft becomes `[[PERSON_ME]].chen@…`, which the gate then blocks (found by AirlockBench).
+    static func dropInsideAtomicPatterns(_ candidates: [Candidate]) -> [Candidate] {
+        let atoms = candidates.filter { $0.detector == .pattern && atomicPatternCategories.contains($0.category) }
+        return candidates.filter { c in
+            !atoms.contains { a in a.category != c.category && a.span.contains(c.span) && a.span != c.span }
+        }
+    }
+
+    static func resolveOverlaps(_ input: [Candidate], in text: String) -> [Accepted] {
+        let candidates = dropInsideAtomicPatterns(input)
         let ordered = candidates.sorted {
             if $0.detector.priority != $1.detector.priority { return $0.detector.priority < $1.detector.priority }
             if $0.span.length != $1.span.length { return $0.span.length > $1.span.length }

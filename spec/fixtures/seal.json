@@ -2,6 +2,47 @@
   "description": "End-to-end deterministic seal: normalise -> vault + pattern detectors (data detectors off) + given LLM candidates -> merge -> policy -> sealer -> gate must pass. Ladder defaults used for generalisation (no model).",
   "cases": [
     {
+      "name": "own email with a vault name inside",
+      "dial": "balanced",
+      "today": "2026-11-21",
+      "text": "Reach me at maya.chen@example.net. Thanks, Maya Chen",
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        },
+        {
+          "id": "v-raj",
+          "canonical": "Raj Patel",
+          "aliases": [
+            "Raj"
+          ],
+          "category": "person",
+          "roleHint": "my landlord",
+          "isUser": false
+        }
+      ],
+      "llm": [],
+      "overrides": [],
+      "expectedText": "Reach me at [[CONTACT_1]]. Thanks, [[PERSON_ME]]",
+      "expectedLegend": [
+        [
+          "CONTACT_1",
+          "contact details"
+        ],
+        [
+          "PERSON_ME",
+          "the user"
+        ]
+      ]
+    },
+    {
       "name": "balanced landlord",
       "dial": "balanced",
       "today": "2026-11-21",

@@ -355,6 +355,90 @@
       }
     },
     {
+      "name": "contact pattern contains a vault name (name inside an email stays part of the address)",
+      "text": "Email maya.chen@example.net, thanks, Maya",
+      "vault": [
+        {
+          "id": "v-me",
+          "canonical": "Maya Chen",
+          "aliases": [
+            "Maya"
+          ],
+          "category": "person",
+          "roleHint": "me",
+          "isUser": true
+        },
+        {
+          "id": "v-raj",
+          "canonical": "Raj Patel",
+          "aliases": [
+            "Raj"
+          ],
+          "category": "person",
+          "roleHint": "my landlord",
+          "isUser": false
+        },
+        {
+          "id": "v-org",
+          "canonical": "Mercy General",
+          "aliases": [],
+          "category": "org",
+          "roleHint": "my employer",
+          "isUser": false
+        }
+      ],
+      "candidates": [
+        {
+          "start": 6,
+          "end": 10,
+          "text": "maya",
+          "category": "person",
+          "detector": "vault",
+          "vaultEntryId": "v-me"
+        },
+        {
+          "start": 6,
+          "end": 27,
+          "text": "maya.chen@example.net",
+          "category": "contact",
+          "detector": "pattern",
+          "subtype": "email"
+        },
+        {
+          "start": 37,
+          "end": 41,
+          "text": "Maya",
+          "category": "person",
+          "detector": "vault",
+          "vaultEntryId": "v-me"
+        }
+      ],
+      "existing": [],
+      "expect": {
+        "entities": [
+          {
+            "id": "CONTACT_1",
+            "canonical": "maya.chen@example.net"
+          },
+          {
+            "id": "PERSON_ME",
+            "canonical": "Maya Chen"
+          }
+        ],
+        "mentions": [
+          [
+            "maya.chen@example.net",
+            "CONTACT_1"
+          ],
+          [
+            "Maya",
+            "PERSON_ME"
+          ]
+        ],
+        "ambiguous": []
+      }
+    },
+    {
       "name": "partial-overlap loser becomes a surface form",
       "text": "I work at Mercy General Hospital.",
       "vault": [

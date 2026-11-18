@@ -278,6 +278,7 @@ t4 = "Write to raj.patel@example.com today."
 t5 = "Maya Chen here."
 t6 = "Raj replied and Lena agreed."
 t7 = "I work at Mercy General Hospital."
+t8 = "Email maya.chen@example.net, thanks, Maya"
 merge_cases = [
   {"name": "coreference by token subset", "text": t1, "vault": [],
    "candidates": [cand(t1, "Dr. Patel", "person", "llm"), cand(t1, "Patel", "person", "llm", 1), cand(t1, "Raj Patel", "person", "llm")],
@@ -308,6 +309,11 @@ merge_cases = [
    "existing": [{"id": "PERSON_1", "category": "person", "canonical": "Raj Patel", "surfaceForms": ["Raj Patel", "Raj"], "action": "placeholder"}],
    "expect": {"entities": [{"id": "PERSON_1", "canonical": "Raj Patel"}, {"id": "PERSON_2", "canonical": "Lena"}],
               "mentions": [["Raj", "PERSON_1"], ["Lena", "PERSON_2"]], "ambiguous": []}},
+  {"name": "contact pattern contains a vault name (name inside an email stays part of the address)", "text": t8, "vault": VAULT,
+   "candidates": [cand(t8, "maya", "person", "vault", vaultEntryId="v-me"), cand(t8, "maya.chen@example.net", "contact", "pattern", subtype="email"),
+                  cand(t8, "Maya", "person", "vault", vaultEntryId="v-me")], "existing": [],
+   "expect": {"entities": [{"id": "CONTACT_1", "canonical": "maya.chen@example.net"}, {"id": "PERSON_ME", "canonical": "Maya Chen"}],
+              "mentions": [["maya.chen@example.net", "CONTACT_1"], ["Maya", "PERSON_ME"]], "ambiguous": []}},
   {"name": "partial-overlap loser becomes a surface form", "text": t7, "vault": VAULT,
    "candidates": [cand(t7, "Mercy General", "org", "vault", vaultEntryId="v-org"), cand(t7, "General Hospital", "org", "nl")], "existing": [],
    "expect": {"entities": [{"id": "ORG_1", "canonical": "Mercy General", "formsInclude": ["General Hospital"]}],
@@ -323,7 +329,11 @@ vault_seal = [VAULT[0], VAULT[1]]
 town = "I live in Springfield and work at Acme Corp."
 llm_town = [cand(town, "Springfield", "location", "llm", subtype="place"), cand(town, "Acme Corp", "org", "llm")]
 secret = "My code is 482913, don't share it."
+own_email = "Reach me at maya.chen@example.net. Thanks, Maya Chen"
 seal_cases = [
+  {"name": "own email with a vault name inside", "dial": "balanced", "today": "2026-11-21", "text": own_email, "vault": vault_seal, "llm": [], "overrides": [],
+   "expectedText": "Reach me at [[CONTACT_1]]. Thanks, [[PERSON_ME]]",
+   "expectedLegend": [["CONTACT_1", "contact details"], ["PERSON_ME", "the user"]]},
   {"name": "balanced landlord", "dial": "balanced", "today": "2026-11-21", "text": maya, "vault": vault_seal, "llm": llm_maya, "overrides": [],
    "expectedText": "Hi [[PERSON_1]], the heater at [[LOC_1]] has been broken since Oct 28. I work nights at an organisation. Call me on [[CONTACT_1]]. Rent is $1,240. Thanks, [[PERSON_ME]]",
    "expectedLegend": [["CONTACT_1", "contact details"], ["PERSON_ME", "the user"], ["PERSON_1", "the user's landlord"], ["LOC_1", "a place mentioned in the message"]]},

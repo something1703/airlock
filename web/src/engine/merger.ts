@@ -58,7 +58,21 @@ export function merge(candidates: Candidate[], text: string, existing: EntityMap
   return assignIds(cluster(accepted, vault), existing, vault);
 }
 
-function resolveOverlaps(candidates: Candidate[], text: string): Accepted[] {
+/** Pattern categories that are one identifier as a whole: a name inside an email address is part of the address. */
+const ATOMIC_PATTERN = new Set<PrivacyCategory>(["contact", "id", "secret"]);
+
+/**
+ * Drops any candidate of a different category that lies strictly inside a contact / ID / secret pattern hit.
+ * Without this, a Vault name inside the user's own email ("maya" in maya.chen@example.net) outranks the email
+ * pattern and the draft becomes `[[PERSON_ME]].chen@…`, which the gate then blocks (found by AirlockBench).
+ */
+export function dropInsideAtomicPatterns(candidates: readonly Candidate[]): Candidate[] {
+  const atoms = candidates.filter((c) => c.detector === "pattern" && ATOMIC_PATTERN.has(c.category));
+  return candidates.filter((c) => !atoms.some((a) => a !== c && a.category !== c.category && spanContains(a.span, c.span) && !spanEquals(a.span, c.span)));
+}
+
+function resolveOverlaps(input: Candidate[], text: string): Accepted[] {
+  const candidates = dropInsideAtomicPatterns(input);
   const ordered = [...candidates].sort((a, b) => {
     if (DETECTOR_PRIORITY[a.detector] !== DETECTOR_PRIORITY[b.detector]) return DETECTOR_PRIORITY[a.detector] - DETECTOR_PRIORITY[b.detector];
     if (spanLength(a.span) !== spanLength(b.span)) return spanLength(b.span) - spanLength(a.span);
