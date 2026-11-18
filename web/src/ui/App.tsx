@@ -6,6 +6,7 @@ import { Onboarding } from "./screens/Onboarding";
 import { ProofScreen } from "./screens/Proof";
 import { ReviewScreen } from "./screens/Review";
 import { SettingsScreen } from "./screens/Settings";
+import { EvidenceScreen } from "./screens/Evidence";
 import { ThreadScreen } from "./screens/Thread";
 import { VaultScreen } from "./screens/Vault";
 import { IconAsk, IconLedger, IconProof, IconSettings, IconVault, Logo } from "./icons";
@@ -24,7 +25,7 @@ export function App() {
   const { screen, threads, currentThreadId } = useAirlock();
   const nav = s.services.config.bool("feature_proof") ? NAV : NAV.filter((n) => n.id !== "proof");
   if (screen === "onboarding") return <Onboarding />;
-  const active: Screen = screen === "review" || screen === "thread" ? "ask" : screen;
+  const active: Screen = screen === "review" || screen === "thread" ? "ask" : screen === "evidence" ? "settings" : screen;
   return (
     <div className="shell">
       <nav className="sidebar" aria-label="Main">
@@ -42,6 +43,7 @@ export function App() {
         {screen === "ledger" && <LedgerScreen />}
         {screen === "vault" && <VaultScreen />}
         {screen === "settings" && <SettingsScreen />}
+        {screen === "evidence" && <EvidenceScreen />}
       </main>
     </div>
   );

@@ -26,7 +26,7 @@ import type { ToolSetup } from "../engine/answer";
 import { sampleCalendarIcs } from "./sampleCalendar";
 import { runProof, shareWarning, type ProofResult, type ProofStage } from "../engine/proof";
 
-export type Screen = "onboarding" | "ask" | "review" | "thread" | "proof" | "ledger" | "vault" | "settings";
+export type Screen = "onboarding" | "ask" | "review" | "thread" | "proof" | "ledger" | "vault" | "settings" | "evidence";
 
 export interface Prefs {
   dial: DialPreset;

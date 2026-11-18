@@ -264,6 +264,27 @@ input.field, select.field { border: 1px solid var(--stroke); border-radius: 12px
 .about-diagram[open] summary::after { transform: rotate(-135deg); }
 .about-diagram img { width: 100%; height: auto; display: block; margin-top: 12px; border-radius: 16px; animation: enter var(--t-slow) var(--ease-out) both; }
 
+/* ---------- Evidence ---------- */
+.ev-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; cursor: pointer; width: 100%; color: inherit; }
+.ev-link:hover { box-shadow: var(--shadow-lift); }
+.ev-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 560px) { .ev-tiles { grid-template-columns: 1fr; } }
+.ev-tile-icon { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: var(--seal-tint); color: var(--seal); }
+.ev-tile-label { font-weight: 700; font-size: 14px; letter-spacing: 0.02em; }
+.ev-num { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin: 10px 0 6px; font-variant-numeric: tabular-nums; }
+.ev-ci svg { width: 100%; height: 12px; display: block; margin-bottom: 6px; }
+.ev-track { fill: var(--stroke); } .ev-range { fill: color-mix(in srgb, var(--seal) 35%, transparent); } .ev-point { fill: var(--seal); }
+.ev-chart { width: 100%; height: auto; display: block; }
+.ev-grid { stroke: var(--stroke); stroke-width: 1; } .ev-axis { fill: var(--text-2); font-size: 12px; }
+.ev-label { fill: var(--text); font-size: 14px; font-weight: 600; } .ev-value { fill: var(--text); font-size: 13px; font-weight: 700; }
+.ev-bar { fill: color-mix(in srgb, var(--risk) 55%, var(--raised)); transform-box: fill-box; transform-origin: left; animation: ev-grow 700ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 120ms); }
+.ev-bar.best { fill: var(--seal); }
+.ev-whisker { stroke: var(--text); stroke-width: 1.6; opacity: 0.7; }
+@keyframes ev-grow { from { transform: scaleX(0); } }
+.ev-misses { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.ev-screen.is-mock .ev-num { color: var(--text-2); }
+.ev-screen.is-mock .ev-tile { border-style: dashed; }
+
 /* ---------- Ledger ---------- */
 .chain-row { transition: background-color 400ms; }
 .chain-row.lit { animation: lit 900ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 120ms); }

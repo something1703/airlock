@@ -35,6 +35,7 @@ export function SettingsScreen() {
         <summary><h2 style={{ display: "inline", margin: 0 }}>How Airlock works</h2></summary>
         <img src={howItWorks} alt="On your device: detect private details, seal them into placeholders, red-team the draft, then a deterministic egress gate. Only sealed text reaches Gemini. The answer comes back with placeholders, your device restores the real details, and a hash-chained receipt records exactly what left." />
       </details>
+      <button className="card ev-link" onClick={() => s.go("evidence")}><span><b>How Airlock is tested</b><br /><span className="small">AirlockBench: leak rate, names caught, answer quality — and what we still miss.</span></span><span aria-hidden="true">→</span></button>
       <div className="card stack" style={{ gap: 8 }}>
         <h2>What Airlock does and doesn’t do</h2>
         <p className="small">Airlock hides who you are, not what happened. It finds names, places, contact details and IDs on your device and replaces them before anything is sent. Detection isn’t perfect, so you always see exactly what leaves. Airlock helps you understand and prepare; it doesn’t give legal, medical or financial advice.</p>
