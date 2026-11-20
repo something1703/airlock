@@ -84,3 +84,4 @@ Record answers here with date and link.
 | 16 Nov | No paid Apple Developer Program. iOS shown in the Simulator; Mac app distributed unsigned (judges allow it in System Settings → Privacy & Security → Open Anyway) | $99 enrolment for TestFlight + notarisation | Owner decision |
 
 Add a row for every decision that changes scope, architecture, or an invariant.
+| 20 Nov | **Web App Check uses Fraud Defense (reCAPTCHA Enterprise), not reCAPTCHA v3.** Firebase disables the secret-key field for new reCAPTCHA Classic registrations. `ReCaptchaEnterpriseProvider` with `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`; v3 stays as a fallback for older setups. Score-based key (no checkbox), domains: the two Hosting domains + localhost. No secret key exists in this setup. | Agent, with owner's go-ahead |

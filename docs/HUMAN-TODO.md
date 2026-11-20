@@ -11,9 +11,9 @@ Google Cloud / Firebase account for Airlock: the team's Google account (decided 
 All coding work is on `main` and the web app is live on the dev project. These are the only things left that an agent can't do.
 
 **Quick (minutes, free)**
-1. **App Check, web** (project `airlock-hybrid-dev-f1bb0`, not the other one): Firebase console → App Check → Apps → the web app → reCAPTCHA → paste the reCAPTCHA **secret** key → Save. Keep enforcement **off** for now.
+1. ~~**App Check, web**~~ ✅ 20 Nov — Firebase no longer accepts new reCAPTCHA Classic keys, so the web app now uses **Fraud Defense** (reCAPTCHA Enterprise): API enabled on `airlock-hybrid-dev-f1bb0`, score-based key "Airlock web" created, registered in App Check, live site exchanging tokens (HTTP 200). No secret key is involved any more.
 2. **App Check debug tokens** (H-07): run each app once; it prints a debug token (browser console on localhost, Xcode console for the Simulator and the Mac, `adb logcat` for Android). Add each under App Check → Manage debug tokens. Never commit them.
-3. **Optional but sensible:** the reCAPTCHA secret was pasted into a chat once. Rotate it at google.com/recaptcha/admin, then repeat step 1 with the new secret.
+3. **Optional:** the old reCAPTCHA Classic key (and its secret, pasted in a chat once) is no longer used. You can delete that site at google.com/recaptcha/admin.
 4. **Mac signing** (for the Keychain on macOS): Xcode → the Airlock target → Signing & Capabilities → Team → your free Apple ID. Tell the agent the Team ID (it isn't secret).
 5. **Mac screenshots:** System Settings → Privacy & Security → Screen & System Audio Recording → allow Terminal (or the app running the agent).
 6. **Chrome Gemini Nano** (H-12) and **Apple Intelligence on this Mac** (H-05): needed to see real on-device inference rather than the demo engines.
