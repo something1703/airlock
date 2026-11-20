@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID: string;
   /** App Check reCAPTCHA v3 site key (production). Absent → debug provider in dev. */
   readonly VITE_RECAPTCHA_SITE_KEY?: string;
+  readonly VITE_RECAPTCHA_ENTERPRISE_SITE_KEY?: string;
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;

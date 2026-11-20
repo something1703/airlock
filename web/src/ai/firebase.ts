@@ -1,6 +1,6 @@
 // Firebase bootstrap for the web app: App Check before any AI call, anonymous auth for sync.
 import { initializeApp, type FirebaseApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, ReCaptchaV3Provider } from "firebase/app-check";
 import { getAuth, signInAnonymously } from "firebase/auth";
 
 export type FirebaseStatus =
@@ -15,10 +15,14 @@ export function bootFirebase(env: ImportMetaEnv = import.meta.env): FirebaseStat
     storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET, messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID, appId: env.VITE_FIREBASE_APP_ID,
   });
   let appCheck: "recaptcha" | "debug" | "off" = "off";
-  if (env.VITE_RECAPTCHA_SITE_KEY) {
+  // Fraud Defense (reCAPTCHA Enterprise) is preferred: Firebase no longer accepts new reCAPTCHA Classic (v3)
+  // registrations. The v3 key stays supported for projects registered before that.
+  const enterpriseKey = env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
+  if (enterpriseKey || env.VITE_RECAPTCHA_SITE_KEY) {
     // In development the SDK prints a debug token to register in the console; never commit it.
     if (env.DEV) (globalThis as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-    initializeAppCheck(app, { provider: new ReCaptchaV3Provider(env.VITE_RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true });
+    const provider = enterpriseKey ? new ReCaptchaEnterpriseProvider(enterpriseKey) : new ReCaptchaV3Provider(env.VITE_RECAPTCHA_SITE_KEY ?? "");
+    initializeAppCheck(app, { provider, isTokenAutoRefreshEnabled: true });
     appCheck = env.DEV ? "debug" : "recaptcha";
   }
   return { kind: "configured", app, appCheck };
