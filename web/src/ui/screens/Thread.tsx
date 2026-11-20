@@ -36,7 +36,7 @@ function GuessCard({ threadId, entities }: { threadId: string; entities: { get(i
       {state.kind === "error" && <Banner tone="risk" title={state.message} action={<button className="btn" onClick={() => void ask()}>Try again</button>} />}
       {state.kind === "done" && (
         <div className="stack" style={{ gap: 8 }} aria-live="polite">
-          {state.unreadable && <Banner tone="warn" title="Gemini's reply couldn't be read as a list. Try again." />}
+          {state.unreadable && <Banner tone="warn" title="Gemini's reply couldn't be read as a list." action={<button className="btn" onClick={() => void ask()}>Try again</button>} />}
           {!state.unreadable && state.items.length === 0 && <Banner tone="ok" title="Gemini couldn't infer anything specific about you from the sealed text." />}
           {state.items.map((g, i) => (
             <div key={i} className={`guess-row ${g.confidence} enter`} style={{ "--i": i } as CSSProperties}>
@@ -87,7 +87,7 @@ function UserBubble({ turn, entities }: { turn: UserTurn; entities: { get(id: st
   );
 }
 
-function AssistantBubble({ turn, waitingForYou }: { turn: AssistantTurn; waitingForYou: boolean }) {
+function AssistantBubble({ turn, waitingForYou, onContinue }: { turn: AssistantTurn; waitingForYou: boolean; onContinue?: () => void }) {
   const o = turn.outcome;
   return (
     <div className="bubble ai" aria-live="polite" aria-busy={turn.status === "streaming"}>
@@ -102,6 +102,12 @@ function AssistantBubble({ turn, waitingForYou }: { turn: AssistantTurn; waiting
           {o.receipt ? <><span className="row" style={{ gap: 4 }}><IconLedger size={14} /> Receipt {o.receipt.id}</span><span className="mono">{o.receipt.outboundSha256.slice(0, 12)}…</span><span>{o.receipt.outboundChars} characters sent</span></> : <span>Nothing left this device — no receipt needed.</span>}
           {o.fidelity.guessedEntities.length > 0 && <span>· Gemini wrote a real detail it guessed — check the answer.</span>}
           {o.fidelity.unknownIds.length > 0 && <span>· The answer mentioned a placeholder Airlock doesn’t know.</span>}
+        </div>
+      )}
+      {o?.truncated && (
+        <div className="cut-short" role="status">
+          <span>This answer was cut short.</span>
+          {onContinue && <button className="btn" onClick={onContinue}>Continue</button>}
         </div>
       )}
     </div>
@@ -131,7 +137,7 @@ export function ThreadScreen() {
         </Banner>
       )}
       {thread.mode === "scrub" && <Banner tone="ok" title="Sealed version copied">Airlock didn't send anything. The text you copied has your private details replaced, and the real ones stay here.</Banner>}
-      {thread.turns.map((t, i) => (t.kind === "user" ? <UserBubble key={i} turn={t} entities={thread.entities} /> : <AssistantBubble key={i} turn={t} waitingForYou={t.status === "streaming" && asking.length > 0} />))}
+      {thread.turns.map((t, i) => (t.kind === "user" ? <UserBubble key={i} turn={t} entities={thread.entities} /> : <AssistantBubble key={i} turn={t} waitingForYou={t.status === "streaming" && asking.length > 0} onContinue={!busy && i === thread.turns.length - 1 ? () => void s.continueAnswer(thread.id) : undefined} />))}
       {asking.length > 0 && <div className="stack" style={{ gap: 10 }} aria-live="polite">{asking.map((c, i) => <ConsentCard key={c.id} consent={c} index={i} />)}</div>}
       {thread.mode === "scrub" && <PasteBack threadId={thread.id} />}
       {thread.mode !== "scrub" && !busy && s.services.mode !== "noCloud" && thread.turns.some((t) => t.kind === "assistant" && t.outcome?.receipt) && <GuessCard key={thread.turns.length} threadId={thread.id} entities={thread.entities} />}

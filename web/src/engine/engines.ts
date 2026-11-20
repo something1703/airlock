@@ -45,6 +45,8 @@ export interface EngineResult {
   modelVersion: string;
   ranOnDevice: boolean;
   latencyMs: number;
+  /** The model stopped because it hit the output-token limit (finish reason MAX_TOKENS). */
+  truncated?: boolean;
 }
 
 /** Stand-in "model version" for Chrome's on-device model (the web SDK reports only inferenceSource). */
@@ -67,6 +69,8 @@ export interface EngineChunk {
   cumulativeText: string;
   modelVersion: string | null;
   ranOnDevice: boolean | null;
+  /** The model stopped because it hit the output-token limit (finish reason MAX_TOKENS). */
+  truncated?: boolean;
 }
 
 export type AnswerQuality = "auto" | "best";

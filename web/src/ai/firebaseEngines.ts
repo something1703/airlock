@@ -2,6 +2,7 @@
 import {
   AgentPlatformBackend, FunctionCallingMode, getAI, getGenerativeModel, GoogleAIBackend, InferenceMode, InferenceSource,
   type AI, type ChatSession, type FunctionDeclaration, type FunctionResponsePart, type GenerativeModel, type GroundingMetadata, type ModelParams,
+  FinishReason,
 } from "firebase/ai";
 import type { FirebaseApp } from "firebase/app";
 import type { AppConfig } from "../core/appConfig";
@@ -186,7 +187,8 @@ class FirebaseSealedEngine implements SealedEngine {
     try {
       const { response } = await this.engines.model(mode, model, system, maxOutputTokens).generateContent(text, { timeout: this.engines.config.cloudTimeoutMs });
       const onDevice = response.inferenceSource === InferenceSource.ON_DEVICE;
-      return { text: response.text(), modelVersion: onDevice ? CHROME_ON_DEVICE_MODEL : model, ranOnDevice: onDevice, latencyMs: performance.now() - t0 };
+      const truncated = response.candidates?.[0]?.finishReason === FinishReason.MAX_TOKENS;
+      return { text: response.text(), modelVersion: onDevice ? CHROME_ON_DEVICE_MODEL : model, ranOnDevice: onDevice, latencyMs: performance.now() - t0, ...(truncated ? { truncated } : {}) };
     } catch (e) {
       throw mapError(e);
     }
@@ -207,12 +209,12 @@ class FirebaseSealedEngine implements SealedEngine {
         if (outcome === "done") return;
       }
       const r = await this.once(this.plan.mode, models[models.length - 1]!, text, system, task.maxOutputTokens);
-      yield { cumulativeText: r.text, modelVersion: r.modelVersion, ranOnDevice: r.ranOnDevice };
+      yield { cumulativeText: r.text, modelVersion: r.modelVersion, ranOnDevice: r.ranOnDevice, ...(r.truncated ? { truncated: true } : {}) };
     } catch (e) {
       const err = mapError(e);
       if (err.code === "offline" && this.plan.manualOfflineFallback) {
         const r = await this.once(InferenceMode.ONLY_ON_DEVICE, this.plan.cloudModel, `${system ?? ""}\n\n${text}`, undefined, task.maxOutputTokens);
-        yield { cumulativeText: r.text, modelVersion: r.modelVersion, ranOnDevice: r.ranOnDevice };
+        yield { cumulativeText: r.text, modelVersion: r.modelVersion, ranOnDevice: r.ranOnDevice, ...(r.truncated ? { truncated: true } : {}) };
         return;
       }
       throw err;
@@ -242,7 +244,8 @@ class FirebaseSealedEngine implements SealedEngine {
         acc += chunk.text();
         const src = chunk.inferenceSource;
         const onDevice = src === undefined ? null : src === InferenceSource.ON_DEVICE;
-        yield { cumulativeText: acc, modelVersion: onDevice === null ? null : onDevice ? CHROME_ON_DEVICE_MODEL : model, ranOnDevice: onDevice };
+        const truncated = chunk.candidates?.[0]?.finishReason === FinishReason.MAX_TOKENS;
+        yield { cumulativeText: acc, modelVersion: onDevice === null ? null : onDevice ? CHROME_ON_DEVICE_MODEL : model, ranOnDevice: onDevice, ...(truncated ? { truncated } : {}) };
       }
       return "done";
     } catch (e) {

@@ -462,6 +462,32 @@ export class AirlockSession {
   }
 
   /**
+   * The last answer hit the output-token limit (UX-04): ask Gemini to carry on. The request is a fixed sentence with
+   * no private details; it still goes through the egress gate like any follow-up, with the thread's sealed history.
+   */
+  async continueAnswer(threadId: string): Promise<void> {
+    const t = this.state.threads.find((x) => x.id === threadId);
+    const last = t?.turns[t.turns.length - 1];
+    if (!t || last?.kind !== "assistant" || last.status !== "done" || !last.outcome?.truncated) return;
+    const draft: SealDraft = {
+      text: CONTINUE_REQUEST, legend: [], replacements: [], entities: t.entities, secretWarnings: [],
+      revealedVaultIds: new Set(), keptValues: new Set(),
+    };
+    let sealed: SealedText;
+    try {
+      sealed = new EgressGate(this.services.patterns, this.state.vault).seal(draft);
+    } catch {
+      return;
+    }
+    const history = historyOf(t);
+    const stored: StoredSealed = { text: draft.text, legend: [], revealedVaultIds: [], keptValues: [] };
+    this.setThread(threadId, (x) => ({ ...x, turns: [...x.turns, { kind: "user", raw: CONTINUE_REQUEST, display: sealed.value, sealed, stored }, { kind: "assistant", task: { kind: "custom" }, status: "streaming", text: "", segments: [], outcome: null, error: null, tools: [] }] }));
+    await this.stream(threadId, sealed, { kind: "custom" }, t.entities, history, 0);
+    await this.persistThread(threadId);
+    void this.backup(threadId);
+  }
+
+  /**
    * Sealed-history backup. Only pairs whose answer has a receipt (i.e. the sealed text already went to Gemini)
    * are synced, so "On this device · nothing sent" stays true for on-device answers. Never blocks the UI.
    */
@@ -733,6 +759,9 @@ export function titleFrom(sealed: string): string {
   const t = head.join(" ");
   return t ? t[0]!.toUpperCase() + t.slice(1) : "Sealed request";
 }
+
+/** The follow-up sent when an answer was cut off. Contains nothing private; still gate-checked. */
+export const CONTINUE_REQUEST = "Please continue your previous answer exactly where it stopped. Do not repeat what you already wrote.";
 
 function historyOf(thread: Thread | undefined): SealedHistory {
   const turns: SealedHistory["turns"] = [];

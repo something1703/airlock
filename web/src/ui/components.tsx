@@ -3,6 +3,7 @@ import { CHROME_ON_DEVICE_MODEL } from "../engine/engines";
 import type { AnswerOutcome } from "../engine/answer";
 import type { Replacement, SealDraft } from "../engine/sealer";
 import type { RestoredSegment } from "../engine/restore";
+import { parseMarkdown, type Inline, type ListBlock } from "./markdown";
 import { type Entity, type PrivacyCategory, idCategory } from "../engine/types";
 import { CATEGORY_ICON, IconAlert, IconCheck, IconCloud, IconDevice, IconQuestion, IconSecret, IconShield, IconSparkle } from "./icons";
 const LABEL: Record<PrivacyCategory, string> = { person: "Person", org: "Organisation", location: "Place", contact: "Contact", id: "ID", date: "Date", health: "Health", secret: "Secret", quasi: "Detail" };
@@ -63,15 +64,47 @@ export function SealedText({ text, entities }: { text: string; entities: Map<str
   return <div className="prose">{parts}</div>;
 }
 
-export function RestoredAnswer({ segments }: { segments: RestoredSegment[] }) {
+function Atom({ seg }: { seg: Exclude<RestoredSegment, { kind: "text" }> }) {
+  switch (seg.kind) {
+    case "restored": return <span className="restored" title={`Gemini wrote ${seg.original}; your device filled in the real detail.`}>{seg.display}</span>;
+    case "secret": return <span className="chip secret" aria-label="Hidden code — never shown"><IconSecret /> hidden code</span>;
+    case "unknown": return <span className="chip id" title="The model invented a placeholder Airlock doesn't know"><IconQuestion /> unknown</span>;
+  }
+}
+
+function Inlines({ nodes }: { nodes: readonly Inline[] }) {
   return (
-    <div className="prose">
-      {segments.map((s, i) => {
-        switch (s.kind) {
-          case "text": return <span key={i}>{s.text}</span>;
-          case "restored": return <span key={i} className="restored" title={`Gemini wrote ${s.original}; your device filled in the real detail.`}>{s.display}</span>;
-          case "secret": return <span key={i} className="chip secret" aria-label="Hidden code — never shown"><IconSecret /> hidden code</span>;
-          case "unknown": return <span key={i} className="chip id" title="The model invented a placeholder Airlock doesn't know"><IconQuestion /> unknown</span>;
+    <>
+      {nodes.map((n, i) => {
+        switch (n.t) {
+          case "text": return <span key={i}>{n.s}</span>;
+          case "atom": return <Atom key={i} seg={n.seg} />;
+          case "strong": return <strong key={i}><Inlines nodes={n.c} /></strong>;
+          case "em": return <em key={i}><Inlines nodes={n.c} /></em>;
+          case "code": return <code key={i}>{n.s}</code>;
+          case "br": return <br key={i} />;
+        }
+      })}
+    </>
+  );
+}
+
+function MdList({ list }: { list: ListBlock }) {
+  const items = list.items.map((it, i) => <li key={i}><Inlines nodes={it.c} />{it.sub && <MdList list={it.sub} />}</li>);
+  return list.ordered ? <ol start={list.start}>{items}</ol> : <ul>{items}</ul>;
+}
+
+/** An answer with real details restored, rendered as a safe Markdown subset (no links, images or HTML). */
+export function RestoredAnswer({ segments }: { segments: RestoredSegment[] }) {
+  const blocks = parseMarkdown(segments);
+  return (
+    <div className="prose md">
+      {blocks.map((b, i) => {
+        switch (b.t) {
+          case "h": return b.level === 1 ? <h3 key={i}><Inlines nodes={b.c} /></h3> : <h4 key={i}><Inlines nodes={b.c} /></h4>;
+          case "p": return <p key={i}><Inlines nodes={b.c} /></p>;
+          case "hr": return <hr key={i} />;
+          case "list": return <MdList key={i} list={b} />;
         }
       })}
     </div>
