@@ -23,6 +23,7 @@ export * from "./llmDetector";
 export * from "./redTeam";
 export * from "./pipeline";
 export * from "./timing";
+export * from "./local";
 export * from "./ledger";
 export * from "./answer";
 export * from "./tools";

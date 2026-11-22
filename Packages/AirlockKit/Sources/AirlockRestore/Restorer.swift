@@ -227,6 +227,9 @@ public struct FidelityReport: Sendable, Hashable {
     public let guessedEntities: [PlaceholderID]
 
     public var isClean: Bool { unknownIDs.isEmpty && guessedEntities.isEmpty }
+
+    /// Nothing to report — for text that was never sealed (an answer written on the device from the raw message).
+    public static let clean = FidelityReport(unknownIDs: [], guessedEntities: [])
 }
 
 public enum FidelityCheck {

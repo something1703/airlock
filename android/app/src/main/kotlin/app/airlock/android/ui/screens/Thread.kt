@@ -156,7 +156,7 @@ fun ThreadScreen(session: AirlockSession, s: State, scroll: ScrollState) {
                 {
                     val text = followUp
                     followUp = ""
-                    session.run { startReview(text, TaskKind.Help, thread.id) }
+                    session.run { submit(text, TaskKind.Help, thread.id) }
                 },
                 kind = ButtonKind.PRIMARY, icon = AirlockIcons.Shield, enabled = followUp.isNotBlank() && !thread.busy,
             )
@@ -169,6 +169,21 @@ fun ThreadScreen(session: AirlockSession, s: State, scroll: ScrollState) {
 private fun UserBubble(turn: Turn.User, thread: Thread, labels: Labels) {
     val c = LocalAirlock.current
     var showRaw by rememberSaveable { mutableStateOf(false) }
+    if (turn.local) {
+        // FX-02: answered on the device. There is no sealed version, and nothing was sent.
+        Column(
+            Modifier.enter(0).padding(start = 36.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.raised).border(1.dp, c.stroke, RoundedCornerShape(18.dp))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(AirlockIcons.Eye, null, Modifier.size(14.dp), tint = c.seal)
+                Small(stringResource(R.string.bubble_local_label), Modifier.weight(1f))
+            }
+            Text(turn.raw, style = Type.body, color = c.text)
+        }
+        return
+    }
     Column(
         Modifier.enter(0).padding(start = 36.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.raised).border(1.dp, c.stroke, RoundedCornerShape(18.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),

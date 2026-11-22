@@ -76,6 +76,15 @@ function PasteBack({ threadId }: { threadId: string }) {
 
 function UserBubble({ turn, entities }: { turn: UserTurn; entities: { get(id: string): import("../../engine/types").Entity | undefined } }) {
   const [showRaw, setShowRaw] = useState(false);
+  if (turn.local) {
+    // Answered on the device: there is no sealed version, and nothing was sent.
+    return (
+      <div className="bubble user">
+        <div className="row" style={{ marginBottom: 6 }}><span className="small row" style={{ flex: 1, gap: 6 }}><IconEye size={14} /> You wrote · stayed on this device</span></div>
+        <div className="prose">{turn.raw}</div>
+      </div>
+    );
+  }
   return (
     <div className="bubble user">
       <div className="row" style={{ marginBottom: 6 }}>
@@ -145,7 +154,7 @@ export function ThreadScreen() {
       {thread.mode !== "scrub" && <div className="card stack" style={{ gap: 10 }}>
         <textarea className="compose" style={{ minHeight: 90 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask a follow-up — it gets sealed too" aria-label="Follow-up question" />
         <div className="row">
-          <button className="btn btn-primary" disabled={!text.trim() || busy} onClick={() => { const t = text; setText(""); void s.startReview(t, { kind: "help" }, thread.id); }}>Continue</button>
+          <button className="btn btn-primary" disabled={!text.trim() || busy} onClick={() => { const t = text; setText(""); void s.submit(t, { kind: "help" }, thread.id); }}>Continue</button>
           <span className="small">Real names show underlined: Gemini wrote placeholders and your device filled them in.</span>
         </div>
       </div>}

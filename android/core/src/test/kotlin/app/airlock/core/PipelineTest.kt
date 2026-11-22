@@ -31,7 +31,7 @@ class PipelineTest {
     }
 
     @Test fun bundlesEveryPromptByteIdenticalToSwift() {
-        assertEquals(24, PromptLibrary.BUNDLED_IDS.size)
+        assertEquals(25, PromptLibrary.BUNDLED_IDS.size)
         val dir = Fixtures.repoFile("Packages/AirlockKit/Sources/AirlockPrompts/Prompts")
         assertEquals(dir.listFiles().orEmpty().map { it.name }.filter { it.endsWith(".txt") }.map { it.removeSuffix(".txt") }.sorted(), PromptLibrary.BUNDLED_IDS)
         for (id in PromptLibrary.BUNDLED_IDS) assertEquals(java.io.File(dir, "$id.txt").readText(), prompts.template(id) + "\n", "$id drifted")

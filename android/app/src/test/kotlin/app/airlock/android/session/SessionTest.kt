@@ -305,6 +305,96 @@ class SessionTest {
         assertFalse(rec.sent.joinToString().contains("Willowbrook"))
     }
 
+    // MARK: quick tasks answered on the device (FX-02): no seal, no Review, nothing sent
+
+    private fun auto(s: AirlockSession, pref: AnswerPreference = AnswerPreference.AUTO) = s.setPrefs { it.copy(preference = pref) }
+
+    @Test fun aSummaryIsAnsweredStraightAwayAsALocalThreadWithNothingSent() = runTest {
+        val (svc, rec) = services()
+        val s = session(svc, backgroundScope)
+        auto(s)
+        assertTrue(s.staysOnDevice(TaskKind.Summary, SAMPLE))
+        s.submit(SAMPLE, TaskKind.Summary)
+        val st = s.current
+        assertEquals(Screen.THREAD, st.screen)
+        assertNull(st.review)
+        val t = st.threads.single()
+        assertEquals("Summary of a message", t.title)
+        val (u, a) = t.turns
+        assertTrue(u is Turn.User && u.local && u.sealed == null)
+        a as Turn.Assistant
+        assertTrue(a.local && a.status == Turn.Status.DONE && a.text.isNotEmpty())
+        assertEquals(Route.PHONE_ONLY, a.outcome!!.route)
+        assertNull(a.outcome!!.receipt)
+        assertTrue(rec.sent.isEmpty() && s.ledger.receipts.isEmpty(), "nothing went to any sealed engine and no receipt was written")
+    }
+
+    @Test fun ifTheOnDeviceAnswerFailsNothingIsLeftBehindAndReviewStarts() = runTest {
+        val demo = DemoEngines.phone(pace = false)
+        val phone = MockPhoneEngine { id, text ->
+            if (id == "phone-local.v1") throw app.airlock.core.EngineError(app.airlock.core.EngineErrorCode.OTHER, "crash")
+            demo.respond(app.airlock.core.PhonePrompt(id, text), app.airlock.core.ANALYSIS_OPTIONS).text
+        }
+        val (svc, rec) = services(phone)
+        val s = session(svc, backgroundScope)
+        auto(s)
+        s.submit(SAMPLE, TaskKind.Summary)
+        assertTrue(s.current.threads.isEmpty())
+        assertEquals(Screen.REVIEW, s.current.screen)
+        assertNotNull(s.current.review?.result)
+        assertTrue(rec.sent.isEmpty(), "nothing is sent until Send")
+        for (raw in RAW) assertFalse(s.current.review!!.result!!.draft.text.contains(raw))
+    }
+
+    @Test fun bestAnswerAndDeepTasksStillGoThroughReviewAndThisDeviceOnlyMakesADeepTaskLocal() = runTest {
+        val best = services().let { (svc, _) -> session(svc, backgroundScope).also { auto(it, AnswerPreference.BEST) } }
+        best.submit(SAMPLE, TaskKind.Summary)
+        assertEquals(Screen.REVIEW, best.current.screen)
+        val deep = services().let { (svc, _) -> session(svc, backgroundScope).also { auto(it) } }
+        deep.submit(SAMPLE, TaskKind.Help)
+        assertEquals(Screen.REVIEW, deep.current.screen)
+        val (svc, rec) = services()
+        val only = session(svc, backgroundScope).also { auto(it, AnswerPreference.PHONE_ONLY) }
+        only.submit(SAMPLE, TaskKind.Help)
+        assertEquals(Screen.THREAD, only.current.screen)
+        assertTrue(rec.sent.isEmpty())
+    }
+
+    @Test fun aFollowUpThatNeedsTheCloudIsSealedOnItsOwnAndEarlierLocalTextNeverGoes() = runTest {
+        val (svc, rec) = services()
+        val s = session(svc, backgroundScope)
+        auto(s)
+        s.submit(SAMPLE, TaskKind.Summary)
+        val id = s.current.currentThreadId!!
+        assertTrue(AirlockSession.historyOf(s.current.threads.single()).turns.isEmpty(), "local turns never enter the replayed history")
+        s.submit("Please draft a firm reply to Raj about the heater.", TaskKind.Help, id)
+        assertEquals(Screen.REVIEW, s.current.screen)
+        assertTrue(s.send())
+        val t = s.current.threads.single()
+        assertEquals(4, t.turns.size)
+        assertEquals("Summary of a message", t.title)
+        val outbound = s.ledger.receipts.joinToString("\n") { it.outboundText ?: "" } + "\n" + rec.sent.joinToString("\n")
+        assertTrue(outbound.isNotBlank())
+        for (raw in RAW + listOf("hasn't fixed the heater")) assertFalse(outbound.contains(raw), "$raw never leaves")
+        assertTrue(AirlockSession.historyOf(t).turns.none { it is app.airlock.core.SealedTurn.Assistant && it.modelText.contains("hasn't fixed") })
+    }
+
+    @Test fun aLocalThreadSurvivesAReloadAsLocal() = runTest {
+        val (svc, _) = services()
+        val s = session(svc, backgroundScope)
+        auto(s)
+        s.submit(SAMPLE, TaskKind.Summary)
+        val id = s.current.currentThreadId!!
+        val again = session(svc, backgroundScope)
+        val t = again.current.threads.first { it.id == id }
+        val (u, a) = t.turns
+        assertTrue(u is Turn.User && u.local && u.sealed == null && u.raw == SAMPLE)
+        a as Turn.Assistant
+        assertTrue(a.local)
+        assertNull(a.outcome!!.receipt)
+        assertEquals(listOf<app.airlock.core.RestoredSegment>(app.airlock.core.RestoredSegment.Text(a.text)), a.segments)
+    }
+
     @Test fun aFailedModelDownloadOffersRetryAndASuccessfulOneClearsIt() = runTest {
         var avail = PhoneAvailability.DOWNLOADABLE
         var fail = true

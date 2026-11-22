@@ -127,7 +127,7 @@ struct ThreadView: View {
         Button("Continue") {
             let text = followUp
             followUp = ""
-            Task { await session.startReview(text, task: .help, threadID: thread.id) }
+            Task { await session.submit(text, task: .help, threadID: thread.id) }
         }
         .buttonStyle(.primary)
         .disabled(followUp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || thread.isStreaming)
@@ -145,6 +145,26 @@ struct UserBubble: View {
     @State private var showRaw = false
 
     var body: some View {
+        if turn.local { localBody } else { sealedBody }
+    }
+
+    /// FX-02: answered on the device. There is no sealed version, and nothing was sent.
+    private var localBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Icon(.eye, size: 14)
+                Text("You wrote · stayed on this device").lineLimit(1).minimumScaleFactor(0.85)
+                Spacer(minLength: 8)
+            }
+            .font(.footnote).foregroundStyle(Palette.text2)
+            Text(verbatim: turn.raw).font(.body).foregroundStyle(Palette.text).lineSpacing(5).textSelection(.enabled)
+        }
+        .card(padding: 16)
+        .padding(.leading, 40)
+        .enter()
+    }
+
+    private var sealedBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Icon(showRaw ? .eye : .shield, size: 14)

@@ -191,6 +191,94 @@ final class AirlockSession {
 
     // MARK: Seal (Ask → Review)
 
+    /// Whether a request would be answered on the device with no seal and no Review (FX-02). For the Ask button's label.
+    func staysOnDevice(_ task: TaskOption, _ raw: String) -> Bool {
+        LocalAnswer.runsOnDevice(
+            task: task.kind, preference: prefs.preference, availability: availability,
+            rawLength: raw.trimmingCharacters(in: .whitespacesAndNewlines).utf16.count)
+    }
+
+    /// Ask and follow-up entry point. A quick task (or "This device only") with the on-device model available is answered right
+    /// here from the raw message: nothing leaves, so there is nothing to review. If that fails for any reason, or the request needs
+    /// the cloud, the normal seal → Review → gate flow runs.
+    func submit(_ raw: String, task: TaskOption, threadID: String? = nil) async {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        if staysOnDevice(task, text), await askOnDevice(text, task: task, threadID: threadID) { return }
+        await startReview(text, task: task, threadID: threadID)
+    }
+
+    /// Thread title for a conversation that has no sealed text yet: the task, never the user's words (titles can sync).
+    static func localTitle(_ task: TaskOption) -> String {
+        switch task {
+        case .help: String(localized: "Help with a message")
+        case .reply: String(localized: "Reply to a message")
+        case .explain: String(localized: "Explanation of a message")
+        case .summary: String(localized: "Summary of a message")
+        case .questions: String(localized: "Questions to ask")
+        case .actions: String(localized: "Actions from a message")
+        }
+    }
+
+    /// Answers from the raw message with the phone-only engine (INV-3). The turns are `local`: no sealed version, never in the
+    /// history sent to Gemini, no receipt, never backed up (INV-1, INV-7). Returns false, leaving no trace in the thread, when the
+    /// on-device answer fails, so the caller can run the normal flow.
+    private func askOnDevice(_ raw: String, task: TaskOption, threadID: String?) async -> Bool {
+        let existing = threadID.flatMap { thread($0) }
+        let id = existing?.id ?? UUID().uuidString
+        var earlier: [LocalAnswer.Exchange] = []
+        if let existing {
+            let turns = existing.turns
+            for i in turns.indices.dropLast() {
+                if case .user(let u) = turns[i], u.local, case .assistant(let a) = turns[i + 1], a.local, a.status == .done, let s = a.summary {
+                    earlier.append(.init(raw: u.raw, answer: s.modelText))
+                }
+            }
+        }
+        let stored = StoredSealed(text: "", legend: [], revealedVaultIDs: [], keptValues: [], local: true)
+        let newTurns: [Turn] = [
+            .user(UserTurn(raw: raw, display: "", sealed: nil, stored: stored, local: true)),
+            .assistant(AssistantTurn(task: task, status: .streaming, segments: [], animate: true, local: true)),
+        ]
+        let priorPath = askPath
+        if existing != nil {
+            updateThread(id) { $0.turns.append(contentsOf: newTurns) }
+        } else {
+            threads.insert(ChatThread(id: id, title: Self.localTitle(task), task: task, entities: EntityMap(), turns: newTurns, createdAt: Date()), at: 0)
+        }
+        section = .ask
+        askPath = [.thread(id)]
+        let result: LocalAnswer.Result
+        do {
+            result = try await LocalAnswer.run(phone: services.engines.phone, prompts: services.prompts, task: task.kind, raw: raw, earlier: earlier)
+        } catch {
+            // Leave no trace: the normal flow starts from the same text.
+            if existing != nil {
+                updateThread(id) { $0.turns.removeLast(2) }
+            } else {
+                threads.removeAll { $0.id == id }
+            }
+            askPath = priorPath
+            Self.log.notice("On-device answer failed; falling back to Review")
+            return false
+        }
+        let outcome = StoredOutcome(
+            route: .phoneOnly, modelVersion: result.modelVersion, ranOnDevice: true, fellBackToPhone: false,
+            latencyMs: Int(result.latency.components.seconds * 1000 + result.latency.components.attoseconds / 1_000_000_000_000_000),
+            receiptID: nil, local: true)
+        updateThread(id) { t in
+            guard case .assistant(var a)? = t.turns.last else { return }
+            a.status = .done
+            a.segments = [.text(result.text)]
+            a.summary = AnswerSummary(stored: outcome, modelText: result.text, receipt: nil, fidelity: .clean)
+            t.turns[t.turns.count - 1] = .assistant(a)
+        }
+        _ = try? await services.stores.saveCapture(RawText(raw, source: existing == nil ? .paste : .followUp), thread: id)
+        do { try await services.stores.saveEntities(existing?.entities ?? EntityMap(), thread: id) } catch { Self.log.error("Entity map save failed") }
+        await persist(id)
+        return true
+    }
+
     /// Runs detection, policy, sealing and the red-team on the device.
     func startReview(_ raw: String, task: TaskOption, threadID: String? = nil) async {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -519,7 +607,7 @@ final class AirlockSession {
                     outcome: s.map {
                         StoredOutcome(
                             route: $0.route, modelVersion: $0.modelVersion, ranOnDevice: $0.ranOnDevice, fellBackToPhone: $0.fellBackToPhone,
-                            latencyMs: $0.latencyMs, receiptID: $0.receipt?.id)
+                            latencyMs: $0.latencyMs, receiptID: $0.receipt?.id, local: a.local ? true : nil)
                     })
             }
         }
@@ -539,11 +627,22 @@ final class AirlockSession {
             var turns: [Turn] = []
             for st in rec.turns {
                 switch st {
+                case .user(let raw, let s) where s.local == true:
+                    // Answered on the device: there is no sealed version to re-check, and none is ever made from this turn.
+                    turns.append(.user(UserTurn(raw: raw, display: "", sealed: nil, stored: s, local: true)))
                 case .user(let raw, let s):
                     let draft = SealDraft(
                         storedText: s.text, legend: s.legend, entities: entities, revealedVaultIDs: Set(s.revealedVaultIDs), keptValues: Set(s.keptValues))
                     let sealed = try? gate.seal(draft)
                     turns.append(.user(UserTurn(raw: raw, display: s.text, sealed: sealed, stored: s)))
+                case .assistant(let task, let status, let modelText, let failure, let outcome) where outcome?.local == true:
+                    // Written on the device from the raw message: shown as it is, never "restored" with another conversation's details.
+                    let summary = outcome.map { AnswerSummary(stored: $0, modelText: modelText, receipt: nil, fidelity: .clean) }
+                    turns.append(
+                        .assistant(
+                            AssistantTurn(
+                                task: task, status: status, segments: [.text(modelText)], summary: summary, failure: failure, animate: false,
+                                local: true)))
                 case .assistant(let task, let status, let modelText, let failure, let outcome):
                     let ctx = RestoreContext(entities: entities, userFirstName: firstName, writingAsUser: task.kind.writesAsUser)
                     let restored = Restorer.restore(modelText, context: ctx)

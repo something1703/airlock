@@ -71,6 +71,8 @@ function demoEngines(): EngineProvider {
       return new Promise<string>((resolve) => setTimeout(() => resolve(JSON.stringify({ items })), import.meta.env.MODE === "test" ? 0 : 1200));
     }
     if (id === "gen.v1") return JSON.stringify({ rewrite: "a large hospital" });
+    // A quick task answered on the device from the raw message (FX-02): plain text, no placeholders.
+    if (id === "phone-local.v1") return "- Your landlord hasn't fixed the heater yet.\n- You have already asked several times.\n- The next step is a firm, polite written request.";
     if (id === "attack.v1") return JSON.stringify({ guesses: [] });
     // A short pause so the demo shows each step of the on-device scan.
     if (id === "tactics.v1") return new Promise<string>((resolve) => setTimeout(() => resolve(demoTactics(text.split("<<<\n")[1]?.split("\n>>>")[0] ?? "")), 700));

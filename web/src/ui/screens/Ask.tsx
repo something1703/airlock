@@ -47,12 +47,13 @@ export function Ask() {
   const { threads } = useAirlock();
   const [text, setText] = useState("");
   const [task, setTask] = useState<TaskKind>(TASKS[0]!.task);
+  const local = s.staysOnDevice(task, text);
 
   return (
     <div className="stack">
       <div>
         <h1>Ask</h1>
-        <p className="sub">Paste anything. Your device reads it first and seals what identifies you.</p>
+        <p className="sub">Paste anything. Your device reads it first and seals what identifies you.{local ? " This one is answered right here: nothing is sent." : ""}</p>
       </div>
       <OnDeviceStatus />
       <textarea className="compose enter" value={text} onFocus={() => s.warmUp()} onChange={(e) => { setText(e.target.value); s.warmUp(); }} placeholder="Paste a tense text thread, a lease clause, a strange message…" aria-label="Your message" />
@@ -63,7 +64,7 @@ export function Ask() {
       </div>
       {task.kind === "meeting" && <MeetingHint />}
       <div className="row">
-        <button className="btn btn-primary" disabled={!text.trim()} onClick={() => void s.startReview(text, task)}><span className="row" style={{ gap: 8 }}>Seal on this device <IconArrow size={16} /></span></button>
+        <button className="btn btn-primary" disabled={!text.trim()} onClick={() => void s.submit(text, task)}><span className="row" style={{ gap: 8 }}>{local ? "Answer on this device" : "Seal on this device"} <IconArrow size={16} /></span></button>
         <CheckScamButton text={text} />
         <button className="btn btn-ghost" onClick={() => { setText(SAMPLE); s.warmUp(); }}><span className="row" style={{ gap: 6 }}><IconSparkle size={16} /> Try a sample (fictional)</span></button>
       </div>

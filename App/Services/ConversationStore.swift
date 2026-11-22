@@ -9,6 +9,8 @@ struct StoredSealed: Codable, Sendable, Hashable {
     let legend: [LegendLine]
     let revealedVaultIDs: [String]
     let keptValues: [String]
+    /// FX-02: answered on the device from the raw message. There is no sealed version (the fields above are empty).
+    var local: Bool?
 }
 
 struct StoredOutcome: Codable, Sendable, Hashable {
@@ -18,6 +20,8 @@ struct StoredOutcome: Codable, Sendable, Hashable {
     let fellBackToPhone: Bool
     let latencyMs: Int
     let receiptID: String?
+    /// FX-02: written on the device from the raw message; shown as it is, never restored, sent or backed up.
+    var local: Bool?
 }
 
 enum StoredTurn: Codable, Sendable {

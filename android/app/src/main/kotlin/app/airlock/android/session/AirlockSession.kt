@@ -13,6 +13,10 @@ import app.airlock.core.ANALYSIS_OPTIONS
 import app.airlock.core.Action
 import app.airlock.core.AnswerEvent
 import app.airlock.core.AnswerOutcome
+import app.airlock.core.FidelityReport
+import app.airlock.core.LocalAnswer
+import app.airlock.core.RestoreResult
+import app.airlock.core.Route
 import app.airlock.core.AnswerRequest
 import app.airlock.core.Answers
 import app.airlock.core.ChainVerification
@@ -68,6 +72,8 @@ sealed interface Turn {
         /** Gate-checked sealed text for follow-up history; null if a reloaded turn no longer passes the gate. */
         val sealed: SealedText?,
         val stored: StoredSealed,
+        /** FX-02: answered on the device from this raw text. There is no sealed version (`sealed` is null) and nothing was sent. */
+        val local: Boolean = false,
     ) : Turn
 
     data class Assistant(
@@ -77,6 +83,8 @@ sealed interface Turn {
         val segments: List<RestoredSegment>,
         val outcome: AnswerOutcome?,
         val error: EngineErrorCode?,
+        /** FX-02: written by the on-device model from the raw message, so it may hold real names; never sent or backed up. */
+        val local: Boolean = false,
     ) : Turn
 
     enum class Status { STREAMING, DONE, ERROR }
@@ -232,6 +240,74 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
         val c = services.config
         val settings = SealSettings(dial = current.prefs.dial, chunkTokens = c.detectChunkTokens, today = Instant.now(), redTeamEnabled = c.redTeamEnabled, redTeamRounds = c.redTeamRounds, detectPromptId = c.detectPromptId)
         return SealPipeline(services.engines.phone, services.patterns, current.vault, services.prompts, settings)
+    }
+
+    /** Whether a request would be answered on the device with no seal and no Review (FX-02). For the Ask button's label. */
+    fun staysOnDevice(task: TaskKind, raw: String): Boolean =
+        LocalAnswer.runsOnDevice(task, current.prefs.preference, current.availability, raw.trim().length)
+
+    /**
+     * Ask and follow-up entry point. A quick task (or "This device only") with the on-device model available is answered right
+     * here from the raw message: nothing leaves, so there is nothing to review. If that fails for any reason, or the request
+     * needs the cloud, the normal seal → Review → gate flow runs.
+     */
+    suspend fun submit(raw: String, task: TaskKind, threadId: String? = null) {
+        val text = raw.trim()
+        if (text.isEmpty()) return
+        if (staysOnDevice(task, text) && askOnDevice(text, task, threadId)) return
+        startReview(text, task, threadId)
+    }
+
+    /**
+     * Answers from the raw message with the phone-only engine (INV-3). The turns are `local`: no sealed version, never in the
+     * history sent to Gemini, no receipt, never backed up (INV-1, INV-7). Returns false, leaving no trace in the thread, when the
+     * on-device answer fails, so the caller can run the normal flow.
+     */
+    private suspend fun askOnDevice(raw: String, task: TaskKind, threadId: String?): Boolean {
+        val existing = threadId?.let { id -> current.threads.firstOrNull { it.id == id } }
+        val id = existing?.id ?: UUID.randomUUID().toString()
+        val earlier = ArrayList<LocalAnswer.Exchange>()
+        existing?.turns?.let { ts ->
+            for (i in 0 until ts.size - 1) {
+                val u = ts[i]
+                val a = ts[i + 1]
+                if (u is Turn.User && u.local && a is Turn.Assistant && a.local && a.status == Turn.Status.DONE && a.outcome != null) earlier.add(LocalAnswer.Exchange(u.raw, a.outcome.modelText))
+            }
+        }
+        val stored = StoredSealed("", emptyList(), emptyList(), emptyList(), local = true)
+        val turns = listOf<Turn>(
+            Turn.User(raw, "", null, stored, local = true),
+            Turn.Assistant(task, Turn.Status.STREAMING, "", emptyList(), null, null, local = true),
+        )
+        val previousScreen = current.screen
+        val previousThread = current.currentThreadId
+        if (existing != null) setThread(id) { it.copy(turns = it.turns + turns) }
+        else set { it.copy(threads = listOf(Thread(id, localTitle(task), task, EntityMap(), turns, System.currentTimeMillis())) + it.threads) }
+        set { it.copy(currentThreadId = id, screen = Screen.THREAD) }
+        val result = try {
+            LocalAnswer.run(services.engines.phone, services.prompts, task, raw, earlier)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Leave no trace: the normal flow starts from the same text.
+            if (existing != null) setThread(id) { it.copy(turns = it.turns.dropLast(2)) }
+            else set { s -> s.copy(threads = s.threads.filter { it.id != id }) }
+            set { it.copy(currentThreadId = previousThread, screen = previousScreen) }
+            return false
+        }
+        val segments = listOf<RestoredSegment>(RestoredSegment.Text(result.text))
+        val outcome = AnswerOutcome(
+            result.text, RestoreResult(result.text, segments, emptyList(), emptyList(), 0), FidelityReport(emptyList(), emptyList()), Route.PHONE_ONLY,
+            result.modelVersion, true, false, result.latencyMs, null,
+        )
+        setThread(id) { t ->
+            val last = t.turns.lastOrNull()
+            if (last is Turn.Assistant) t.copy(turns = t.turns.dropLast(1) + last.copy(status = Turn.Status.DONE, text = result.text, segments = segments, outcome = outcome)) else t
+        }
+        runCatching { services.stores.saveCapture(raw, if (existing != null) "followUp" else "paste", id) }
+        runCatching { services.stores.saveEntities(id, existing?.entities ?: EntityMap()) }
+        persistThread(id)
+        return true
     }
 
     /** Ask → Review: detection, policy, sealing and red-team, all on the device. Suspends until the red-team is done. */
@@ -434,7 +510,7 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
                 is Turn.Assistant -> if (turn.status == Turn.Status.STREAMING) null else StoredTurn(
                     kind = "assistant", task = TaskDto.of(turn.task), status = if (turn.status == Turn.Status.DONE) "done" else "error",
                     modelText = turn.outcome?.modelText ?: "", error = turn.error?.wire,
-                    outcome = turn.outcome?.let { o -> StoredOutcome(o.route.wire, o.modelVersion, o.ranOnDevice, o.fellBackToPhone, o.latencyMs, o.receipt?.id) },
+                    outcome = turn.outcome?.let { o -> StoredOutcome(o.route.wire, o.modelVersion, o.ranOnDevice, o.fellBackToPhone, o.latencyMs, o.receipt?.id, turn.local) },
                 )
             }
         }
@@ -454,7 +530,23 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
         return services.stores.threads().map { rec ->
             val entities = runCatching { services.stores.loadEntities(rec.id) }.getOrElse { EntityMap() }
             val turns = rec.turns.mapNotNull { st ->
-                if (st.kind == "user") {
+                if (st.kind == "user" && st.sealed?.local == true) {
+                    // Answered on the device: there is no sealed version to re-check, and none is ever made from this turn.
+                    Turn.User(st.raw ?: "", "", null, st.sealed, local = true)
+                } else if (st.kind == "assistant" && st.outcome?.local == true) {
+                    // Written on the device from the raw message: shown as it is, never "restored" with another conversation's details.
+                    val modelText = st.modelText ?: ""
+                    val o = st.outcome
+                    val segments = listOf<RestoredSegment>(RestoredSegment.Text(modelText))
+                    Turn.Assistant(
+                        st.task?.toTask() ?: TaskKind.Help, if (st.status == "done") Turn.Status.DONE else Turn.Status.ERROR, modelText, segments,
+                        AnswerOutcome(
+                            modelText, RestoreResult(modelText, segments, emptyList(), emptyList(), 0), FidelityReport(emptyList(), emptyList()), routeOf(o.route),
+                            o.modelVersion, true, false, o.latencyMs, null,
+                        ),
+                        st.error?.let { w -> EngineErrorCode.entries.firstOrNull { it.wire == w } }, local = true,
+                    )
+                } else if (st.kind == "user") {
                     val s = st.sealed ?: return@mapNotNull null
                     val draft = SealDraft(s.text, s.legendLines(), emptyList(), entities, emptyList(), s.revealedVaultIds.toSet(), s.keptValues.toSet())
                     val sealed = try {
@@ -535,6 +627,18 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
         private val STOP = Regex("^(a|an|the|at|to|of|and|or|in|on|for|with|my|your)$", RegexOption.IGNORE_CASE)
 
         /** First few words of the sealed text, placeholders replaced by plain nouns (title.v1 on device refines it). */
+        /** Thread title for a conversation that has no sealed text yet: the task, never the user's words (titles can sync). */
+        fun localTitle(task: TaskKind): String = when (task) {
+            TaskKind.Summary -> "Summary of a message"
+            TaskKind.Explain -> "Explanation of a message"
+            TaskKind.Actions -> "Actions from a message"
+            is TaskKind.Rewrite -> "Rewritten message"
+            TaskKind.Questions -> "Questions to ask"
+            is TaskKind.Reply -> "Reply to a message"
+            TaskKind.Help -> "Help with a message"
+            TaskKind.Custom -> "Conversation"
+        }
+
         fun titleFrom(sealed: String): String {
             val words = sealed.replace("[[PERSON_ME]]", "me")
                 .replace(Regex("\\[\\[([A-Z]+)_\\d+]]")) { NOUNS[it.groupValues[1]] ?: "something" }

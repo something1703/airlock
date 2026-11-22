@@ -42,7 +42,11 @@ data class LegendDto(val placeholder: String, val description: String)
 
 /** The sealed side of a user turn, kept so it can be re-checked by the gate on load (never trusted as-is). */
 @Serializable
-data class StoredSealed(val text: String, val legend: List<LegendDto>, val revealedVaultIds: List<String>, val keptValues: List<String>) {
+data class StoredSealed(
+    val text: String, val legend: List<LegendDto>, val revealedVaultIds: List<String>, val keptValues: List<String>,
+    /** FX-02: answered on the device from the raw message. There is no sealed version (the fields above are empty). */
+    val local: Boolean = false,
+) {
     fun legendLines(): List<LegendLine> = legend.map { LegendLine(it.placeholder, it.description) }
 
     companion object {
@@ -53,6 +57,8 @@ data class StoredSealed(val text: String, val legend: List<LegendDto>, val revea
 @Serializable
 data class StoredOutcome(
     val route: String, val modelVersion: String, val ranOnDevice: Boolean, val fellBackToPhone: Boolean, val latencyMs: Double, val receiptId: String?,
+    /** FX-02: written on the device from the raw message; shown as it is, never restored, sent or backed up. */
+    val local: Boolean = false,
 )
 
 @Serializable
