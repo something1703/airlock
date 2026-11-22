@@ -310,7 +310,7 @@ class PipelineTest {
         }
     }
 
-    @Test fun stagedBalancedShowsDraftEarlyStrictWaits() = runTest {
+    @Test fun stagedBalancedShowsDraftEarly() = runTest {
         val release = CompletableDeferred<Unit>()
         val p = townPhone()
         val slow = object : PhoneOnlyEngine {
@@ -332,10 +332,33 @@ class PipelineTest {
         assertEquals(1, full.risks.size)
         assertEquals(staged.result.draft.text, full.draft.text)
         assertContains(full.reasons, ReviewReason.Risks(1))
+        assertEquals(emptyList(), full.acceptedRisks)
+    }
 
-        val strict = pipe(townPhone(), DialPreset.STRICT).runStaged(this, townRaw)
-        assertNull(strict.later)
-        assertNull(strict.result.redTeamPending)
+    @Test fun stagedStrictShowsDraftFirstAndRewritesArriveLater() = runTest {
+        val release = CompletableDeferred<Unit>()
+        val p = townPhone()
+        val slow = object : PhoneOnlyEngine {
+            override suspend fun availability() = p.availability()
+            override suspend fun respond(prompt: PhonePrompt, options: PhoneOptions): EngineResult {
+                if (prompt.promptId == "attack.v1") release.await()
+                return p.respond(prompt, options)
+            }
+        }
+        val staged = SealPipeline(slow, patterns, vault, prompts, settings(DialPreset.STRICT)).runStaged(this, townRaw)
+        assertEquals(true, staged.result.redTeamPending)
+        assertTrue(staged.result.requiresReview)
+        assertContains(staged.result.draft.text, "near the old mill")
+        assertEquals(emptyList(), staged.result.acceptedRisks)
+        val later = assertNotNull(staged.later)
+        release.complete(Unit)
+        val full = later.await()
+        assertEquals(false, full.redTeamPending)
+        assertFalse(full.draft.text.contains("near the old mill"))
+        assertContains(full.draft.text, "in the area")
+        assertEquals(1, full.acceptedRisks.size)
+        assertFalse(full.reasons.any { it is ReviewReason.Risks })
+        EgressGate(patterns, vault).seal(full.draft)
     }
 
     @Test fun balancedRiskCardsAndReseal() = runTest {

@@ -306,6 +306,35 @@ describe("AirlockSession (demo engines, end to end)", () => {
     expect(after.draft.text).not.toContain("Willowbrook");
   });
 
+  it("strict: the draft shows first and the red-team's rewrites join it, with the user's mark kept (FX-02)", async () => {
+    const services = await createServices("?demo=1");
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    const base = services.engines.phone;
+    const scripted = { availability: () => base.availability(), respond: async (p: Parameters<typeof base.respond>[0], o: Parameters<typeof base.respond>[1]) => {
+      if (p.promptId === "attack.v1") { await gate; return { text: JSON.stringify({ guesses: [{ attribute: "location", evidence: "near the old mill", confidence: "high" }] }), modelVersion: "mock", ranOnDevice: true, latencyMs: 0 }; }
+      if (p.promptId === "gen.v1" && p.text.includes("near the old mill")) return { text: JSON.stringify({ rewrite: "in the area" }), modelVersion: "mock", ranOnDevice: true, latencyMs: 0 };
+      return base.respond(p, o);
+    } };
+    const s = new AirlockSession({ ...services, engines: { phone: scripted, sealed: services.engines.sealed.bind(services.engines), tools: services.engines.tools.bind(services.engines) } }, { dial: "strict", preference: "best", onboarded: true, backup: false });
+    await s.load();
+    await s.deleteEverything();
+    s.setPrefs({ onboarded: true, dial: "strict", backup: false });
+    const started = s.startReview("I live near the old mill and the leak at Willowbrook Court got worse.", { kind: "help" });
+    while (!s.getState().review?.result) await new Promise((r) => setTimeout(r, 1));
+    const early = s.getState().review!.result!;
+    expect(early.redTeamPending).toBe(true);
+    expect(early.draft.text).toContain("near the old mill");
+    expect(s.protect("Willowbrook Court", "location")).toBe(true);
+    release();
+    await started;
+    const after = s.getState().review!.result!;
+    expect(after.redTeamPending).toBe(false);
+    expect(after.draft.text).not.toContain("Willowbrook");
+    expect(after.draft.text).not.toContain("near the old mill");
+    expect(s.getState().review!.accepted.length).toBeGreaterThan(0);
+  });
+
   it("titles never contain placeholder tokens", () => {
     expect(titleFrom("Hi [[PERSON_1]], the heater at [[LOC_1]] has been broken")).toBe("Hi someone the heater at a place");
     expect(titleFrom("[[PERSON_ME]]")).toBe("Me");

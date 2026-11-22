@@ -96,6 +96,8 @@ public struct SealResult: Sendable {
     /// Risks whose suggestion is in the draft (auto-applied in Strict, or accepted in Review).
     public let acceptedRisks: [Risk]
     public let redTeamUnavailable: Bool
+    /// Staged mode: the red-team check is still running; sending must wait (FX-02).
+    public var redTeamPending = false
 
     /// Risks still shown as pending cards.
     public var pendingRisks: [Risk] {
@@ -131,6 +133,23 @@ public actor SealPipeline {
         _ raw: RawText, existing: EntityMap = EntityMap(), overrides: [PlaceholderID: UserOverride] = [:],
         progress: @escaping @Sendable (SealProgress) -> Void = { _ in }
     ) async -> SealResult {
+        await prepare(raw, existing: existing, overrides: overrides, staged: false, progress: progress).result
+    }
+
+    /// Like `run`, but returns the draft as soon as it is sealed (`redTeamPending == true`) and the full result via
+    /// `later`: risk cards in Balanced, and in Strict the draft with the red-team's rewrites applied (`acceptedRisks`).
+    /// Nothing may be sent while `redTeamPending` is true. `later` is nil when there is no red-team check to wait for.
+    public func runStaged(
+        _ raw: RawText, existing: EntityMap = EntityMap(), overrides: [PlaceholderID: UserOverride] = [:],
+        progress: @escaping @Sendable (SealProgress) -> Void = { _ in }
+    ) async -> (result: SealResult, later: Task<SealResult, Never>?) {
+        await prepare(raw, existing: existing, overrides: overrides, staged: true, progress: progress)
+    }
+
+    private func prepare(
+        _ raw: RawText, existing: EntityMap, overrides: [PlaceholderID: UserOverride], staged: Bool,
+        progress: @escaping @Sendable (SealProgress) -> Void
+    ) async -> (result: SealResult, later: Task<SealResult, Never>?) {
         let clock = ContinuousClock()
         let start = clock.now
         let meter = CallMeter(phone, start: start)
@@ -195,6 +214,35 @@ public actor SealPipeline {
                 progress(.checkingRisks)
                 let redStart = clock.now
                 let callsBefore = await meter.calls()
+                if staged {
+                    // The user can start reading now; the red-team's cards (Balanced) or rewrites (Strict) arrive later.
+                    var early = timings
+                    early.total = clock.now - start
+                    early.firstModelOutput = await meter.firstModelOutput
+                    Self.log(early)
+                    let first = Self.finalised(
+                        SealResult(
+                            normalised: normalised, merge: merge, draft: draft, reasons: [], requiresReview: false, detection: report,
+                            rewrites: rewrites, sealDuration: early.total, timings: early, risks: [], acceptedRisks: [],
+                            redTeamUnavailable: false, redTeamPending: true),
+                        mode: policy.reviewMode)
+                    let (sealed, mode, rounds, summary, reviewMode) = (draft, policy.redTeamMode, settings.redTeamRounds, settings.taskSummary, policy.reviewMode)
+                    let (prompts, patterns) = (self.prompts, self.patterns)
+                    let later = Task {
+                        let rt = await RedTeam(phone: meter, prompts: prompts, patterns: patterns)
+                            .run(sealed, mode: mode, maxRounds: rounds, taskSummary: summary)
+                        var t = early
+                        t.redTeam = clock.now - redStart
+                        t.redTeamCalls = await meter.calls() - callsBefore
+                        return Self.finalised(
+                            SealResult(
+                                normalised: normalised, merge: merge, draft: rt.draft, reasons: [], requiresReview: false, detection: report,
+                                rewrites: rewrites, sealDuration: early.total, timings: t, risks: rt.risks, acceptedRisks: rt.applied,
+                                redTeamUnavailable: rt.unavailable, redTeamPending: false),
+                            mode: reviewMode)
+                    }
+                    return (first, later)
+                }
                 let rt = await RedTeam(phone: meter, prompts: prompts, patterns: patterns)
                     .run(draft, mode: policy.redTeamMode, maxRounds: settings.redTeamRounds, taskSummary: settings.taskSummary)
                 timings.redTeam = clock.now - redStart
@@ -217,7 +265,7 @@ public actor SealPipeline {
             sealDuration: sealDuration, timings: timings, risks: risks, acceptedRisks: accepted, redTeamUnavailable: redTeamUnavailable)
         result = Self.finalised(result, mode: policy.reviewMode)
         progress(.done)
-        return result
+        return (result, nil)
     }
 
     /// The model's own general phrase for this entity (any of its surface forms), or nil if it gave none.
@@ -236,7 +284,7 @@ public actor SealPipeline {
             normalised: r.normalised, merge: r.merge, draft: r.draft, reasons: reasons, requiresReview: requiresReview(reasons, mode: mode),
             detection: r.detection, rewrites: r.rewrites, sealDuration: r.sealDuration, timings: r.timings, risks: r.risks,
             acceptedRisks: r.acceptedRisks,
-            redTeamUnavailable: r.redTeamUnavailable)
+            redTeamUnavailable: r.redTeamUnavailable, redTeamPending: r.redTeamPending)
     }
 
     /// Re-applies Review edits without calling the model again (chip toggles and "Use suggestion"
@@ -252,7 +300,7 @@ public actor SealPipeline {
                 normalised: result.normalised, merge: result.merge, draft: draft, reasons: [], requiresReview: false,
                 detection: result.detection, rewrites: result.rewrites, sealDuration: result.sealDuration, timings: result.timings,
                 risks: result.risks,
-                acceptedRisks: accepted, redTeamUnavailable: result.redTeamUnavailable),
+                acceptedRisks: accepted, redTeamUnavailable: result.redTeamUnavailable, redTeamPending: result.redTeamPending),
             mode: policy.reviewMode)
     }
 

@@ -90,6 +90,19 @@ struct ReviewView: View {
                 } else {
                     sealedCard(result, sealed: sealedCount, generalised: generalised, kept: keptCount)
                 }
+                if session.redTeamPending {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Checking what someone could still guess…").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
+                            Text("Still on your device. You can review and change details meanwhile; sending unlocks when the check is done.")
+                                .font(.footnote).foregroundStyle(Palette.text2)
+                        }
+                    }
+                    .card()
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.updatesFrequently)
+                }
                 if !risks.isEmpty {
                     Text("What someone could still guess").font(.title3.weight(.semibold)).foregroundStyle(Palette.text).accessibilityAddTraits(.isHeader)
                     ForEach(Array(risks.enumerated()), id: \.element.id) { i, r in
@@ -134,7 +147,7 @@ struct ReviewView: View {
             IconLabel(title: "Seal & send", glyph: .shield)
         }
         .buttonStyle(.primary)
-        .disabled(sending)
+        .disabled(sending || session.redTeamPending)
         .touchKeyboardShortcut(.return, modifiers: .command)
         .accessibilityHint(Text("Runs the final check and sends only the sealed version"))
         if session.review?.threadID == nil {
@@ -144,7 +157,7 @@ struct ReviewView: View {
                 IconLabel(title: "Copy sealed version", glyph: .copy)
             }
             .buttonStyle(.secondary)
-            .disabled(sending)
+            .disabled(sending || session.redTeamPending)
             .touchKeyboardShortcut("c", modifiers: [.command, .shift])
             .accessibilityHint(Text("Copies the sealed text to use with any other AI or person. Airlock sends nothing."))
         }

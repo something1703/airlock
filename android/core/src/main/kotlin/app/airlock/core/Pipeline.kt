@@ -72,7 +72,7 @@ data class SealResult(
     override fun toString(): String = "SealResult(${draft.text.length} chars, review=$requiresReview)"
 }
 
-/** `runStaged` output: the result now, and (Balanced only) the full result with risk cards later. */
+/** `runStaged` output: the result now, and the full result later (risk cards in Balanced, applied rewrites in Strict). */
 data class StagedSeal(val result: SealResult, val later: Deferred<SealResult>?)
 
 /**
@@ -152,17 +152,18 @@ class SealPipeline(
         }
         if (settings.redTeamEnabled && policy.redTeamMode != RedTeamMode.OFF) {
             if (report.unavailable != null) redTeamUnavailable = true
-            else if (staged != null && policy.redTeamMode == RedTeamMode.SUGGEST) {
-                // Suggestions don't change the draft, so the user can start reviewing now; risk cards arrive later.
+            else if (staged != null) {
+                // The user can start reading now; the red team's cards (Balanced) or its rewrites (Strict) arrive later and are
+                // applied on top of whatever they changed meanwhile. Nothing may be sent while redTeamPending is true.
                 val early = base().copy(redTeamPending = true)
                 progress(SealProgress.CheckingRisks)
                 val tRed = now()
                 val callsBefore = meter.calls()
                 val later = staged.async {
-                    val rt = RedTeam(meter, prompts, patterns).run(draft, RedTeamMode.SUGGEST, settings.redTeamRounds, settings.taskSummary)
+                    val rt = RedTeam(meter, prompts, patterns).run(draft, policy.redTeamMode, settings.redTeamRounds, settings.taskSummary)
                     finalise(
                         early.copy(
-                            redTeamPending = false, risks = rt.risks, redTeamUnavailable = rt.unavailable, sealMs = now() - t0,
+                            redTeamPending = false, risks = rt.risks, acceptedRisks = rt.applied, draft = rt.draft, redTeamUnavailable = rt.unavailable, sealMs = now() - t0,
                             timings = early.timings.copy(redTeamMs = now() - tRed, redTeamCalls = meter.calls() - callsBefore),
                         ),
                         policy.reviewMode,
@@ -200,10 +201,9 @@ class SealPipeline(
     ): SealResult = prepare(raw, existing, overrides, progress, null).result
 
     /**
-     * Like [run], but when the red team only *suggests* (Balanced), returns the draft as soon as it is sealed
-     * (`redTeamPending = true`) and the full result — with risk cards — via `later`, launched in `scope`. Strict
-     * still waits, because there the red team rewrites the draft itself. Nothing may be sent while
-     * `redTeamPending` is true.
+     * Like [run], but returns the draft as soon as it is sealed (`redTeamPending = true`) and the full result via `later`,
+     * launched in `scope`: risk cards in Balanced, and in Strict the draft with the red team's rewrites applied
+     * (`acceptedRisks`). Nothing may be sent while `redTeamPending` is true.
      */
     suspend fun runStaged(
         scope: CoroutineScope,

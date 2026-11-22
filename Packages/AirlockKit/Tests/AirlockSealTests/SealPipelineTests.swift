@@ -212,6 +212,63 @@ final class ProgressLog: @unchecked Sendable {
         #expect(sealed.gateReport.counts["redteamApplied"] == 1)
     }
 
+    /// A phone that behaves like `base` but holds the red-team's attack call until `gate` is released.
+    fileprivate static func gated(_ base: MockPhoneEngine, by gate: Gate) -> MockPhoneEngine {
+        MockPhoneEngine { (id: String, text: String) async throws(EngineError) -> String in
+            if id == "attack.v1" { await gate.wait() }
+            return try await base.respond(PhonePrompt(promptID: id, text: text), options: .analysis).text
+        }
+    }
+
+    /// FX-02: Balanced shows the draft before the red-team finishes; the risk cards arrive with the late result.
+    @Test func stagedBalancedShowsTheDraftFirst() async throws {
+        let gate = Gate()
+        let base = Self.phone(rewrite: "in the area", attack: Self.townGuess)
+        let phone = Self.gated(base, by: gate)
+        let (early, later) = await try pipeline(phone).runStaged(RawText(townRaw, source: .paste))
+        #expect(early.redTeamPending)
+        #expect(early.risks.isEmpty && early.draft.text.contains("a large hospital"))
+        #expect(early.timings.redTeamCalls == 0)
+        let task = try #require(later)
+        await gate.release()
+        let full = await task.value
+        #expect(!full.redTeamPending)
+        #expect(full.risks.count == 1 && full.acceptedRisks.isEmpty)
+        #expect(full.draft.text == early.draft.text)
+        #expect(full.reasons.contains(.risks(count: 1)))
+        #expect(full.timings.redTeamCalls > 0)
+    }
+
+    /// FX-02: Strict also shows the draft first; its rewrites arrive with the late result, and Review stays mandatory.
+    @Test func stagedStrictShowsTheDraftFirstAndRewritesArriveLater() async throws {
+        let gate = Gate()
+        let base = Self.phone(rewrite: "in the area", attack: Self.townGuess)
+        let phone = Self.gated(base, by: gate)
+        let (early, later) = await try pipeline(phone, dial: .strict).runStaged(RawText(townRaw, source: .paste))
+        #expect(early.redTeamPending && early.requiresReview)
+        #expect(early.draft.text.contains("near the old mill") && early.acceptedRisks.isEmpty)
+        let task = try #require(later)
+        await gate.release()
+        let full = await task.value
+        #expect(!full.redTeamPending)
+        #expect(full.draft.text.contains("in the area") && !full.draft.text.contains("old mill"))
+        #expect(full.acceptedRisks.count == 1 && full.pendingRisks.isEmpty)
+        _ = try EgressGate(patterns: fixturePatterns, vault: vault).seal(full.draft)
+    }
+
+    /// A chip toggled while the check runs keeps the pending flag, so Send stays locked.
+    @Test func resealKeepsThePendingFlag() async throws {
+        let gate = Gate()
+        let base = Self.phone(rewrite: "in the area", attack: Self.townGuess)
+        let phone = Self.gated(base, by: gate)
+        let p = try pipeline(phone)
+        let (early, later) = await p.runStaged(RawText(townRaw, source: .paste))
+        let touched = await p.reseal(early, overrides: [:])
+        #expect(touched.redTeamPending)
+        await gate.release()
+        _ = await later?.value
+    }
+
     @Test func strictAutoApplies() async throws {
         let phone = Self.phone(rewrite: "in the area", attack: Self.townGuess)
         let r = await try pipeline(phone, dial: .strict).run(RawText(townRaw, source: .paste))
@@ -230,5 +287,21 @@ final class ProgressLog: @unchecked Sendable {
         let phone = Self.phone(attack: Self.townGuess)
         _ = await try pipeline(phone, dial: .open).run(RawText(townRaw, source: .paste))
         #expect(!phone.calledPromptIDs.contains("attack.v1"))
+    }
+}
+
+
+/// Holds a model call until the test lets it go.
+fileprivate actor Gate {
+    private var open = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func wait() async {
+        if open { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+    func release() {
+        open = true
+        for w in waiters { w.resume() }
+        waiters = []
     }
 }

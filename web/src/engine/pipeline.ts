@@ -171,15 +171,16 @@ export class SealPipeline {
     };
     if (this.settings.redTeamEnabled && policy.redTeamMode !== "off") {
       if (report.unavailable !== null) redTeamUnavailable = true;
-      else if (staged && policy.redTeamMode === "suggest") {
-        // Suggestions don't change the draft, so the user can start reviewing now; risk cards arrive later.
+      else if (staged) {
+        // The user can start reading now; the red-team's cards (Balanced) or its rewrites (Strict) arrive later and are
+        // applied on top of whatever they changed meanwhile. Nothing may be sent while `redTeamPending` is true.
         const early = { ...base(), redTeamPending: true };
         progress({ kind: "checkingRisks" });
         const tRed = performance.now();
         const callsBefore = meter.calls();
-        later = new RedTeam(meter, this.prompts, this.patterns).run(draft, "suggest", this.settings.redTeamRounds, this.settings.taskSummary)
+        later = new RedTeam(meter, this.prompts, this.patterns).run(draft, policy.redTeamMode, this.settings.redTeamRounds, this.settings.taskSummary)
           .then((rt) => finalise({
-            ...early, redTeamPending: false, risks: rt.risks, redTeamUnavailable: rt.unavailable, sealMs: performance.now() - t0,
+            ...early, redTeamPending: false, risks: rt.risks, acceptedRisks: rt.applied, draft: rt.draft, redTeamUnavailable: rt.unavailable, sealMs: performance.now() - t0,
             timings: { ...early.timings, redTeamMs: performance.now() - tRed, redTeamCalls: meter.calls() - callsBefore },
           }, policy.reviewMode));
         return { result: finalise(early, policy.reviewMode), later };
@@ -204,9 +205,9 @@ export class SealPipeline {
   }
 
   /**
-   * Like `run`, but when the red-team only *suggests* (Balanced), returns the draft as soon as it is sealed
-   * (`redTeamPending: true`) and the full result — with risk cards — via `later`. Strict still waits, because
-   * there the red-team rewrites the draft itself. Nothing may be sent while `redTeamPending` is true.
+   * Like `run`, but returns the draft as soon as it is sealed (`redTeamPending: true`) and the full result via `later`:
+   * risk cards in Balanced, and in Strict the draft with the red-team's rewrites applied (`acceptedRisks`).
+   * Nothing may be sent while `redTeamPending` is true.
    */
   runStaged(raw: string, existing = new EntityMap(), overrides = new Map<PlaceholderId, UserOverride>(), progress: (p: SealProgress) => void = () => {}): Promise<{ result: SealResult; later: Promise<SealResult> | null }> {
     return this.prepare(raw, existing, overrides, progress, true);
