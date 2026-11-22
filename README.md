@@ -71,7 +71,7 @@ Firebase AI Logic iOS SDK **12.19.0** (the release with the documented `HybridMo
 
 | Capability | Inference mode | Firebase AI Logic call | File |
 |-----------|----------------|------------------------|------|
-| Entity detection on raw text (`detect.v1`) | On-device only | `generativeModelSession(model: .systemModel(guardrails: .permissiveContentTransformations))` | `AirlockEngines/FirebaseEngines.swift` (`FirebasePhoneEngine`), used by `AirlockDetect/LLMDetector.swift` |
+| Entity detection on raw text (`detect.v1`; `detect.v2` when Remote Config `detect_prompt_id` says so) | On-device only | `generativeModelSession(model: .systemModel(guardrails: .permissiveContentTransformations))` | `AirlockEngines/FirebaseEngines.swift` (`FirebasePhoneEngine`), used by `AirlockDetect/LLMDetector.swift` |
 | Generalising phrases on raw text (`gen.v1`) | On-device only | same phone-only session | `AirlockSeal/SealPipeline.swift` |
 | Red-team attack (`attack.v1`) | On-device only | same phone-only session | `AirlockSeal/RedTeam.swift` *(next WP)* |
 | Quick tasks on sealed text | On-device first, cloud fallback | `.hybridModel(primary: .systemModel(), secondary: .geminiModel(...))` | `AirlockEngines/ModelPlan.swift`, `FirebaseEngines.swift` (`FirebaseSealedEngine`) |

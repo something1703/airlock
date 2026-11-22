@@ -12,6 +12,25 @@ export interface LLMDetectionReport {
   repairsUsed: number;
   unavailable: PhoneAvailability | null;
   chunkCount: number;
+  /**
+   * `detect.v2`: the model's own "a large hospital" phrase for an ORG / LOCATION / HEALTH item, by `category:lower-cased text`.
+   * Unchecked: the pipeline shape-checks it and the Sealer validates it before use.
+   */
+  generals: Map<string, string>;
+}
+
+/** Key into `LLMDetectionReport.generals`. */
+export const generalKey = (category: PrivacyCategory, text: string): string => `${category}:${text.toLowerCase()}`;
+
+/** The prompt that asks for the one-line format; anything else is answered as v1 JSON. */
+export const DETECT_V2 = "detect.v2";
+export const DETECT_V1 = "detect.v1";
+
+export interface DetectorOptions {
+  /** `detect.v1` (JSON, default) or `detect.v2` (lines). Both replies parse either way. */
+  promptId?: string;
+  /** Rule hits to hide from the model in the prompt (`[email]`, `[phone]`, `[id]`…) so it doesn't write them back out. */
+  masks?: readonly Candidate[];
 }
 
 export const isComplete = (r: LLMDetectionReport): boolean => r.failedChunks.length === 0 && r.refusedChunks.length === 0 && r.unavailable === null;
@@ -22,6 +41,7 @@ interface Item {
   role: string | null;
   sameAs: string | null;
   confidence: Confidence;
+  general: string | null;
 }
 
 /** First balanced `{…}` (code fences and prose around it are ignored). */
@@ -49,7 +69,37 @@ export function firstJsonObject(s: string): string | null {
   return null;
 }
 
+/**
+ * `detect.v2` reply: `TYPE | exact text | role | general`, one per line, `?TYPE` when unsure, `END` last. Returns null when
+ * the reply holds neither a line in that form nor `END` (so it can be repaired). A bare `END` is a valid "nothing found".
+ */
+function parseLines(output: string): Item[] | null {
+  const items: Item[] = [];
+  let sawEnd = false;
+  let sawLine = false;
+  for (const raw of output.split(/\r?\n/u)) {
+    const line = raw.trim().replace(/^[-*•]\s+/u, "");
+    if (!line) continue;
+    if (line.toUpperCase() === "END") {
+      sawEnd = true;
+      break;
+    }
+    const m = line.match(/^(\??)\s*([A-Za-z_ ]+?)\s*\|(.*)$/u);
+    if (!m) continue;
+    sawLine = true;
+    const [, unsure, type, rest] = m;
+    const fields = rest!.split("|").map((f) => f.trim());
+    const text = fields[0] ?? "";
+    if (!text) continue;
+    const dash = (f: string | undefined): string | null => (f === undefined || f === "" || f === "-" ? null : f);
+    items.push({ text, type: type!.toUpperCase(), role: dash(fields[1]), sameAs: null, confidence: unsure ? "low" : "high", general: dash(fields[2]) });
+  }
+  return sawLine || sawEnd ? items : null;
+}
+
 function parseItems(output: string): Item[] | null {
+  const lines = parseLines(output);
+  if (lines) return lines;
   const json = firstJsonObject(output);
   if (!json) return null;
   let obj: unknown;
@@ -68,7 +118,7 @@ function parseItems(output: string): Item[] | null {
     const conf = typeof d.confidence === "string" ? d.confidence.toLowerCase() : "";
     out.push({
       text: d.text, type: d.type.toUpperCase(), role: typeof d.role === "string" ? d.role : null, sameAs: typeof d.same_as === "string" ? d.same_as : null,
-      confidence: conf === "high" || conf === "medium" || conf === "low" ? conf : "medium",
+      confidence: conf === "high" || conf === "medium" || conf === "low" ? conf : "medium", general: typeof d.general === "string" && d.general.trim() ? d.general.trim() : null,
     });
   }
   return out;
@@ -108,14 +158,22 @@ type Outcome = { kind: "found"; candidates: Candidate[] } | { kind: "stop" };
  * failures are reported, never hidden.
  */
 export class LLMDetector {
+  readonly promptId: string;
+  private readonly masks: readonly Candidate[];
+
   constructor(
     readonly engine: PhoneOnlyEngine,
     readonly prompts: PromptLibrary,
     readonly budgetTokens: number,
-  ) {}
+    options: DetectorOptions = {},
+  ) {
+    this.promptId = options.promptId ?? DETECT_V1;
+    // Masking belongs to detect.v2 (its prompt tells the model what [email] means); detect.v1 sees the text as written.
+    this.masks = this.promptId === DETECT_V2 ? (options.masks ?? []) : [];
+  }
 
   async detect(text: string, progress: (section: number, of: number) => void = () => {}): Promise<LLMDetectionReport> {
-    const report: LLMDetectionReport = { candidates: [], failedChunks: [], refusedChunks: [], hallucinatedDropped: 0, repairsUsed: 0, unavailable: null, chunkCount: 0 };
+    const report: LLMDetectionReport = { candidates: [], failedChunks: [], refusedChunks: [], hallucinatedDropped: 0, repairsUsed: 0, unavailable: null, chunkCount: 0, generals: new Map() };
     const availability = await this.engine.availability();
     if (availability !== "available") {
       report.unavailable = availability;
@@ -143,7 +201,7 @@ export class LLMDetector {
   private async run(chunk: Chunk, fullText: string, depth: number, report: LLMDetectionReport): Promise<Outcome> {
     let output: string;
     try {
-      output = (await this.engine.respond({ promptId: "detect.v1", text: this.prompts.render("detect.v1", { chunk: chunk.text }) }, ANALYSIS_OPTIONS)).text;
+      output = (await this.engine.respond({ promptId: this.promptId, text: this.prompts.render(this.promptId, { chunk: maskChunk(chunk, this.masks) }) }, ANALYSIS_OPTIONS)).text;
     } catch (e) {
       return this.handle(e, chunk, fullText, depth, report);
     }
@@ -191,12 +249,17 @@ export class LLMDetector {
   private locate(items: Item[], chunk: Chunk, report: LLMDetectionReport): Candidate[] {
     const out: Candidate[] = [];
     for (const item of items) {
+      if (/^\[[^\]]*\]$/u.test(item.text.trim())) continue; // a mask token ("[email]") the model echoed back: not a detail
       const category = CATEGORY[item.type];
       if (!category) continue;
       const ranges = occurrences(item.text, chunk.text);
       if (ranges.length === 0) {
         report.hallucinatedDropped++;
         continue;
+      }
+      if (item.general && (category === "org" || category === "location" || category === "health")) {
+        const k = generalKey(category, item.text);
+        if (!report.generals.has(k)) report.generals.set(k, item.general);
       }
       const subtype = category === "location" ? (/\p{N}/u.test(item.text) ? "address" : "place") : category === "date" ? "dob" : null;
       for (const r of ranges) {
@@ -208,4 +271,27 @@ export class LLMDetector {
     }
     return out;
   }
+}
+
+const MASK_TOKEN: Record<string, string> = { email: "[email]", phone: "[phone]", url: "[link]", handle: "[handle]" };
+
+/**
+ * The chunk as the model sees it for `detect.v2`: contact, ID and secret hits the rules already found become `[email]`,
+ * `[phone]`, `[id]`, `[secret]`, so the model doesn't spend output tokens copying them back. Locating spans still uses
+ * the original chunk text. With no masks the chunk is returned unchanged.
+ */
+export function maskChunk(chunk: Chunk, masks: readonly Candidate[]): string {
+  const inside = masks
+    .filter((c) => (c.category === "contact" || c.category === "id" || c.category === "secret") && c.span.start >= chunk.span.start && c.span.end <= chunk.span.end)
+    .sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end);
+  if (!inside.length) return chunk.text;
+  let out = "";
+  let at = chunk.span.start;
+  for (const c of inside) {
+    if (c.span.start < at) continue; // overlaps a mask already applied
+    out += chunk.text.slice(at - chunk.span.start, c.span.start - chunk.span.start);
+    out += c.category === "contact" ? (MASK_TOKEN[c.subtype ?? ""] ?? "[contact]") : c.category === "secret" ? "[secret]" : "[id]";
+    at = c.span.end;
+  }
+  return out + chunk.text.slice(at - chunk.span.start);
 }

@@ -74,6 +74,17 @@ public enum Generaliser {
 
     // MARK: Validation
 
+    /// Shape check for a phrase the model wrote to replace `replaced` (FX-02, `detect.v2` `general`): at most 6 words, no
+    /// sentence punctuation or brackets, and no capital first letter unless the replaced text started with one. It stops a
+    /// whole sentence being dropped into the middle of another; `validate` still runs after it.
+    public static func plausibleGeneral(_ phrase: String, replacing replaced: String) -> Bool {
+        let p = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !p.isEmpty, p.split(whereSeparator: \.isWhitespace).count <= 6 else { return false }
+        if p.contains(where: { ".!?;:[]{}<>|\n".contains($0) }) { return false }
+        let startedUpper = replaced.trimmingCharacters(in: .whitespacesAndNewlines).first?.isUppercase ?? false
+        return !((p.first?.isUppercase ?? false) && !startedUpper)
+    }
+
     public static func validate(_ rewrite: String, replacing phrase: String, entities: EntityMap, patterns: PatternDetector) -> Bool {
         let r = rewrite.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !r.isEmpty, r.split(whereSeparator: \.isWhitespace).count <= maxWords else { return false }

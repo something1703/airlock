@@ -28,6 +28,13 @@
       "valueType": "BOOLEAN",
       "description": "Non-streaming deep answers so Model Armor screens them"
     },
+    "detect_prompt_id": {
+      "defaultValue": {
+        "value": "detect.v1"
+      },
+      "valueType": "STRING",
+      "description": "On-device detection prompt: detect.v1 (JSON) or detect.v2 (one line per detail; also writes the generalised phrase). Anything else runs detect.v1"
+    },
     "detect_chunk_tokens": {
       "defaultValue": {
         "value": "1400"

@@ -59,6 +59,48 @@ final class ProgressLog: @unchecked Sendable {
         _ = try EgressGate(patterns: fixturePatterns, vault: vault).seal(r.draft)
     }
 
+    /// FX-02 detect.v2: the model's general phrase is used (no gen.v1); bad ones fall back to the fixed phrase.
+    @Test func detectV2UsesTheModelsGeneralPhrase() async throws {
+        func pipe(_ p: MockPhoneEngine) throws -> SealPipeline {
+            SealPipeline(
+                phone: p, patterns: fixturePatterns, vault: vault, prompts: try PromptLibrary(),
+                settings: SealSettings(dial: .balanced, nlTaggerEnabled: false, today: utcDate("2026-11-21"), detectPromptID: "detect.v2"))
+        }
+        let good = MockPhoneEngine { id, _ in
+            id == "detect.v2" ? "ORG | Mercy General Hospital | employer | a large hospital\nEND" : id == "attack.v1" ? Self.noGuesses : "{}"
+        }
+        let r = await try pipe(good).run(RawText(raw, source: .paste))
+        #expect(good.calledPromptIDs == ["detect.v2", "attack.v1"])
+        #expect(r.draft.text.contains("I work nights at a large hospital."))
+        #expect(r.timings.generaliseCalls == 0)
+        for bad in ["Mercy General campus", "Works nights at a big hospital downtown today."] {
+            let p = MockPhoneEngine { id, _ in
+                id == "detect.v2" ? "ORG | Mercy General Hospital | employer | \(bad)\nEND" : id == "attack.v1" ? Self.noGuesses : "{}"
+            }
+            let r = await try pipe(p).run(RawText(raw, source: .paste))
+            #expect(!p.calledPromptIDs.contains("gen.v1"), "\(bad)")
+            #expect(r.draft.text.contains("I work nights at an organisation."), "\(bad)")
+        }
+        let none = MockPhoneEngine { id, _ in
+            id == "detect.v2" ? "ORG | Mercy General Hospital | employer | -\nEND" : id == "gen.v1" ? #"{"rewrite":"a large hospital"}"# : Self.noGuesses
+        }
+        let r3 = await try pipe(none).run(RawText(raw, source: .paste))
+        #expect(none.calledPromptIDs == ["detect.v2", "gen.v1", "attack.v1"])
+        #expect(r3.draft.text.contains("a large hospital"))
+    }
+
+    @Test func plausibleGeneralShapeCheck() {
+        for g in ["a large hospital", "a nearby street", "a chronic condition"] {
+            #expect(Generaliser.plausibleGeneral(g, replacing: "Mercy General Hospital"), "\(g)")
+        }
+        #expect(!Generaliser.plausibleGeneral("Two-week turnaround required for repairs.", replacing: "14 days"))
+        #expect(!Generaliser.plausibleGeneral("a very large and busy teaching hospital in town", replacing: "Mercy General"))
+        #expect(!Generaliser.plausibleGeneral("a [[ORG_1]] clinic", replacing: "Mercy"))
+        #expect(!Generaliser.plausibleGeneral("The hospital", replacing: "mercy"))
+        #expect(Generaliser.plausibleGeneral("The hospital", replacing: "Mercy"))
+        #expect(!Generaliser.plausibleGeneral("", replacing: "Mercy"))
+    }
+
     /// FX-02: timings count calls per stage and add up; no model → no calls and no first reply.
     @Test func timingsCountCallsPerStage() async throws {
         let r = await try pipeline(Self.phone()).run(RawText(raw, source: .paste))

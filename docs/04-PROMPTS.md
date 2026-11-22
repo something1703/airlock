@@ -43,6 +43,50 @@ Schema:
 {"items":[{"text":"string (exact substring)","type":"PERSON|ORG|LOCATION|CONTACT|ID|DATE|HEALTH|SECRET","role":"string|null","same_as":"string|null","confidence":"high|medium|low"}]}
 ```
 
+### `detect.v2` — the same job in about half the output (FX-02)
+
+Used instead of `detect.v1` when Remote Config `detect_prompt_id` is `detect.v2` (default `detect.v1` until the live check in `docs/API-NOTES.md` confirms it on each platform's on-device model). One line per detail instead of a JSON object, so the model writes fewer tokens (the cost of a seal is its output tokens: ~18 tokens/s on Chrome's model). It also writes the "general" phrase that `gen.v1` used to produce, one extra call per generalised detail.
+
+```
+You find private details in text so they can be hidden before it is shared.
+
+Write one line for each private detail, in exactly this form:
+TYPE | exact text | role | general
+
+TYPE is one of:
+PERSON: a person's name, nickname or username (not "my mom" alone, but yes to "Mom (Linda)")
+ORG: a named company, employer, school, hospital, clinic, landlord company, client, shop
+LOCATION: a street address, unit or apartment number, neighbourhood, or a town/city name
+CONTACT: email, phone number, social handle, personal website
+ID: account, card, policy, case, claim, order, passport, licence or ID numbers
+DATE: a date of birth or birthday
+HEALTH: a named medical condition, medication or procedure about a person
+SECRET: passwords, one-time codes, PINs, API keys, recovery phrases
+
+Rules:
+- exact text: copy it exactly as it appears in the text.
+- role: one or two words for who or what it is to the writer, without naming anyone (landlord, employer, doctor, me). Write - if unclear.
+- general: only for ORG, LOCATION and HEALTH. A short phrase of at most 6 words that says what kind of thing it is, with no names ("a large hospital", "a nearby street", "a chronic condition"). Write - for every other type.
+- Put ? before TYPE if you are not sure the detail is private.
+- Text in [square brackets], such as [email], is already hidden. Do not list it.
+- Write END on the last line. If nothing is private, write only END.
+
+Example text: Hi Raj, I work at Mercy General Hospital near Elm Street. Thanks, Maya
+Example answer:
+PERSON | Raj | landlord | -
+ORG | Mercy General Hospital | employer | a large hospital
+LOCATION | Elm Street | nearby street | a nearby street
+PERSON | Maya | me | -
+END
+
+Text:
+<<<
+{{chunk}}
+>>>
+```
+
+Reply format: `TYPE | exact text | role | general`, one per line; `?` before TYPE = unsure (low confidence, otherwise high); `-` = none; `END` = done. `general` is read for ORG, LOCATION and HEALTH only, shape-checked (≤ 6 words, no sentence punctuation, no capital the replaced text lacked) and then validated like a `gen.v1` rewrite; if it fails the fixed phrase for the category is used. Contact, ID and secret hits the rules already found are replaced in the prompt by `[email]`, `[phone]`, `[link]`, `[handle]`, `[contact]`, `[id]`, `[secret]`, and an item that echoes such a token is ignored. The parser also accepts the `detect.v1` JSON, and a reply that is neither gets one `detect-repair.v1` attempt. Conformance: `spec/fixtures/detect.json`.
+
 ### `detect-repair.v1`
 
 ```
@@ -308,3 +352,4 @@ Scored against the synthetic `profile` with fuzzy matching (`07-EVALUATION.md` �
 | Date | Prompt id | Change | Eval run |
 |------|-----------|--------|----------|
 | 2026-11-16 | all `.v1` | Initial | — |
+| 2026-11-22 | `detect.v2` | New: one-line replies, a model-written general phrase per ORG/LOCATION/HEALTH item, rule hits masked in the prompt. Off by default (`detect_prompt_id`) until checked live | — |

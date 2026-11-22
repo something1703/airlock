@@ -21,6 +21,11 @@ describe("AppConfig", () => {
     expect(new AppConfig({ redteam_rounds: "9" }).redTeamRounds).toBe(2);
     expect(new AppConfig({ pattern_packs_disabled: '["national"]' }).disabledPatternPacks).toEqual(new Set(["national"]));
   });
+  it("detect_prompt_id: v1 unless exactly detect.v2", () => {
+    expect(new AppConfig({}).detectPromptId).toBe("detect.v1");
+    expect(new AppConfig({ detect_prompt_id: "detect.v2" }).detectPromptId).toBe("detect.v2");
+    for (const bad of ["detect.v3", "", "DETECT.V2", "detect.v1 "]) expect(new AppConfig({ detect_prompt_id: bad }).detectPromptId, bad).toBe("detect.v1");
+  });
   it("stable models only", () => {
     for (const [k, v] of Object.entries(DEFAULTS)) if (k.startsWith("model_")) expect(remoteString(v)).not.toMatch(/preview|latest/);
   });

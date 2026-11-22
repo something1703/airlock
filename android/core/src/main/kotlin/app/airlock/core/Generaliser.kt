@@ -150,6 +150,19 @@ object Generaliser {
      * A rewrite is accepted only if it is non-empty, ≤ 8 words, different from the phrase, contains no entity term
      * (surface forms, partial names, distinctive words) and no pattern hit outside dates.
      */
+    /**
+     * Shape check for a phrase the model wrote to replace [replaced] (FX-02, `detect.v2` `general`): at most 6 words, no
+     * sentence punctuation or brackets, and no capital first letter unless the replaced text started with one. It stops a
+     * whole sentence being dropped into the middle of another; [validateRewrite] still runs after it.
+     */
+    fun plausibleGeneral(phrase: String, replaced: String): Boolean {
+        val p = Js.trim(phrase)
+        if (p.isEmpty() || Js.splitWhitespace(p).size > 6) return false
+        if (p.any { it in ".!?;:[]{}<>|\n" }) return false
+        val startedUpper = Js.trim(replaced).firstOrNull()?.isUpperCase() ?: false
+        return !((p.firstOrNull()?.isUpperCase() ?: false) && !startedUpper)
+    }
+
     fun validateRewrite(rewrite: String, phrase: String, entities: EntityMap, patterns: PatternDetector): Boolean {
         val r = Js.trim(rewrite)
         if (r.isEmpty() || Js.splitWhitespace(r).size > MAX_WORDS) return false

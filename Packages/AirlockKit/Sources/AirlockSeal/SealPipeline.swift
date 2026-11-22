@@ -18,12 +18,15 @@ public struct SealSettings: Sendable, Hashable {
     /// Remote Config `redteam_enabled` / `redteam_rounds`.
     public var redTeamEnabled: Bool
     public var redTeamRounds: Int
+    /// `detect.v1` (JSON) or `detect.v2` (one line per detail, model-written "general" phrases, rule hits masked).
+    public var detectPromptID: String
 
     public init(
         dial: DialPreset = .balanced, policy: PolicySettings = PolicySettings(), nlTaggerEnabled: Bool = true,
         chunkTokens: Int = 1_400, maxRewrites: Int = 6, taskSummary: String = "getting help with this message", today: Date = Date(),
-        redTeamEnabled: Bool = true, redTeamRounds: Int = 2
+        redTeamEnabled: Bool = true, redTeamRounds: Int = 2, detectPromptID: String = LLMDetector.detectV1
     ) {
+        self.detectPromptID = detectPromptID
         self.redTeamEnabled = redTeamEnabled
         self.redTeamRounds = redTeamRounds
         self.dial = dial
@@ -42,7 +45,8 @@ public struct SealSettings: Sendable, Hashable {
         self.init(
             dial: dial ?? config.dialDefault, policy: policy, nlTaggerEnabled: config.nlTaggerEnabled,
             chunkTokens: config.detectChunkTokens,
-            taskSummary: taskSummary, redTeamEnabled: config.redTeamEnabled, redTeamRounds: config.redTeamRounds)
+            taskSummary: taskSummary, redTeamEnabled: config.redTeamEnabled, redTeamRounds: config.redTeamRounds,
+            detectPromptID: config.detectPromptID)
     }
 }
 
@@ -140,7 +144,8 @@ public actor SealPipeline {
         let rulesDone = clock.now
         timings.rules = rulesDone - start
         progress(.rulesReady(RulesPreview(text: text, candidates: candidates)))
-        let detector = LLMDetector(engine: meter, prompts: prompts, budgetTokens: settings.chunkTokens)
+        let detector = LLMDetector(
+            engine: meter, prompts: prompts, budgetTokens: settings.chunkTokens, promptID: settings.detectPromptID, masks: candidates)
         let report = await detector.detect(in: text) { section, total in progress(.detecting(section: section, of: total)) }
         timings.detect = clock.now - rulesDone
         timings.detectCalls = await meter.calls("detect")
@@ -164,6 +169,14 @@ public actor SealPipeline {
                 guard case .generalise(let level) = policy.action(for: e, override: overrides[e.id]),
                     let mention = merge.mentions.first(where: { $0.entityID == e.id })
                 else { continue }
+                // detect.v2 already asked the model for a short phrase: use it if it fits the sentence, else the Sealer falls
+                // back to the fixed phrase. gen.v1 is only for details the model gave none for (Vault and rule hits, or v1).
+                if let given = Self.modelGeneral(report, e) {
+                    if Generaliser.plausibleGeneral(given, replacing: mention.text) {
+                        rewrites[e.id] = given.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    continue
+                }
                 if let r = await rewrite(e, mention: mention, level: level, in: text, using: meter) { rewrites[e.id] = r }
             }
             timings.generalise = clock.now - genStart
@@ -205,6 +218,14 @@ public actor SealPipeline {
         result = Self.finalised(result, mode: policy.reviewMode)
         progress(.done)
         return result
+    }
+
+    /// The model's own general phrase for this entity (any of its surface forms), or nil if it gave none.
+    static func modelGeneral(_ report: LLMDetectionReport, _ e: Entity) -> String? {
+        for form in [e.canonical] + e.surfaceForms.sorted() {
+            if let g = report.generals[LLMDetector.generalKey(e.category, form)] { return g }
+        }
+        return nil
     }
 
     static func finalised(_ r: SealResult, mode: ReviewMode) -> SealResult {

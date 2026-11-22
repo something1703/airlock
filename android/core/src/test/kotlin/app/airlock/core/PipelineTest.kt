@@ -31,7 +31,7 @@ class PipelineTest {
     }
 
     @Test fun bundlesEveryPromptByteIdenticalToSwift() {
-        assertEquals(23, PromptLibrary.BUNDLED_IDS.size)
+        assertEquals(24, PromptLibrary.BUNDLED_IDS.size)
         val dir = Fixtures.repoFile("Packages/AirlockKit/Sources/AirlockPrompts/Prompts")
         assertEquals(dir.listFiles().orEmpty().map { it.name }.filter { it.endsWith(".txt") }.map { it.removeSuffix(".txt") }.sorted(), PromptLibrary.BUNDLED_IDS)
         for (id in PromptLibrary.BUNDLED_IDS) assertEquals(java.io.File(dir, "$id.txt").readText(), prompts.template(id) + "\n", "$id drifted")
@@ -264,6 +264,25 @@ class PipelineTest {
         assertEquals(listOf("Raj Patel", "raj", "Raj"), r.spans.map { text.substring(it.start, it.end) })
         assertEquals(2, r.count)
         assertEquals(0, RulesPreview.of("nothing here", emptyList()).count)
+    }
+
+    @Test fun detectV2UsesTheModelsGeneralPhrase() = runTest {
+        fun pipeV2(p: PhoneOnlyEngine) = SealPipeline(p, patterns, vault, prompts, settings(DialPreset.BALANCED).copy(detectPromptId = "detect.v2"))
+        val good = MockPhoneEngine { id, _ -> if (id == "detect.v2") "ORG | Mercy General Hospital | employer | a large hospital\nEND" else if (id == "attack.v1") "{\"guesses\":[]}" else "{}" }
+        val r = pipeV2(good).run(raw)
+        assertEquals(listOf("detect.v2", "attack.v1"), good.calledPromptIds)
+        assertContains(r.draft.text, "I work nights at a large hospital.")
+        assertEquals(0, r.timings.generaliseCalls)
+        for (bad in listOf("Mercy General campus", "Works nights at a big hospital downtown today.")) {
+            val p = MockPhoneEngine { id, _ -> if (id == "detect.v2") "ORG | Mercy General Hospital | employer | $bad\nEND" else if (id == "attack.v1") "{\"guesses\":[]}" else "{}" }
+            val r2 = pipeV2(p).run(raw)
+            assertFalse(p.calledPromptIds.contains("gen.v1"), bad)
+            assertContains(r2.draft.text, "I work nights at an organisation.", message = bad)
+        }
+        val none = MockPhoneEngine { id, _ -> if (id == "detect.v2") "ORG | Mercy General Hospital | employer | -\nEND" else if (id == "gen.v1") rewriteJson("a large hospital") else "{\"guesses\":[]}" }
+        val r3 = pipeV2(none).run(raw)
+        assertEquals(listOf("detect.v2", "gen.v1", "attack.v1"), none.calledPromptIds)
+        assertContains(r3.draft.text, "a large hospital")
     }
 
     @Test fun leakyRewriteFallsBack() = runTest {

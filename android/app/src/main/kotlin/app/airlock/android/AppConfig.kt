@@ -51,6 +51,8 @@ class AppConfig(remote: Map<String, String> = emptyMap()) {
     val modelCloudFallback: String get() = string("model_cloud_fallback")
     val dialDefault: DialPreset get() = DialPreset.entries.firstOrNull { it.wire == string("dial_default") } ?: BALANCED
     /** Gemini Nano on Android has a ~4,000-token window, so chunks are smaller than on iOS or the web. */
+    /** `detect.v1` (JSON) or `detect.v2` (short lines, FX-02). Anything else runs v1. */
+    val detectPromptId: String get() = if (string("detect_prompt_id") == "detect.v2") "detect.v2" else "detect.v1"
     val detectChunkTokens: Int get() = maxOf(200, int("detect_chunk_tokens_android"))
     val redTeamEnabled: Boolean get() = bool("redteam_enabled")
     val redTeamRounds: Int get() = int("redteam_rounds").coerceIn(0, 2)
@@ -79,6 +81,7 @@ class AppConfig(remote: Map<String, String> = emptyMap()) {
             "model_cloud_proof" to ConfigValue.Str("gemini-3.8-flash"),
             "model_cloud_fallback" to ConfigValue.Str("gemini-3.5-flash-lite"),
             "dial_default" to ConfigValue.Str("balanced"),
+            "detect_prompt_id" to ConfigValue.Str("detect.v1"),
             "detect_chunk_tokens" to ConfigValue.Num(1400.0),
             "detect_chunk_tokens_web" to ConfigValue.Num(3000.0),
             "detect_chunk_tokens_android" to ConfigValue.Num(700.0),

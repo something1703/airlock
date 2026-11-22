@@ -11,6 +11,11 @@ data class LLMDetectionReport(
     val repairsUsed: Int = 0,
     val unavailable: PhoneAvailability? = null,
     val chunkCount: Int = 0,
+    /**
+     * `detect.v2`: the model's own "a large hospital" phrase for an ORG / LOCATION / HEALTH item, by [LLMDetector.generalKey].
+     * Unchecked: the pipeline shape-checks it and the Sealer validates it before use.
+     */
+    val generals: Map<String, String> = emptyMap(),
 ) {
     val isComplete: Boolean get() = failedChunks.isEmpty() && refusedChunks.isEmpty() && unavailable == null
 }
@@ -58,8 +63,21 @@ object ModelJson {
  * Every returned candidate is an exact substring of the input; invented items are dropped. Broken JSON gets one
  * `detect-repair.v1` attempt; `contextTooLong` halves the chunk (≤ 2 times); refusals and failures are reported.
  */
-class LLMDetector(val engine: PhoneOnlyEngine, val prompts: PromptLibrary, val budgetTokens: Int) {
-    private class Item(val text: String, val type: String, val role: String?, val sameAs: String?, val confidence: Confidence)
+class LLMDetector(
+    val engine: PhoneOnlyEngine,
+    val prompts: PromptLibrary,
+    val budgetTokens: Int,
+    /** `detect.v1` (JSON, default) or `detect.v2` (one line per detail). Both replies parse either way. */
+    val promptId: String = DETECT_V1,
+    masks: List<Candidate> = emptyList(),
+) {
+    /**
+     * Rule hits to hide from the model in a `detect.v2` prompt (`[email]`, `[phone]`, `[id]`…) so it doesn't write them back out.
+     * Ignored for `detect.v1`, which sees the text as written.
+     */
+    private val masks: List<Candidate> = if (promptId == DETECT_V2) masks else emptyList()
+
+    private class Item(val text: String, val type: String, val role: String?, val sameAs: String?, val confidence: Confidence, val general: String? = null)
 
     private class Acc {
         val candidates = ArrayList<Candidate>()
@@ -69,7 +87,8 @@ class LLMDetector(val engine: PhoneOnlyEngine, val prompts: PromptLibrary, val b
         var repairs = 0
         var unavailable: PhoneAvailability? = null
         var chunkCount = 0
-        fun report() = LLMDetectionReport(candidates.toList(), failed.toList(), refused.toList(), hallucinated, repairs, unavailable, chunkCount)
+        val generals = LinkedHashMap<String, String>()
+        fun report() = LLMDetectionReport(candidates.toList(), failed.toList(), refused.toList(), hallucinated, repairs, unavailable, chunkCount, generals.toMap())
     }
 
     private sealed interface Outcome {
@@ -104,7 +123,7 @@ class LLMDetector(val engine: PhoneOnlyEngine, val prompts: PromptLibrary, val b
 
     private suspend fun run(chunk: Chunk, fullText: String, depth: Int, acc: Acc): Outcome {
         val output = try {
-            ask("detect.v1", mapOf("chunk" to chunk.text))
+            ask(promptId, mapOf("chunk" to maskChunk(chunk, masks)))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -145,7 +164,34 @@ class LLMDetector(val engine: PhoneOnlyEngine, val prompts: PromptLibrary, val b
         }
     }
 
+    /**
+     * `detect.v2` reply: `TYPE | exact text | role | general`, one per line, `?TYPE` when unsure, `END` last. Returns null when
+     * the reply holds neither a line in that form nor `END` (so it can be repaired). A bare `END` is a valid "nothing found".
+     */
+    private fun parseLines(output: String): List<Item>? {
+        val items = ArrayList<Item>()
+        var sawEnd = false
+        var sawLine = false
+        fun dash(f: String?): String? = if (f == null || f.isEmpty() || f == "-") null else f
+        for (raw in output.split(Regex("\r?\n"))) {
+            val line = Js.trim(raw).replace(BULLET, "")
+            if (line.isEmpty()) continue
+            if (line.uppercase() == "END") {
+                sawEnd = true
+                break
+            }
+            val m = LINE.matchEntire(line) ?: continue
+            sawLine = true
+            val fields = m.groupValues[3].split("|").map { Js.trim(it) }
+            val text = fields.getOrNull(0) ?: ""
+            if (text.isEmpty()) continue
+            items.add(Item(text, m.groupValues[2].uppercase(), dash(fields.getOrNull(1)), null, if (m.groupValues[1].isEmpty()) Confidence.HIGH else Confidence.LOW, dash(fields.getOrNull(2))))
+        }
+        return if (sawLine || sawEnd) items else null
+    }
+
     private fun parseItems(output: String): List<Item>? {
+        parseLines(output)?.let { return it }
         val obj = ModelJson.firstObject(output) ?: return null
         val items = obj["items"] as? List<*> ?: return null
         val out = ArrayList<Item>()
@@ -155,7 +201,8 @@ class LLMDetector(val engine: PhoneOnlyEngine, val prompts: PromptLibrary, val b
             val type = d["type"] as? String ?: continue
             if (Js.trim(text).isEmpty()) continue
             val conf = (d["confidence"] as? String)?.lowercase() ?: ""
-            out.add(Item(text, type.uppercase(), d["role"] as? String, d["same_as"] as? String, Confidence.entries.firstOrNull { it.wire == conf } ?: Confidence.MEDIUM))
+            val general = (d["general"] as? String)?.let { Js.trim(it) }?.takeIf { it.isNotEmpty() }
+            out.add(Item(text, type.uppercase(), d["role"] as? String, d["same_as"] as? String, Confidence.entries.firstOrNull { it.wire == conf } ?: Confidence.MEDIUM, general))
         }
         return out
     }
@@ -163,11 +210,16 @@ class LLMDetector(val engine: PhoneOnlyEngine, val prompts: PromptLibrary, val b
     private fun locate(items: List<Item>, chunk: Chunk, acc: Acc): List<Candidate> {
         val out = ArrayList<Candidate>()
         for (item in items) {
+            // A mask token ("[email]") the model echoed back is not a detail.
+            if (MASK_ECHO.matches(Js.trim(item.text))) continue
             val category = CATEGORY[item.type] ?: continue
             val ranges = occurrences(item.text, chunk.text)
             if (ranges.isEmpty()) {
                 acc.hallucinated++
                 continue
+            }
+            if (item.general != null && (category == PrivacyCategory.ORG || category == PrivacyCategory.LOCATION || category == PrivacyCategory.HEALTH)) {
+                acc.generals.putIfAbsent(generalKey(category, item.text), item.general)
             }
             val subtype = when (category) {
                 PrivacyCategory.LOCATION -> if (Js.any(item.text, Js::isN)) "address" else "place"
@@ -188,6 +240,41 @@ class LLMDetector(val engine: PhoneOnlyEngine, val prompts: PromptLibrary, val b
     }
 
     companion object {
+        const val DETECT_V1 = "detect.v1"
+        const val DETECT_V2 = "detect.v2"
+        private val BULLET = Regex("^[-*•]\\s+")
+        private val LINE = Regex("^(\\??)\\s*([A-Za-z_ ]+?)\\s*\\|(.*)$")
+        private val MASK_ECHO = Regex("^\\[[^\\]]*\\]$")
+
+        /** Key into [LLMDetectionReport.generals]. */
+        fun generalKey(category: PrivacyCategory, text: String): String = "${category.wire}:${text.lowercase()}"
+
+        private fun maskToken(c: Candidate): String = when (c.category) {
+            PrivacyCategory.CONTACT -> when (c.subtype) { "email" -> "[email]"; "phone" -> "[phone]"; "url" -> "[link]"; "handle" -> "[handle]"; else -> "[contact]" }
+            PrivacyCategory.SECRET -> "[secret]"
+            else -> "[id]"
+        }
+
+        /**
+         * The chunk as the model sees it for `detect.v2`: contact, ID and secret hits the rules already found become `[email]`,
+         * `[phone]`, `[id]`, `[secret]`. Locating spans still uses the original chunk text. With no masks, unchanged.
+         */
+        fun maskChunk(chunk: Chunk, masks: List<Candidate>): String {
+            val inside = masks
+                .filter { (it.category == PrivacyCategory.CONTACT || it.category == PrivacyCategory.ID || it.category == PrivacyCategory.SECRET) && it.span.start >= chunk.span.start && it.span.end <= chunk.span.end }
+                .sortedWith { a, b -> if (a.span.start != b.span.start) a.span.start - b.span.start else b.span.end - a.span.end }
+            if (inside.isEmpty()) return chunk.text
+            val out = StringBuilder()
+            var at = chunk.span.start
+            for (c in inside) {
+                if (c.span.start < at) continue // overlaps a mask already applied
+                out.append(chunk.text, at - chunk.span.start, c.span.start - chunk.span.start)
+                out.append(maskToken(c))
+                at = c.span.end
+            }
+            return out.append(chunk.text, at - chunk.span.start, chunk.text.length).toString()
+        }
+
         private val CATEGORY = mapOf(
             "PERSON" to PrivacyCategory.PERSON, "NAME" to PrivacyCategory.PERSON, "ORG" to PrivacyCategory.ORG, "ORGANIZATION" to PrivacyCategory.ORG,
             "ORGANISATION" to PrivacyCategory.ORG, "COMPANY" to PrivacyCategory.ORG, "LOCATION" to PrivacyCategory.LOCATION, "LOC" to PrivacyCategory.LOCATION,

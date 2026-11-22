@@ -12,6 +12,7 @@ export const DEFAULTS: Record<string, ConfigValue> = {
   model_cloud_proof: { type: "STRING", value: "gemini-3.8-flash" },
   model_cloud_fallback: { type: "STRING", value: "gemini-3.5-flash-lite" },
   dial_default: { type: "STRING", value: "balanced" },
+  detect_prompt_id: { type: "STRING", value: "detect.v1" },
   detect_chunk_tokens: { type: "NUMBER", value: 1400 },
   detect_chunk_tokens_web: { type: "NUMBER", value: 3000 },
   detect_chunk_tokens_android: { type: "NUMBER", value: 700 },
@@ -77,6 +78,8 @@ export class AppConfig {
   }
   /** Chrome's on-device window is 9,216 tokens; the web budget is larger than iOS's 1,400. */
   get detectChunkTokens(): number { return Math.max(200, this.int("detect_chunk_tokens_web")); }
+  /** Which on-device detection prompt runs: `detect.v1` (JSON) or `detect.v2` (short lines, FX-02). Anything else → v1. */
+  get detectPromptId(): string { return this.string("detect_prompt_id") === "detect.v2" ? "detect.v2" : "detect.v1"; }
   get redTeamEnabled(): boolean { return this.bool("redteam_enabled"); }
   get redTeamRounds(): number { return Math.min(Math.max(0, this.int("redteam_rounds")), 2); }
   get rawPurgeDays(): number { return Math.max(0, this.int("raw_purge_days")); }

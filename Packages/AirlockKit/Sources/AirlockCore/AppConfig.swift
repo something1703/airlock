@@ -44,6 +44,7 @@ public struct AppConfig: Sendable, Hashable {
         "model_cloud_proof": .string("gemini-3.8-flash"),
         "model_cloud_fallback": .string("gemini-3.5-flash-lite"),
         "dial_default": .string("balanced"),
+        "detect_prompt_id": .string("detect.v1"),
         "detect_chunk_tokens": .number(1400),
         "detect_chunk_tokens_web": .number(3000),
         "detect_chunk_tokens_android": .number(700),
@@ -109,6 +110,8 @@ public struct AppConfig: Sendable, Hashable {
     public var modelCloudMax: String { string("model_cloud_max") }
     public var modelCloudProof: String { string("model_cloud_proof") }
     public var dialDefault: DialPreset { DialPreset(rawValue: string("dial_default")) ?? .balanced }
+    /// `detect.v1` (JSON) or `detect.v2` (short lines, FX-02). Anything else runs v1.
+    public var detectPromptID: String { string("detect_prompt_id") == "detect.v2" ? "detect.v2" : "detect.v1" }
     public var detectChunkTokens: Int { max(200, int("detect_chunk_tokens")) }
     public var redTeamEnabled: Bool { bool("redteam_enabled") }
     public var redTeamRounds: Int { min(max(0, int("redteam_rounds")), 2) }
