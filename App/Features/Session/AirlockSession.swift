@@ -56,6 +56,8 @@ final class AirlockSession {
     @ObservationIgnored private var ledger = ReceiptLedger()
     @ObservationIgnored private var answers: AnswerService
     @ObservationIgnored private var reviewPipeline: SealPipeline?
+    /// The red-team check still running behind a shown draft (FX-02); cancelled when the review goes away.
+    @ObservationIgnored private var reviewLater: Task<SealResult, Never>?
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let prefsKey: String
     private static let log = Logger(subsystem: "app.airlock", category: "session")
@@ -132,7 +134,10 @@ final class AirlockSession {
     var isReviewShowing: Bool { section == .ask && askPath.last == .review }
 
     /// Review is finished sealing and on screen (menu commands).
-    var canSealAndSend: Bool { isReviewShowing && review?.result != nil }
+    var canSealAndSend: Bool { isReviewShowing && review?.result != nil && review?.result?.redTeamPending != true }
+
+    /// The on-device "what could still be guessed" check is still running behind the shown draft (FX-02); sending waits.
+    var redTeamPending: Bool { review?.result?.redTeamPending == true }
 
     /// Scrub & copy is offered for a new request only (a follow-up belongs to its conversation).
     var canCopySealed: Bool { canSealAndSend && review?.threadID == nil }
@@ -202,20 +207,39 @@ final class AirlockSession {
             phone: services.engines.phone, patterns: services.patterns, vault: vault, prompts: services.prompts,
             settings: SealSettings(config: services.config, dial: prefs.dial))
         reviewPipeline = pipeline
-        let result = await pipeline.run(rawText, existing: existing) { [weak self] p in
+        reviewLater?.cancel()
+        reviewLater = nil
+        let staged = await pipeline.runStaged(rawText, existing: existing) { [weak self] p in
             Task { @MainActor in
                 guard self?.review?.id == reviewID else { return }
                 if case .rulesReady(let preview) = p { self?.review?.found = preview } else { self?.review?.progress = p }
             }
         }
-        guard review?.id == reviewID else { return }
+        guard review?.id == reviewID else {
+            staged.later?.cancel()
+            return
+        }
         review?.progress = .done
-        review?.result = result
-        review?.accepted = result.acceptedRisks
+        review?.result = staged.result
+        review?.accepted = staged.result.acceptedRisks
+        // The red-team finishes while the user reads the draft (cards in Balanced, rewrites in Strict). Their chip edits are
+        // re-applied on top, together with the rewrites Strict applied.
+        guard let later = staged.later else { return }
+        reviewLater = later
+        let full = await later.value
+        guard let r = review, r.id == reviewID, r.result != nil else { return }
+        let accepted = r.accepted + full.acceptedRisks.filter { x in !r.accepted.contains { $0.id == x.id } }
+        let merged = await pipeline.reseal(full, overrides: r.overrides, acceptedRisks: accepted)
+        guard review?.id == reviewID else { return }
+        review?.result = merged
+        review?.accepted = accepted
+        reviewLater = nil
     }
 
     func cancelReview() {
         let threadID = review?.threadID
+        reviewLater?.cancel()
+        reviewLater = nil
         review = nil
         askPath = threadID.map { [.thread($0)] } ?? []
     }
@@ -273,7 +297,7 @@ final class AirlockSession {
     /// Seal & send. Returns false if the gate blocked it.
     @discardableResult
     func send() async -> Bool {
-        guard let r = review, let result = r.result else { return false }
+        guard let r = review, let result = r.result, !result.redTeamPending else { return false }
         let draft = result.draft
         let sealed: SealedText
         do {
@@ -316,7 +340,7 @@ final class AirlockSession {
     /// Returns the copied text, or nil if the gate blocked it.
     @discardableResult
     func copySealedVersion() async -> String? {
-        guard let r = review, r.threadID == nil, let result = r.result else { return nil }
+        guard let r = review, r.threadID == nil, let result = r.result, !result.redTeamPending else { return nil }
         let draft = result.draft
         let sealed: SealedText
         do {

@@ -364,13 +364,16 @@ export class AirlockSession {
     const { result, later } = staged;
     this.setReview({ result, accepted: result.acceptedRisks });
     if (!later) return;
-    // Balanced: the red-team finishes while the user reads the draft. Their chip edits are re-applied on top.
+    // The red-team finishes while the user reads the draft (cards in Balanced, rewrites in Strict). Their chip edits are
+    // re-applied on top.
     const full = await later.catch(() => ({ ...result, redTeamPending: false, redTeamUnavailable: true }));
     const r = this.state.review;
     if (!r?.result || r.result.normalised !== result.normalised) return;
-    // Keep what the user changed meanwhile (Protect this re-merges): take only the red-team outcome from `full`.
+    // Keep what the user changed meanwhile (Protect this re-merges): take only the red-team outcome from `full`,
+    // including the rewrites Strict applied (`acceptedRisks`).
     const merged = { ...full, merge: r.result.merge, candidates: r.result.candidates };
-    this.setReview({ result: this.pipeline().reseal(merged, r.overrides, r.accepted) });
+    const accepted = [...r.accepted, ...full.acceptedRisks.filter((x) => !r.accepted.some((y) => y.id === x.id))];
+    this.setReview({ result: this.pipeline().reseal(merged, r.overrides, accepted), accepted });
   }
 
   private warmed = false;

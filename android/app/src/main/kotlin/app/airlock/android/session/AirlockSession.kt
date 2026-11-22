@@ -258,7 +258,8 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
         val result = staged.result
         setReview { it.copy(result = result, accepted = result.acceptedRisks) }
         val later = staged.later ?: return
-        // Balanced: the red-team finishes while the user reads the draft. Their chip edits are re-applied on top.
+        // The red-team finishes while the user reads the draft (cards in Balanced, rewrites in Strict). Their chip edits are
+        // re-applied on top.
         val full = try {
             later.await()
         } catch (e: CancellationException) {
@@ -271,7 +272,9 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
         // Keep anything the user marked with "Protect this" meanwhile: the late result still has the first merge.
         setReview { cur ->
             val now = cur.result ?: return@setReview cur
-            cur.copy(result = pipeline().reseal(full.copy(merge = now.merge, candidates = now.candidates), cur.overrides, cur.accepted))
+            // Include the rewrites Strict applied (acceptedRisks), alongside anything the user accepted meanwhile.
+            val accepted = cur.accepted + full.acceptedRisks.filter { x -> cur.accepted.none { it.id == x.id } }
+            cur.copy(result = pipeline().reseal(full.copy(merge = now.merge, candidates = now.candidates), cur.overrides, accepted), accepted = accepted)
         }
     }
 

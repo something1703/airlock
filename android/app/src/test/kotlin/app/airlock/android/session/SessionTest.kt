@@ -274,6 +274,37 @@ class SessionTest {
         assertFalse(rec.sent.joinToString().contains("Willowbrook"))
     }
 
+    @Test fun strictShowsTheDraftFirstAndTheRedTeamsRewritesJoinItWithTheUsersMarkKept() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val demo = DemoEngines.phone(pace = false)
+        val phone = MockPhoneEngine { id, text ->
+            when {
+                id == "attack.v1" -> {
+                    gate.await()
+                    "{\"guesses\":[{\"attribute\":\"location\",\"guess\":\"g\",\"evidence\":\"near the old mill\",\"confidence\":\"high\"}]}"
+                }
+                id == "gen.v1" && text.contains("near the old mill") -> "{\"rewrite\":\"in the area\"}"
+                else -> demo.respond(app.airlock.core.PhonePrompt(id, text), app.airlock.core.ANALYSIS_OPTIONS).text
+            }
+        }
+        val (svc, rec) = services(phone)
+        val s = session(svc, backgroundScope)
+        s.setPrefs { it.copy(dial = DialPreset.STRICT) }
+        val job = launch { s.startReview("I live near the old mill and the leak at Willowbrook Court got worse, Raj.", TaskKind.Help) }
+        s.state.first { it.review?.result?.redTeamPending == true }
+        assertTrue(s.current.review!!.result!!.draft.text.contains("near the old mill"), "the draft shows before the red team is done")
+        assertTrue(s.protect("Willowbrook Court", PrivacyCategory.LOCATION))
+        gate.complete(Unit)
+        job.join()
+        val result = s.current.review!!.result!!
+        assertEquals(false, result.redTeamPending)
+        assertFalse(result.draft.text.contains("Willowbrook"), "the user's mark survives the late result")
+        assertFalse(result.draft.text.contains("near the old mill"), "the red team's rewrite was applied")
+        assertTrue(s.current.review!!.accepted.isNotEmpty())
+        assertTrue(s.send())
+        assertFalse(rec.sent.joinToString().contains("Willowbrook"))
+    }
+
     @Test fun aFailedModelDownloadOffersRetryAndASuccessfulOneClearsIt() = runTest {
         var avail = PhoneAvailability.DOWNLOADABLE
         var fail = true
