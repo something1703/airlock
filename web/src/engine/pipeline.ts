@@ -1,6 +1,7 @@
 import type { AppConfig } from "../core/appConfig";
 import type { PhoneAvailability, PhoneOnlyEngine } from "./engines";
-import { firstJsonObject, LLMDetector, type LLMDetectionReport } from "./llmDetector";
+import { firstJsonObject, generalKey, LLMDetector, type LLMDetectionReport } from "./llmDetector";
+import { plausibleGeneral } from "./generaliser";
 import { merge, type Mention, type MergeResult } from "./merger";
 import { normalise, MAX_INPUT_UTF16, type NormalisedText } from "./normaliser";
 import type { PatternDetector } from "./patterns";
@@ -23,12 +24,14 @@ export interface SealSettings {
   today: Date;
   redTeamEnabled: boolean;
   redTeamRounds: number;
+  /** `detect.v1` (JSON) or `detect.v2` (one line per detail, model-written "general" phrases, rule hits masked). */
+  detectPromptId: string;
 }
 
 export function sealSettings(config: AppConfig, overrides: Partial<SealSettings> = {}): SealSettings {
   return {
     dial: config.dialDefault, policy: DEFAULT_POLICY_SETTINGS, chunkTokens: config.detectChunkTokens, maxRewrites: 6,
-    taskSummary: "getting help with this message", today: new Date(), redTeamEnabled: config.redTeamEnabled, redTeamRounds: config.redTeamRounds,
+    taskSummary: "getting help with this message", today: new Date(), redTeamEnabled: config.redTeamEnabled, redTeamRounds: config.redTeamRounds, detectPromptId: config.detectPromptId,
     ...overrides,
   };
 }
@@ -122,7 +125,8 @@ export class SealPipeline {
     const tRules = performance.now();
     timings.rulesMs = tRules - t0;
     progress({ kind: "rulesReady", preview: rulesPreview(text, candidates) });
-    const report = await new LLMDetector(meter, this.prompts, this.settings.chunkTokens).detect(text, (section, of) => progress({ kind: "detecting", section, of }));
+    const detector = new LLMDetector(meter, this.prompts, this.settings.chunkTokens, { promptId: this.settings.detectPromptId, masks: candidates });
+    const report = await detector.detect(text, (section, of) => progress({ kind: "detecting", section, of }));
     timings.detectMs = performance.now() - tRules;
     timings.detectCalls = meter.calls("detect");
     timings.repairCalls = meter.calls("detect-repair");
@@ -142,6 +146,13 @@ export class SealPipeline {
         const action = policy.action(e, overrides.get(e.id));
         const mention = m.mentions.find((x) => x.entityId === e.id);
         if (action.kind !== "generalise" || !mention) continue;
+        // detect.v2 already asked the model for a short phrase: use it if it fits the sentence, else the Sealer falls back to
+        // the fixed phrase. gen.v1 is only for details the model didn't give one for (Vault and rule hits, or a v1 reply).
+        const given = modelGeneral(report, e);
+        if (given !== null) {
+          if (plausibleGeneral(given, mention.text)) rewrites.set(e.id, given.trim());
+          continue;
+        }
         const r = await this.rewrite(meter, e, mention, action.level, text);
         if (r) rewrites.set(e.id, r);
       }
@@ -245,6 +256,15 @@ export class SealPipeline {
       return null;
     }
   }
+}
+
+/** The model's own general phrase for this entity (any of its surface forms), or null if it gave none. */
+function modelGeneral(report: LLMDetectionReport, e: Entity): string | null {
+  for (const form of [e.canonical, ...e.surfaceForms]) {
+    const g = report.generals.get(generalKey(e.category, form));
+    if (g) return g;
+  }
+  return null;
 }
 
 function finalise(r: SealResult, mode: ReviewMode): SealResult {

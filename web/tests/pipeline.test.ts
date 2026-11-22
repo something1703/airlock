@@ -19,7 +19,7 @@ const utc = (s: string): Date => new Date(`${s}T00:00:00Z`);
 
 describe("prompt library", () => {
   it("bundles every prompt, byte-identical to the Swift package", () => {
-    expect(BUNDLED_PROMPT_IDS.length).toBe(23);
+    expect(BUNDLED_PROMPT_IDS.length).toBe(24);
     for (const id of BUNDLED_PROMPT_IDS) {
       const swift = readFileSync(join(repoRoot, "Packages/AirlockKit/Sources/AirlockPrompts/Prompts", `${id}.txt`), "utf8");
       expect(prompts.template(id) + "\n", `${id} drifted — run npm run sync-packs`).toBe(swift);
@@ -258,6 +258,31 @@ describe("seal pipeline", () => {
     expect(r.spans.map((x) => text.slice(x.start, x.end))).toEqual(["Raj Patel", "raj", "Raj"]);
     expect(r.count).toBe(2);
     expect(rulesPreview("nothing here", []).count).toBe(0);
+  });
+  it("FX-02 detect.v2: the model's own general phrase is used, so no gen.v1 call is needed", async () => {
+    const p = new MockPhoneEngine((id) => (id === "detect.v2" ? "ORG | Mercy General Hospital | employer | a large hospital\nEND" : id === "attack.v1" ? '{"guesses":[]}' : "{}"));
+    const pl = new SealPipeline(p, patterns, vault, prompts, sealSettings(new AppConfig(), { dial: "balanced", today: utc("2026-11-21"), detectPromptId: "detect.v2" }));
+    const r = await pl.run(raw);
+    expect(p.calledPromptIds).toEqual(["detect.v2", "attack.v1"]);
+    expect(r.draft.text).toContain("I work nights at a large hospital.");
+    expect(r.timings.generaliseCalls).toBe(0);
+    expect(() => new EgressGate(patterns, vault).seal(r.draft)).not.toThrow();
+  });
+  it("FX-02 detect.v2: a general that doesn't fit the sentence or leaks the name falls back to the fixed phrase, still without gen.v1", async () => {
+    for (const bad of ["Mercy General campus", "Works nights at a big hospital downtown today."]) {
+      const p = new MockPhoneEngine((id) => (id === "detect.v2" ? `ORG | Mercy General Hospital | employer | ${bad}\nEND` : id === "attack.v1" ? '{"guesses":[]}' : "{}"));
+      const pl = new SealPipeline(p, patterns, vault, prompts, sealSettings(new AppConfig(), { dial: "balanced", today: utc("2026-11-21"), detectPromptId: "detect.v2" }));
+      const r = await pl.run(raw);
+      expect(p.calledPromptIds, bad).not.toContain("gen.v1");
+      expect(r.draft.text, bad).toContain("I work nights at an organisation.");
+    }
+  });
+  it("FX-02 detect.v2: an item with no general still gets a gen.v1 rewrite", async () => {
+    const p = new MockPhoneEngine((id) => (id === "detect.v2" ? "ORG | Mercy General Hospital | employer | -\nEND" : id === "gen.v1" ? JSON.stringify({ rewrite: "a large hospital" }) : '{"guesses":[]}'));
+    const pl = new SealPipeline(p, patterns, vault, prompts, sealSettings(new AppConfig(), { dial: "balanced", today: utc("2026-11-21"), detectPromptId: "detect.v2" }));
+    const r = await pl.run(raw);
+    expect(p.calledPromptIds).toEqual(["detect.v2", "gen.v1", "attack.v1"]);
+    expect(r.draft.text).toContain("a large hospital");
   });
   it("FX-02: a broken detect reply counts a repair call; no model → no calls and no first reply", async () => {
     let n = 0;

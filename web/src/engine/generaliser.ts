@@ -144,4 +144,18 @@ export function validateRewrite(rewrite: string, phrase: string, entities: Entit
   return !patterns.detect(r).some((c) => c.category !== "date");
 }
 
+/**
+ * Shape check for a phrase the model wrote to replace `replaced` (FX-02, `detect.v2` `general`): at most 6 words, no
+ * sentence punctuation or brackets, and no capital first letter unless the replaced text started with one. It stops a
+ * whole sentence being dropped into the middle of another; the Sealer's `validateRewrite` still runs after it.
+ */
+export function plausibleGeneral(phrase: string, replaced: string): boolean {
+  const p = phrase.trim();
+  if (!p || p.split(/\s+/u).length > 6) return false;
+  if (/[.!?;:\[\]{}<>|\n]/u.test(p)) return false;
+  const first = p[0] ?? "";
+  const startedUpper = /^\p{Lu}/u.test(replaced.trim());
+  return !(/\p{Lu}/u.test(first) && !startedUpper);
+}
+
 export { contains };

@@ -230,7 +230,7 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
     // MARK: Seal
     private fun pipeline(): SealPipeline {
         val c = services.config
-        val settings = SealSettings(dial = current.prefs.dial, chunkTokens = c.detectChunkTokens, today = Instant.now(), redTeamEnabled = c.redTeamEnabled, redTeamRounds = c.redTeamRounds)
+        val settings = SealSettings(dial = current.prefs.dial, chunkTokens = c.detectChunkTokens, today = Instant.now(), redTeamEnabled = c.redTeamEnabled, redTeamRounds = c.redTeamRounds, detectPromptId = c.detectPromptId)
         return SealPipeline(services.engines.phone, services.patterns, current.vault, services.prompts, settings)
     }
 

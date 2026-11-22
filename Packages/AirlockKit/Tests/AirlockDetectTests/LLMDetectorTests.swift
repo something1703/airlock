@@ -148,3 +148,62 @@ final class Counter: @unchecked Sendable {
     }
     var value: Int { lock.withLock { n } }
 }
+
+// MARK: detect.v2 / shared conformance (spec/fixtures/detect.json)
+
+private struct DetectFixture: Decodable {
+    struct Mask: Decodable {
+        let start: Int
+        let end: Int
+        let text: String
+        let category: String
+        let subtype: String?
+        let detector: String
+    }
+    struct Case: Decodable {
+        let name: String
+        let promptId: String
+        let text: String
+        let masks: [Mask]
+        let modelOutput: String
+        let expect: [[String?]]
+        let generals: [String: String]
+        let promptIncludes: [String]
+        let promptExcludes: [String]
+        let hallucinated: Int
+    }
+    let cases: [Case]
+}
+
+@Suite struct DetectV2Tests {
+    @Test func sharedConformanceCases() async throws {
+        let fx = try fixture("detect.json", as: DetectFixture.self)
+        for c in fx.cases {
+            let masks = c.masks.map {
+                Candidate(
+                    span: TextSpan(start: $0.start, end: $0.end), text: $0.text, category: PrivacyCategory(rawValue: $0.category)!,
+                    subtype: $0.subtype, detector: DetectorID(rawValue: $0.detector)!, confidence: .high)
+            }
+            let output = c.modelOutput
+            let phone = MockPhoneEngine { _, _ in output }
+            let r = await LLMDetector(engine: phone, prompts: try PromptLibrary(), budgetTokens: 3000, promptID: c.promptId, masks: masks).detect(in: c.text)
+            #expect(phone.calledPromptIDs.first == c.promptId, "\(c.name)")
+            let got = r.candidates.map { [$0.text, $0.category.rawValue, $0.confidence.rawValue, $0.roleHint] as [String?] }
+            #expect(got == c.expect, "\(c.name)")
+            #expect(r.generals == c.generals, "\(c.name)")
+            #expect(r.hallucinatedDropped == c.hallucinated, "\(c.name)")
+            #expect(r.failedChunks.isEmpty, "\(c.name)")
+            let sent = phone.calledPromptTexts.first ?? ""
+            for s in c.promptIncludes { #expect(sent.contains(s), "\(c.name): prompt should include \(s)") }
+            for s in c.promptExcludes { #expect(!sent.contains(s), "\(c.name): prompt should not include \(s)") }
+        }
+    }
+
+    @Test func brokenReplyIsRepairedOnceThenFailed() async throws {
+        let phone = MockPhoneEngine { _, _ in "I cannot do that" }
+        let r = await LLMDetector(engine: phone, prompts: try PromptLibrary(), budgetTokens: 3000, promptID: "detect.v2").detect(in: "Hi Raj.")
+        #expect(phone.calledPromptIDs == ["detect.v2", "detect-repair.v1"])
+        #expect(r.failedChunks == [0])
+    }
+
+}

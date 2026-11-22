@@ -322,6 +322,44 @@ merge_cases = [
 w("merge.json", {"description": "Merger conformance. Candidate spans are UTF-16 offsets. formsInclude must be a subset of the entity's surfaceForms.",
                  "cases": merge_cases})
 
+# ---------- llm detector (model reply -> candidates; detect.v1 JSON and detect.v2 lines) ----------
+d_text = "Hi Raj, I work at Mercy General Hospital near Elm Street. Thanks, Maya"
+d_mail = "Hi Raj, mail me at maya@example.com or call 312-555-0147. I work at Mercy General Hospital."
+d_unsure = "Dr Wu saw me about my knee."
+def mask_cand(text, needle, cat, subtype):
+    return cand(text, needle, cat, "pattern", subtype=subtype)
+llm_cases = [
+  {"name": "v2 lines: people, org and place with general phrases", "promptId": "detect.v2", "text": d_text, "masks": [],
+   "modelOutput": "PERSON | Raj | landlord | -\nORG | Mercy General Hospital | employer | a large hospital\nLOCATION | Elm Street | nearby street | a nearby street\nPERSON | Maya | me | -\nEND",
+   "expect": [["Raj", "person", "high", "landlord"], ["Mercy General Hospital", "org", "high", "employer"], ["Elm Street", "location", "high", "nearby street"], ["Maya", "person", "high", "me"]],
+   "generals": {"org:mercy general hospital": "a large hospital", "location:elm street": "a nearby street"},
+   "promptIncludes": ["Hi Raj, I work at Mercy General Hospital near Elm Street. Thanks, Maya\n>>>"], "promptExcludes": [], "hallucinated": 0},
+  {"name": "v2: ? means low confidence, - means none, bullets and prose lines are tolerated", "promptId": "detect.v2", "text": d_unsure, "masks": [],
+   "modelOutput": "Here you go:\n- ?PERSON | Dr Wu | doctor | -\n? HEALTH | knee | - | -\nEND\nHope that helps",
+   "expect": [["Dr Wu", "person", "low", "doctor"], ["knee", "health", "low", None]],
+   "generals": {}, "promptIncludes": [], "promptExcludes": [], "hallucinated": 0},
+  {"name": "v2: a bare END is a valid empty answer", "promptId": "detect.v2", "text": "The weekly meeting moved upstairs.", "masks": [],
+   "modelOutput": "END", "expect": [], "generals": {}, "promptIncludes": [], "promptExcludes": [], "hallucinated": 0},
+  {"name": "v2: rule hits are masked in the prompt and an echoed mask is ignored", "promptId": "detect.v2", "text": d_mail,
+   "masks": [mask_cand(d_mail, "maya@example.com", "contact", "email"), mask_cand(d_mail, "312-555-0147", "contact", "phone")],
+   "modelOutput": "PERSON | Raj | friend | -\nCONTACT | [email] | - | -\nCONTACT | [phone] | - | -\nORG | Mercy General Hospital | employer | a hospital\nEND",
+   "expect": [["Raj", "person", "high", "friend"], ["Mercy General Hospital", "org", "high", "employer"]],
+   "generals": {"org:mercy general hospital": "a hospital"},
+   "promptIncludes": ["mail me at [email] or call [phone]. I work at"], "promptExcludes": ["maya@example.com", "312-555-0147"], "hallucinated": 0},
+  {"name": "v2: invented text is dropped and counted; a general is kept only for org, location and health", "promptId": "detect.v2", "text": d_text, "masks": [],
+   "modelOutput": "PERSON | Zed | friend | -\nPERSON | Raj | landlord | a tall man\nEND",
+   "expect": [["Raj", "person", "high", "landlord"]], "generals": {}, "promptIncludes": [], "promptExcludes": [], "hallucinated": 1},
+  {"name": "v2 prompt, v1 JSON reply: still parsed", "promptId": "detect.v2", "text": d_text, "masks": [],
+   "modelOutput": '{"items":[{"text":"Raj","type":"PERSON","role":"the writer\'s landlord","confidence":"high"}]}',
+   "expect": [["Raj", "person", "high", "the writer's landlord"]], "generals": {}, "promptIncludes": [], "promptExcludes": [], "hallucinated": 0},
+  {"name": "v1 prompt is unchanged: no masking, JSON in", "promptId": "detect.v1", "text": d_mail,
+   "masks": [mask_cand(d_mail, "maya@example.com", "contact", "email")],
+   "modelOutput": '{"items":[{"text":"Raj","type":"PERSON","confidence":"medium"}]}',
+   "expect": [["Raj", "person", "medium", None]], "generals": {}, "promptIncludes": ["maya@example.com"], "promptExcludes": ["[email]"], "hallucinated": 0},
+]
+w("detect.json", {"description": "LLM detector conformance. For each case, run the detector with the given prompt id on `text` (one chunk) with a scripted model that returns modelOutput. 'masks' are rule hits (candidates) to hide in a detect.v2 prompt; they are ignored for detect.v1. 'expect' is [text, category, confidence, roleHint] for every candidate, ordered by span. 'generals' is the detector report's category:lowercased-text -> phrase map. promptIncludes/promptExcludes are substrings of the rendered prompt. 'hallucinated' is the dropped-item count.",
+                  "cases": llm_cases})
+
 # ---------- seal (end to end, deterministic: vault + patterns + given LLM candidates) ----------
 maya = "Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I work nights at Mercy General Hospital. Call me on 312-555-0147. Rent is $1,240. Thanks, Maya Chen"
 llm_maya = [cand(maya, "Mercy General Hospital", "org", "llm", roleHint="the writer's employer")]

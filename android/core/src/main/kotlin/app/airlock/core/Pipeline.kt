@@ -17,6 +17,8 @@ data class SealSettings(
     val today: Instant = Instant.now(),
     val redTeamEnabled: Boolean = true,
     val redTeamRounds: Int = 2,
+    /** `detect.v1` (JSON) or `detect.v2` (one line per detail, model-written "general" phrases, rule hits masked). */
+    val detectPromptId: String = LLMDetector.DETECT_V1,
 )
 
 /** Why Review is shown. */
@@ -105,7 +107,7 @@ class SealPipeline(
         val tRules = now()
         timings = timings.copy(rulesMs = tRules - t0)
         progress(SealProgress.RulesReady(RulesPreview.of(text, candidates)))
-        val report = LLMDetector(meter, prompts, settings.chunkTokens).detect(text) { section, of -> progress(SealProgress.Detecting(section, of)) }
+        val report = LLMDetector(meter, prompts, settings.chunkTokens, settings.detectPromptId, candidates.toList()).detect(text) { section, of -> progress(SealProgress.Detecting(section, of)) }
         timings = timings.copy(detectMs = now() - tRules, detectCalls = meter.calls("detect"), repairCalls = meter.calls("detect-repair"))
         candidates.addAll(report.candidates)
 
@@ -123,6 +125,13 @@ class SealPipeline(
                 val action = policy.action(e, overrides[e.id])
                 val mention = m.mentions.firstOrNull { it.entityId == e.id }
                 if (action !is Action.Generalise || mention == null) continue
+                // detect.v2 already asked the model for a short phrase: use it if it fits the sentence, else the Sealer falls back
+                // to the fixed phrase. gen.v1 is only for details the model gave none for (Vault and rule hits, or a v1 reply).
+                val given = modelGeneral(report, e)
+                if (given != null) {
+                    if (Generaliser.plausibleGeneral(given, mention.text)) rewrites[e.id] = Js.trim(given)
+                    continue
+                }
                 val r = rewrite(meter, e, mention, action.level, text)
                 if (!r.isNullOrEmpty()) rewrites[e.id] = r
             }
@@ -175,6 +184,12 @@ class SealPipeline(
         val result = finalise(base(), policy.reviewMode)
         progress(SealProgress.Done)
         return StagedSeal(result, null)
+    }
+
+    /** The model's own general phrase for this entity (any of its surface forms), or null if it gave none. */
+    private fun modelGeneral(report: LLMDetectionReport, e: Entity): String? {
+        for (form in listOf(e.canonical) + e.surfaceForms) report.generals[LLMDetector.generalKey(e.category, form)]?.let { return it }
+        return null
     }
 
     suspend fun run(
