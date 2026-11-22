@@ -84,7 +84,8 @@ fun AskScreen(session: AirlockSession, s: State) {
         TaskPills(TASKS[taskIndex].second) { t -> taskIndex = TASKS.indexOfFirst { it.second == t }.coerceAtLeast(0) }
         Wrap {
             AirButton(
-                stringResource(R.string.ask_seal), { val text = s.draft; val task = TASKS[taskIndex].second; session.run { startReview(text, task) } },
+                stringResource(if (session.staysOnDevice(TASKS[taskIndex].second, s.draft)) R.string.ask_answer_local else R.string.ask_seal),
+                { val text = s.draft; val task = TASKS[taskIndex].second; session.run { submit(text, task) } },
                 kind = ButtonKind.PRIMARY, trailingIcon = AirlockIcons.Arrow, enabled = s.draft.isNotBlank(),
             )
             AirButton(stringResource(R.string.ask_sample), { session.setDraft(sample); session.warmUp() }, kind = ButtonKind.GHOST, icon = AirlockIcons.Sparkle)

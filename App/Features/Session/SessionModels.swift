@@ -156,6 +156,8 @@ struct UserTurn: Identifiable, Sendable {
     /// Gate-checked sealed text for follow-up history; nil if a reloaded turn no longer passes the gate.
     let sealed: SealedText?
     let stored: StoredSealed
+    /// FX-02: answered on the device from this raw text. There is no sealed version (`sealed` is nil) and nothing was sent.
+    var local = false
 }
 
 /// An assistant turn, streaming or finished.
@@ -171,6 +173,8 @@ struct AssistantTurn: Identifiable, Sendable {
     var animate: Bool
     /// F-27: the placeholder text the user pasted back (an answer they got elsewhere), before restore.
     var pasted: String?
+    /// FX-02: written by the on-device model from the raw message, so it may hold real names; never sent or backed up.
+    var local = false
 }
 
 enum Turn: Identifiable, Sendable {

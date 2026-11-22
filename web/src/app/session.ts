@@ -1,5 +1,6 @@
 // All app state and actions, independent of React (the UI subscribes via useSyncExternalStore).
 import { answer, type AnswerOutcome, type AnswerPreference, type TaskKind } from "../engine/answer";
+import { answerOnDevice, localTitle, runsOnDevice, type LocalExchange } from "../engine/local";
 import { ANALYSIS_OPTIONS, EngineError, type PhoneAvailability, type SealedHistory } from "../engine/engines";
 import { EgressGate, GateBlocked, type GateHit } from "../engine/gate";
 import { ReceiptLedger, type LedgerStats } from "../engine/ledger";
@@ -63,6 +64,8 @@ export interface UserTurn {
   stored: StoredSealed;
   /** FX-02: where this turn's seal time went (memory only, not saved or synced). */
   timings?: SealTimings;
+  /** FX-02: answered on the device from this raw text. There is no sealed version (`sealed` is null) and nothing was sent. */
+  local?: boolean;
 }
 export interface AssistantTurn {
   kind: "assistant";
@@ -76,6 +79,8 @@ export interface AssistantTurn {
   pasted?: string;
   /** Private tool calls made for this answer. */
   tools: ToolActivity[];
+  /** FX-02: the on-device model wrote this from the raw message, so it may contain real names and is never sent or backed up. */
+  local?: boolean;
 }
 export interface Thread {
   id: string;
@@ -347,6 +352,74 @@ export class AirlockSession {
     return new SealPipeline(s.engines.phone, s.patterns, this.state.vault, s.prompts, sealSettings(s.config, { dial: this.state.prefs.dial }));
   }
 
+  /** Whether a request would be answered on the device with no seal and no Review (FX-02). For the Ask button's label. */
+  staysOnDevice(task: TaskKind, raw: string): boolean {
+    return runsOnDevice(task, this.state.prefs.preference, this.state.availability, raw.trim().length);
+  }
+
+  /**
+   * Ask and follow-up entry point. A quick task (or "This device only") with the on-device model available is answered right
+   * here from the raw message — nothing leaves, so there is nothing to review. If that fails for any reason, or the request needs
+   * the cloud, the normal seal → Review → gate flow runs.
+   */
+  async submit(raw: string, task: TaskKind, threadId: string | null = null): Promise<void> {
+    const text = raw.trim();
+    if (!text) return;
+    if (this.staysOnDevice(task, text) && (await this.askOnDevice(text, task, threadId))) return;
+    await this.startReview(text, task, threadId);
+  }
+
+  /**
+   * Answers from the raw message with the phone-only engine (INV-3). The turns carry `local: true`: they have no sealed version,
+   * never enter the history sent to Gemini, never get a receipt and are never backed up (INV-1, INV-7). Returns false — leaving
+   * no trace in the thread — when the on-device answer fails, so the caller can run the normal flow.
+   */
+  private async askOnDevice(raw: string, task: TaskKind, threadId: string | null): Promise<boolean> {
+    const existing = threadId ? this.state.threads.find((t) => t.id === threadId) : undefined;
+    const id = existing?.id ?? crypto.randomUUID();
+    const earlier: LocalExchange[] = [];
+    if (existing) {
+      for (let i = 0; i + 1 < existing.turns.length; i++) {
+        const u = existing.turns[i]!;
+        const a = existing.turns[i + 1]!;
+        if (u.kind === "user" && u.local && a.kind === "assistant" && a.local && a.status === "done" && a.outcome) earlier.push({ raw: u.raw, answer: a.outcome.modelText });
+      }
+    }
+    const stored: StoredSealed = { text: "", legend: [], revealedVaultIds: [], keptValues: [] };
+    const turns: Thread["turns"] = [
+      { kind: "user", raw, display: "", sealed: null, stored, local: true },
+      { kind: "assistant", task, status: "streaming", text: "", segments: [], outcome: null, error: null, tools: [], local: true },
+    ];
+    if (existing) this.setThread(id, (t) => ({ ...t, turns: [...t.turns, ...turns] }));
+    else this.set({ threads: [{ id, title: localTitle(task), task, entities: new EntityMapClass(), turns, createdAt: Date.now() }, ...this.state.threads] });
+    this.set({ currentThreadId: id, screen: "thread" });
+    let result: Awaited<ReturnType<typeof answerOnDevice>>;
+    try {
+      result = await answerOnDevice({ phone: this.services.engines.phone, prompts: this.services.prompts, task, raw, earlier });
+    } catch {
+      // Leave no trace: the normal flow starts from the same text.
+      if (existing) this.setThread(id, (t) => ({ ...t, turns: t.turns.slice(0, t.turns.length - 2) }));
+      else this.set({ threads: this.state.threads.filter((t) => t.id !== id), screen: "ask", currentThreadId: null });
+      return false;
+    }
+    const segments: RestoredSegment[] = [{ kind: "text", text: result.text }];
+    const outcome: AnswerOutcome = {
+      modelText: result.text, restored: { text: result.text, segments, restoredRanges: [], unknownIds: [], secretsHidden: 0 },
+      fidelity: { unknownIds: [], guessedEntities: [], isClean: true }, route: "phoneOnly", modelVersion: result.modelVersion, ranOnDevice: true,
+      fellBackToPhone: false, latencyMs: result.latencyMs, receipt: null,
+    };
+    this.setThread(id, (t) => {
+      const ts = [...t.turns];
+      const last = ts[ts.length - 1];
+      if (last?.kind === "assistant") ts[ts.length - 1] = { ...last, status: "done", text: result.text, segments, outcome };
+      return { ...t, turns: ts };
+    });
+    await this.services.stores.saveCapture(raw, existing ? "followUp" : "paste", id);
+    await this.services.stores.saveEntities(id, existing?.entities ?? new EntityMapClass());
+    await this.persistThread(id);
+    return true;
+  }
+
   /** Ask → Review: runs detection, policy, sealing and red-team on the device. */
   async startReview(raw: string, task: TaskKind, threadId: string | null = null): Promise<void> {
     const text = raw.trim();
@@ -595,11 +668,11 @@ export class AirlockSession {
     if (!t) return;
     const turns: StoredTurn[] = [];
     for (const turn of t.turns) {
-      if (turn.kind === "user") turns.push({ kind: "user", raw: turn.raw, sealed: turn.stored });
+      if (turn.kind === "user") turns.push({ kind: "user", raw: turn.raw, sealed: turn.stored, ...(turn.local ? { local: true } : {}) });
       else if (turn.status !== "streaming")
         turns.push({
           kind: "assistant", task: turn.task, status: turn.status, modelText: turn.outcome?.modelText ?? turn.pasted ?? "", error: turn.error,
-          outcome: turn.outcome ? { route: turn.outcome.route, modelVersion: turn.outcome.modelVersion, ranOnDevice: turn.outcome.ranOnDevice, fellBackToPhone: turn.outcome.fellBackToPhone, latencyMs: turn.outcome.latencyMs, receiptId: turn.outcome.receipt?.id ?? null, ...(turn.tools.length ? { tools: turn.tools } : {}) } : null,
+          outcome: turn.outcome ? { ...(turn.local ? { local: true } : {}), route: turn.outcome.route, modelVersion: turn.outcome.modelVersion, ranOnDevice: turn.outcome.ranOnDevice, fellBackToPhone: turn.outcome.fellBackToPhone, latencyMs: turn.outcome.latencyMs, receiptId: turn.outcome.receipt?.id ?? null, ...(turn.tools.length ? { tools: turn.tools } : {}) } : null,
         });
     }
     try {
@@ -622,7 +695,10 @@ export class AirlockSession {
       const entities = await this.services.stores.loadEntities(rec.id);
       const turns: (UserTurn | AssistantTurn)[] = [];
       for (const st of rec.turns) {
-        if (st.kind === "user") {
+        if (st.kind === "user" && st.local) {
+          // Answered on the device: there is no sealed version to re-check, and none is ever made from this turn.
+          turns.push({ kind: "user", raw: st.raw, display: "", sealed: null, stored: st.sealed, local: true });
+        } else if (st.kind === "user") {
           const draft: SealDraft = { text: st.sealed.text, legend: st.sealed.legend, replacements: [], entities, secretWarnings: [], revealedVaultIds: new Set(st.sealed.revealedVaultIds), keptValues: new Set(st.sealed.keptValues) };
           let sealed: SealedText | null = null;
           try {
@@ -631,6 +707,15 @@ export class AirlockSession {
             sealed = null;
           }
           turns.push({ kind: "user", raw: st.raw, display: st.sealed.text, sealed, stored: st.sealed });
+        } else if (st.outcome?.local) {
+          // Written on the device from the raw message: shown as it is. Nothing in it is ever "restored" with another
+          // conversation's real details.
+          const segments: RestoredSegment[] = [{ kind: "text", text: st.modelText }];
+          const o = st.outcome;
+          turns.push({
+            kind: "assistant", task: st.task, status: st.status, text: st.modelText, segments, error: st.error, tools: [], local: true,
+            outcome: { modelText: st.modelText, restored: { text: st.modelText, segments, restoredRanges: [], unknownIds: [], secretsHidden: 0 }, fidelity: { unknownIds: [], guessedEntities: [], isClean: true }, route: o.route, modelVersion: o.modelVersion, ranOnDevice: true, fellBackToPhone: false, latencyMs: o.latencyMs, receipt: null },
+          });
         } else {
           const ctx = { entities, userFirstName: me?.canonical.split(" ")[0] ?? null, writingAsUser: writesAsUser(st.task) };
           const restored = restore(st.modelText, ctx);

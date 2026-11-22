@@ -199,6 +199,21 @@ Message:
 
 Quick tasks (`summary`, `actions`, `rewrite`, short `explain`) go phoneFirst; the same instructions work on device without the system instruction's long Boundaries section (use `phone-system.v1`, a 4-line version, to save tokens).
 
+### `phone-local.v1` — a quick task answered on the device from the raw message (PhoneOnly, FX-02)
+
+Used when a quick task (summary, explain, actions, rewrite) or "This device only" runs entirely on the device with the on-device model available: the raw message goes to the phone-only engine and nowhere else (INV-3), no seal, no Review, no receipt. `task_instruction` is the usual `task.*.v1` text. Earlier local exchanges of the same conversation, if any, are put in front as "Earlier in this conversation".
+
+```
+You are helping a person understand and prepare. Be brief and clear. Write plain text; short lists are fine. Describe what is typical and what to ask; do not give legal, medical or financial advice.
+
+Task: {{task_instruction}}
+
+Message:
+<<<
+{{text}}
+>>>
+```
+
 ### `phone-system.v1`
 
 ```
@@ -352,4 +367,5 @@ Scored against the synthetic `profile` with fuzzy matching (`07-EVALUATION.md` �
 | Date | Prompt id | Change | Eval run |
 |------|-----------|--------|----------|
 | 2026-11-16 | all `.v1` | Initial | — |
+| 2026-11-22 | `phone-local.v1` | New: quick tasks answered on the device from the raw message, with no seal or Review | — |
 | 2026-11-22 | `detect.v2` | New: one-line replies, a model-written general phrase per ORG/LOCATION/HEALTH item, rule hits masked in the prompt. Off by default (`detect_prompt_id`) until checked live | — |

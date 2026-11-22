@@ -18,6 +18,9 @@ enum DemoEngines {
                     ? #"{"guesses":[{"attribute":"occupation","guess":"works night shifts at a hospital","evidence":"I work nights","confidence":"medium"}]}"#
                     : #"{"guesses":[]}"#
             case "title.v1": return "Broken heater repair"
+            // A quick task answered on the device from the raw message (FX-02): plain text, no placeholders.
+            case "phone-local.v1":
+                return "- Your landlord hasn't fixed the heater yet.\n- You have already asked several times.\n- The next step is a firm, polite written request."
             default: return "{}"
             }
         }

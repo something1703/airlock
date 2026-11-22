@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
-import { createServices } from "../src/app/services";
+import { createServices, type Services } from "../src/app/services";
 import { AirlockSession, cleanTitle, titleFrom } from "../src/app/session";
 import { PROOF_SAMPLES } from "../src/app/proofSamples";
 
@@ -333,6 +333,128 @@ describe("AirlockSession (demo engines, end to end)", () => {
     expect(after.draft.text).not.toContain("Willowbrook");
     expect(after.draft.text).not.toContain("near the old mill");
     expect(s.getState().review!.accepted.length).toBeGreaterThan(0);
+  });
+
+  describe("quick tasks answered on the device (FX-02): no seal, no Review, nothing sent", () => {
+    type Phone = Services["engines"]["phone"];
+    const watching = (wrap: (base: Phone) => Phone) => wrap;
+    async function localSession(opts: { preference?: "auto" | "phoneOnly" | "best"; phone?: (base: Phone) => Phone } = {}) {
+      const services = await createServices("?demo=1");
+      const sentRoutes: string[] = [];
+      const histories: unknown[] = [];
+      const backedUp: unknown[] = [];
+      const sync = { push: async (b: unknown) => { backedUp.push(b); }, deleteThread: async () => {}, deleteAll: async () => {} };
+      const base = services.engines.phone;
+      const phone = opts.phone ? opts.phone(base) : base;
+      const s = new AirlockSession({ ...services, sync, engines: { phone, sealed: (r: Parameters<typeof services.engines.sealed>[0], q: Parameters<typeof services.engines.sealed>[1]) => {
+        sentRoutes.push(r);
+        const e = services.engines.sealed(r, q);
+        return { route: e.route, respond: (sealed, task, h) => { histories.push(h); return e.respond(sealed, task, h); }, stream: (sealed, task, h) => { histories.push(h); return e.stream(sealed, task, h); } };
+      }, tools: services.engines.tools.bind(services.engines) } }, { dial: "balanced", preference: opts.preference ?? "auto", onboarded: true, backup: true });
+      await s.load();
+      await s.deleteEverything();
+      s.setPrefs({ onboarded: true, preference: opts.preference ?? "auto", backup: true });
+      await s.saveVault([
+        { id: "me", canonical: "Maya Chen", aliases: ["Maya"], category: "person", roleHint: "me", isUser: true },
+        { id: "raj", canonical: "Raj Patel", aliases: ["Raj"], category: "person", roleHint: "my landlord", isUser: false },
+      ]);
+      return { s, sentRoutes, histories, backedUp };
+    }
+
+    it("a summary is answered straight away: a local thread, no Review, no receipt, nothing to the cloud", async () => {
+      const { s, sentRoutes } = await localSession();
+      expect(s.staysOnDevice({ kind: "summary" }, SAMPLE)).toBe(true);
+      await s.submit(SAMPLE, { kind: "summary" });
+      const st = s.getState();
+      expect(st.screen).toBe("thread");
+      expect(st.review).toBeNull();
+      const t = st.threads[0]!;
+      expect(t.title).toBe("Summary of a message");
+      expect(t.turns).toHaveLength(2);
+      const [u, a] = t.turns;
+      expect(u!.kind === "user" && u!.local && u!.sealed === null).toBe(true);
+      if (a!.kind !== "assistant") throw new Error("expected answer");
+      expect(a!.local).toBe(true);
+      expect(a!.status).toBe("done");
+      expect(a!.outcome).toMatchObject({ route: "phoneOnly", ranOnDevice: true, receipt: null });
+      expect(a!.text.length).toBeGreaterThan(0);
+      expect(sentRoutes).toEqual([]);
+      expect(s.ledger.receipts).toHaveLength(0);
+      expect(await s.services.stores.captures()).toHaveLength(1);
+    });
+
+    it("the on-device model sees the raw message; the cloud engines are never asked", async () => {
+      const seen: string[] = [];
+      const { s, sentRoutes } = await localSession({ phone: watching((base) => ({ availability: () => base.availability(), respond: (p, o) => { seen.push(`${p.promptId}:${p.text}`); return base.respond(p, o); } })) });
+      await s.submit(SAMPLE, { kind: "summary" });
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toContain("phone-local.v1:");
+      expect(seen[0]).toContain("Raj");
+      expect(sentRoutes).toEqual([]);
+    });
+
+    it("if the on-device answer fails nothing is left behind and the normal Review flow starts; nothing is sent until Send", async () => {
+      const { s, sentRoutes } = await localSession({ phone: watching((base) => ({ availability: () => base.availability(), respond: (p, o) => (p.promptId === "phone-local.v1" ? Promise.reject(new Error("model crashed")) : base.respond(p, o)) })) });
+      await s.submit(SAMPLE, { kind: "summary" });
+      const st = s.getState();
+      expect(st.threads).toHaveLength(0);
+      expect(st.screen).toBe("review");
+      expect(st.review?.result).not.toBeNull();
+      expect(sentRoutes).toEqual([]);
+      expect(await s.services.stores.captures()).toHaveLength(1);
+      for (const raw of ["Raj", "Maya", "Elm", "312-555", "Mercy"]) expect(st.review!.result!.draft.text).not.toContain(raw);
+    });
+
+    it("'Best answer' and deep tasks still go through Review; 'This device only' makes a deep task local", async () => {
+      const best = await localSession({ preference: "best" });
+      await best.s.submit(SAMPLE, { kind: "summary" });
+      expect(best.s.getState().screen).toBe("review");
+      const auto = await localSession({ preference: "auto" });
+      await auto.s.submit(SAMPLE, { kind: "help" });
+      expect(auto.s.getState().screen).toBe("review");
+      const only = await localSession({ preference: "phoneOnly" });
+      await only.s.submit(SAMPLE, { kind: "help" });
+      expect(only.s.getState().screen).toBe("thread");
+      expect(only.sentRoutes).toEqual([]);
+    });
+
+    it("a follow-up that needs the cloud is sealed and reviewed on its own: earlier local text never goes, and the title stays task-based", async () => {
+      const { s, histories, backedUp } = await localSession();
+      await s.submit(SAMPLE, { kind: "summary" });
+      const id = s.getState().currentThreadId!;
+      await s.submit("Please draft a firm reply to Raj about the heater.", { kind: "help" }, id);
+      expect(s.getState().screen).toBe("review");
+      await s.send();
+      const t = s.getState().threads.find((x) => x.id === id)!;
+      expect(t.turns).toHaveLength(4);
+      expect(t.title).toBe("Summary of a message");
+      const outbound = s.ledger.receipts.map((r) => r.outboundText ?? "").join("\n");
+      expect(outbound.length).toBeGreaterThan(0);
+      for (const raw of ["Raj", "Maya", "Elm", "312-555", "Mercy", "heater at"]) expect(outbound).not.toContain(raw);
+      expect(outbound).not.toContain("hasn't fixed the heater");
+      // The history replayed to Gemini holds none of the local turns (their raw text or the on-device answer).
+      // Backup: only the sealed follow-up pair; the local turns, their raw text and answers never sync (INV-7).
+      const synced = JSON.stringify(backedUp);
+      expect(backedUp.length).toBeGreaterThan(0);
+      for (const raw of ["Raj", "Maya", "Elm", "312-555", "Mercy", "hasn't fixed the heater", "Apt 3B"]) expect(synced).not.toContain(raw);
+      expect(synced).toContain("Summary of a message");
+      expect(histories.length).toBeGreaterThan(0);
+      for (const h of histories) expect(h === undefined || (h as { turns: unknown[] }).turns.length === 0).toBe(true);
+    });
+
+    it("a local thread survives a reload as local: no sealed version is made from it, and its answer is shown as written", async () => {
+      const { s } = await localSession();
+      await s.submit(SAMPLE, { kind: "summary" });
+      const reloaded = new AirlockSession(s.services, { dial: "balanced", preference: "auto", onboarded: true, backup: false });
+      await reloaded.load();
+      const t = reloaded.getState().threads[0]!;
+      const [u, a] = t.turns;
+      expect(u!.kind === "user" && u!.local === true && u!.sealed === null && u!.raw === SAMPLE).toBe(true);
+      if (a!.kind !== "assistant") throw new Error("expected answer");
+      expect(a!.local).toBe(true);
+      expect(a!.outcome?.receipt).toBeNull();
+      expect(a!.segments).toEqual([{ kind: "text", text: a!.text }]);
+    });
   });
 
   it("titles never contain placeholder tokens", () => {

@@ -156,6 +156,7 @@
     <string name="task_questions">Questions to ask</string>
     <string name="task_actions">List actions</string>
     <string name="ask_seal">Seal on this phone</string>
+    <string name="ask_answer_local">Answer on this phone</string>
     <string name="ask_sample">Try a sample (fictional)</string>
     <string name="ask_sample_text">Hi Raj, the heater at 14 Elm St, Apt 3B has been broken since Oct 28. I\'ve texted you four times. I work nights at Mercy General Hospital and need to sleep during the day — please send someone this week. You can reach me on 312-555-0147. Thanks, Maya Chen</string>
     <string name="recent">Recent</string>
@@ -271,6 +272,7 @@
     <string name="thread_delete_body">Your words, the answers and the real names for this conversation are removed. Its receipts stay in the Ledger so the chain can still be verified — they only ever held the sealed text.</string>
     <string name="delete">Delete</string>
     <string name="bubble_raw_label">You wrote · never sent</string>
+    <string name="bubble_local_label">You wrote · stayed on this phone</string>
     <string name="bubble_sealed_label">What Gemini saw</string>
     <string name="bubble_show_raw">Show what I wrote</string>
     <string name="bubble_show_sealed">Show sealed</string>

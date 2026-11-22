@@ -58,14 +58,15 @@ struct AskView: View {
         let t = text
         guard !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         focused = false
-        Task { await session.startReview(t, task: task) }
+        Task { await session.submit(t, task: task) }
     }
 
     private var sealButton: some View {
         Button {
             seal()
         } label: {
-            IconLabel(title: "Seal on this device", glyph: .arrow, trailing: true)
+            IconLabel(
+                title: session.staysOnDevice(task, text) ? "Answer on this device" : "Seal on this device", glyph: .arrow, trailing: true)
         }
         .buttonStyle(.primary)
         .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

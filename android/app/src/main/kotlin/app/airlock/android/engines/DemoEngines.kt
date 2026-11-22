@@ -56,6 +56,8 @@ object DemoEngines {
                 else "{\"guesses\":[]}"
             }
             "title.v1" -> "Heater repair request"
+            // A quick task answered on the device from the raw message (FX-02): plain text, no placeholders.
+            "phone-local.v1" -> "- Your landlord hasn't fixed the heater yet.\n- You have already asked several times.\n- The next step is a firm, polite written request."
             else -> "{}"
         }
     }

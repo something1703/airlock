@@ -112,7 +112,7 @@ function ProtectBar({ phrase, setPhrase }: { phrase: string; setPhrase: (s: stri
 
 export function ReviewScreen() {
   const s = useSession();
-  const { review } = useAirlock();
+  const { review, threads } = useAirlock();
   const [view, setView] = useState<"sealed" | "raw">("sealed");
   const [sending, setSending] = useState(false);
   const [phrase, setPhrase] = useState("");
@@ -164,6 +164,9 @@ export function ReviewScreen() {
         </div>
       </div>
 
+      {review.threadId && threads.find((t) => t.id === review.threadId)?.turns.some((t) => t.kind === "user" && t.local) && (
+        <Banner tone="info" title="Earlier messages stayed on this device">Only this new message is sealed and sent. The earlier ones in this conversation were answered here and are not shared with Gemini.</Banner>
+      )}
       {result.requiresReview && result.reasons.map((r, i) => <Banner key={i} tone={r.kind === "secretsFound" || r.kind === "phoneUnavailable" ? "risk" : "warn"} title={reasonText(r)} />)}
 
       {review.blocked && (

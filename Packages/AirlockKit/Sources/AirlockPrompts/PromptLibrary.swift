@@ -18,7 +18,7 @@ public enum PromptError: Error, Sendable, Hashable {
 public struct PromptLibrary: Sendable {
     public static let bundledIDs: [String] = [
         "attack.v1", "attacker.v1", "claimcheck.v1", "cloud-system.v1", "cloud-user.v1", "detect-repair.v1", "detect.v1", "detect.v2",
-        "gen.v1", "infer.v1", "judge.v1", "phone-system.v1", "synth.v1", "tactics.v1", "task.actions.v1", "task.custom.v1",
+        "gen.v1", "infer.v1", "judge.v1", "phone-local.v1", "phone-system.v1", "synth.v1", "tactics.v1", "task.actions.v1", "task.custom.v1",
         "task.explain.v1", "task.help.v1", "task.questions.v1", "task.reply.v1", "task.rewrite.v1", "task.summary.v1",
         "title.v1", "tools-addendum.v1",
     ]

@@ -19,7 +19,7 @@ const utc = (s: string): Date => new Date(`${s}T00:00:00Z`);
 
 describe("prompt library", () => {
   it("bundles every prompt, byte-identical to the Swift package", () => {
-    expect(BUNDLED_PROMPT_IDS.length).toBe(24);
+    expect(BUNDLED_PROMPT_IDS.length).toBe(25);
     for (const id of BUNDLED_PROMPT_IDS) {
       const swift = readFileSync(join(repoRoot, "Packages/AirlockKit/Sources/AirlockPrompts/Prompts", `${id}.txt`), "utf8");
       expect(prompts.template(id) + "\n", `${id} drifted — run npm run sync-packs`).toBe(swift);

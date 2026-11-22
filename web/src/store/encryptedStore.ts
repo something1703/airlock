@@ -143,6 +143,8 @@ export interface StoredSealed {
   keptValues: string[];
 }
 export interface StoredOutcome {
+  /** FX-02: answered on the device from the raw message (no seal, no receipt); never restored or sent. */
+  local?: boolean;
   route: Route;
   modelVersion: string;
   ranOnDevice: boolean;
@@ -158,7 +160,7 @@ export interface StoredCalendar {
   sample: boolean;
 }
 export type StoredTurn =
-  | { kind: "user"; raw: string; sealed: StoredSealed }
+  | { kind: "user"; raw: string; sealed: StoredSealed; /** FX-02: answered on the device; there is no sealed version (`sealed` is empty). */ local?: boolean }
   | { kind: "assistant"; task: TaskKind; status: "done" | "error"; modelText: string; error: string | null; outcome: StoredOutcome | null };
 export interface ThreadRecord {
   v: 1;
