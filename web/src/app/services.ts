@@ -117,6 +117,16 @@ function demoToolEngine(): MockToolEngine {
   }, "gemini-demo");
 }
 
+/**
+ * Dev builds only (`npm run dev`, never the hosted app): `?detect=v1` / `?detect=v2` picks the on-device detection prompt for
+ * this page load, so the two can be timed side by side on one machine without editing code or Remote Config.
+ */
+export function withDevOverrides(remote: Record<string, string>, search: string, dev: boolean): Record<string, string> {
+  if (!dev) return remote;
+  const pick = new URLSearchParams(search).get("detect");
+  return pick === "v1" || pick === "v2" ? { ...remote, detect_prompt_id: `detect.${pick}` } : remote;
+}
+
 export async function createServices(search = typeof location !== "undefined" ? location.search : ""): Promise<Services> {
   const config = new AppConfig();
   const prompts = new PromptLibrary(config.promptOverridesJson);
@@ -133,7 +143,7 @@ export async function createServices(search = typeof location !== "undefined" ? 
   }
   void signInQuietly(firebase.app);
   // Live mode: Remote Config (model names, thresholds, prompt overrides) replaces the bundled defaults.
-  const liveConfig = new AppConfig(await loadRemoteConfig(firebase.app));
+  const liveConfig = new AppConfig(withDevOverrides(await loadRemoteConfig(firebase.app), search, import.meta.env.DEV));
   const livePrompts = new PromptLibrary(liveConfig.promptOverridesJson);
   const livePatterns = new PatternDetector(undefined, liveConfig.disabledPatternPacks);
   const engines = new FirebaseEngines(firebase.app, liveConfig, livePrompts);
