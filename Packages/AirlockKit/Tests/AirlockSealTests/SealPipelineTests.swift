@@ -59,6 +59,23 @@ final class ProgressLog: @unchecked Sendable {
         _ = try EgressGate(patterns: fixturePatterns, vault: vault).seal(r.draft)
     }
 
+    /// FX-02: timings count calls per stage and add up; no model → no calls and no first reply.
+    @Test func timingsCountCallsPerStage() async throws {
+        let r = await try pipeline(Self.phone()).run(RawText(raw, source: .paste))
+        let t = r.timings
+        let counts: [Int] = [t.detectCalls, t.repairCalls, t.generaliseCalls, t.redTeamCalls]
+        #expect(counts == [1, 0, 1, 1])
+        #expect(t.firstModelOutput != nil)
+        let stages: Duration = t.rules + t.detect + t.generalise + t.redTeam
+        #expect(stages <= t.total)
+        #expect(t.total == r.sealDuration)
+
+        let off = await try pipeline(MockPhoneEngine(answering: Self.detectAnswer, availability: .appleIntelligenceNotEnabled), dial: .open)
+            .run(RawText(raw, source: .paste))
+        #expect(off.timings.detectCalls + off.timings.generaliseCalls + off.timings.redTeamCalls == 0)
+        #expect(off.timings.firstModelOutput == nil)
+    }
+
     @Test func leakyRewriteFallsBackToLadder() async throws {
         let phone = Self.phone(rewrite: "the Mercy General campus")
         let r = await try pipeline(phone).run(RawText(raw, source: .paste))

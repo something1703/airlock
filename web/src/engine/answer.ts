@@ -42,7 +42,9 @@ export function taskSpec(prompts: PromptLibrary, t: TaskKind, question?: SealedT
     : t.kind === "meeting" ? prompts.render(id, { tone: MEETING_TONE })
     : t.kind === "custom" ? prompts.render(id, { user_question: question?.value ?? "Help me with this." })
     : prompts.render(id);
-  return { id, instruction, maxOutputTokens: isQuick(t) ? 600 : 1500 };
+  // Generous limits: on thinking models the reasoning tokens count against this too, and 1500 cut answers off
+  // mid-sentence (docs/12-REVIEW.md UX-04). A cut-off answer is flagged (`truncated`) and can be continued.
+  return { id, instruction, maxOutputTokens: isQuick(t) ? 1024 : 8192 };
 }
 
 /** Private tools for one answer. Only used for `usesTools` tasks on a cloud route (never phone-only). */
@@ -66,6 +68,8 @@ export interface AnswerOutcome {
   ranOnDevice: boolean;
   fellBackToPhone: boolean;
   latencyMs: number;
+  /** The model hit its output-token limit; the UI offers to continue. */
+  truncated?: boolean;
   receipt: Receipt | null;
   /** Private tool calls made while answering (with the exact gate-checked JSON that was returned to Gemini). */
   tools?: ToolActivity[];
@@ -112,6 +116,7 @@ export async function* answer(args: {
   let modelText = "";
   let modelVersion = "";
   let ranOnDevice = false;
+  let truncated = false;
   let activity: ToolActivity[] | undefined;
   const t0 = performance.now();
   try {
@@ -146,6 +151,7 @@ export async function* answer(args: {
         modelText = chunk.cumulativeText;
         if (chunk.modelVersion) modelVersion = chunk.modelVersion;
         if (chunk.ranOnDevice !== null) ranOnDevice = chunk.ranOnDevice;
+        if (chunk.truncated) truncated = true;
         restorer.update(modelText);
         yield { kind: "partial", text: restorer.text, segments: [...restorer.segments] };
       }
@@ -169,6 +175,7 @@ export async function* answer(args: {
     outcome: {
       modelText, restored: resultFrom(restorer), fidelity: fidelityCheck(modelText, ctx), route: r, modelVersion, ranOnDevice,
       fellBackToPhone: ranOnDevice && (r === "cloudFirst" || r === "cloudOnly"), latencyMs, receipt, ...(activity ? { tools: activity } : {}),
+      ...(truncated ? { truncated: true } : {}),
     },
   };
 }

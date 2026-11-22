@@ -22,6 +22,7 @@ export * from "./chunker";
 export * from "./llmDetector";
 export * from "./redTeam";
 export * from "./pipeline";
+export * from "./timing";
 export * from "./ledger";
 export * from "./answer";
 export * from "./tools";

@@ -40,12 +40,14 @@ export class MockSealedEngine implements SealedEngine {
     readonly route: Route,
     private readonly handler: (sealed: SealedText, task: TaskSpec) => string | Promise<string>,
     private readonly modelVersion = "mock-gemini",
+    /** Simulates a reply cut off at the output-token limit. */
+    private readonly truncated = false,
   ) {}
 
   async respond(sealed: SealedText, task: TaskSpec, _history?: SealedHistory): Promise<EngineResult> {
     this.received.push(sealed);
     const text = await this.handler(sealed, task);
-    return { text, modelVersion: this.modelVersion, ranOnDevice: this.modelVersion === CHROME_ON_DEVICE_MODEL, latencyMs: 1 };
+    return { text, modelVersion: this.modelVersion, ranOnDevice: this.modelVersion === CHROME_ON_DEVICE_MODEL, latencyMs: 1, ...(this.truncated ? { truncated: true } : {}) };
   }
 
   async *stream(sealed: SealedText, task: TaskSpec, history?: SealedHistory): AsyncIterable<EngineChunk> {
@@ -55,7 +57,7 @@ export class MockSealedEngine implements SealedEngine {
       acc += ch;
       if (acc.length % 12 === 0) yield { cumulativeText: acc, modelVersion: r.modelVersion, ranOnDevice: r.ranOnDevice };
     }
-    yield { cumulativeText: acc, modelVersion: r.modelVersion, ranOnDevice: r.ranOnDevice };
+    yield { cumulativeText: acc, modelVersion: r.modelVersion, ranOnDevice: r.ranOnDevice, ...(r.truncated ? { truncated: true } : {}) };
   }
 }
 

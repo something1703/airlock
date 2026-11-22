@@ -225,6 +225,18 @@ class PipelineTest {
         EgressGate(patterns, vault).seal(r.draft)
     }
 
+    @Test fun timingsCountCallsPerStage() = runTest {
+        val r = pipe(phone()).run(raw)
+        val t = r.timings
+        assertEquals(listOf(1, 0, 1, 1), listOf(t.detectCalls, t.repairCalls, t.generaliseCalls, t.redTeamCalls))
+        assertTrue(t.firstModelOutputMs != null)
+        assertTrue(t.rulesMs + t.detectMs + t.generaliseMs + t.redTeamMs <= t.totalMs + 1)
+        assertEquals(r.sealMs, t.totalMs)
+        val off = pipe(MockPhoneEngine.answering(detectAnswer, PhoneAvailability.UNAVAILABLE), DialPreset.OPEN).run(raw)
+        assertEquals(0, off.timings.detectCalls + off.timings.generaliseCalls + off.timings.redTeamCalls)
+        assertEquals(null, off.timings.firstModelOutputMs)
+    }
+
     @Test fun leakyRewriteFallsBack() = runTest {
         val r = pipe(phone("the Mercy General campus")).run(raw)
         assertContains(r.draft.text, "I work nights at an organisation.")

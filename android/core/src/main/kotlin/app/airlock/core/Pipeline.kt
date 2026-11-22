@@ -56,6 +56,8 @@ data class SealResult(
     val redTeamPending: Boolean? = null,
     /** Every detection before merging (kept so the user can add their own and re-merge — "Protect this"). */
     val candidates: List<Candidate> = emptyList(),
+    /** Where the seal's time went (FX-02); numbers only. */
+    val timings: SealTimings = SealTimings(),
 ) {
     /** Risks not yet accepted. */
     val pendingRisks: List<Risk> get() {
@@ -91,12 +93,17 @@ class SealPipeline(
         staged: CoroutineScope?,
     ): StagedSeal {
         val t0 = now()
+        val meter = CallMeter(phone, t0, ::now)
+        var timings = SealTimings()
         val normalised = Normaliser.normalise(raw.substring(0, minOf(raw.length, Normaliser.MAX_INPUT_UTF16)))
         val text = normalised.text
         val candidates = ArrayList<Candidate>()
         candidates.addAll(VaultMatcher(vault).detect(text))
         candidates.addAll(patterns.detect(text))
-        val report = LLMDetector(phone, prompts, settings.chunkTokens).detect(text) { section, of -> progress(SealProgress.Detecting(section, of)) }
+        val tRules = now()
+        timings = timings.copy(rulesMs = tRules - t0)
+        val report = LLMDetector(meter, prompts, settings.chunkTokens).detect(text) { section, of -> progress(SealProgress.Detecting(section, of)) }
+        timings = timings.copy(detectMs = now() - tRules, detectCalls = meter.calls("detect"), repairCalls = meter.calls("detect-repair"))
         candidates.addAll(report.candidates)
 
         val m = Merger.merge(candidates, text, existing, vault)
@@ -107,13 +114,16 @@ class SealPipeline(
             val ids = m.mentions.mapTo(LinkedHashSet()) { it.entityId }.sortedWith(Placeholders.ORDER)
             val targets = ids.mapNotNull { m.entities[it] }.filter { policy.action(it, overrides[it.id]) is Action.Generalise }.take(settings.maxRewrites)
             if (targets.isNotEmpty()) progress(SealProgress.Generalising)
+            val tGen = now()
+            val callsBefore = meter.calls()
             for (e in targets) {
                 val action = policy.action(e, overrides[e.id])
                 val mention = m.mentions.firstOrNull { it.entityId == e.id }
                 if (action !is Action.Generalise || mention == null) continue
-                val r = rewrite(e, mention, action.level, text)
+                val r = rewrite(meter, e, mention, action.level, text)
                 if (!r.isNullOrEmpty()) rewrites[e.id] = r
             }
+            timings = timings.copy(generaliseMs = now() - tGen, generaliseCalls = meter.calls() - callsBefore)
         }
 
         var draft = Sealer(policy, patterns, settings.today).draft(normalised, m, overrides, rewrites)
@@ -121,21 +131,38 @@ class SealPipeline(
         var accepted: List<Risk> = emptyList()
         var redTeamUnavailable = false
         val allCandidates: List<Candidate> = candidates.toList()
-        fun base() = SealResult(normalised, m, draft, emptyList(), false, report, rewrites, now() - t0, risks, accepted, redTeamUnavailable, candidates = allCandidates)
+        fun base(): SealResult {
+            val sealMs = now() - t0
+            return SealResult(
+                normalised, m, draft, emptyList(), false, report, rewrites, sealMs, risks, accepted, redTeamUnavailable, candidates = allCandidates,
+                timings = timings.copy(firstModelOutputMs = meter.firstModelOutputMs, totalMs = sealMs),
+            )
+        }
         if (settings.redTeamEnabled && policy.redTeamMode != RedTeamMode.OFF) {
             if (report.unavailable != null) redTeamUnavailable = true
             else if (staged != null && policy.redTeamMode == RedTeamMode.SUGGEST) {
                 // Suggestions don't change the draft, so the user can start reviewing now; risk cards arrive later.
                 val early = base().copy(redTeamPending = true)
                 progress(SealProgress.CheckingRisks)
+                val tRed = now()
+                val callsBefore = meter.calls()
                 val later = staged.async {
-                    val rt = RedTeam(phone, prompts, patterns).run(draft, RedTeamMode.SUGGEST, settings.redTeamRounds, settings.taskSummary)
-                    finalise(early.copy(redTeamPending = false, risks = rt.risks, redTeamUnavailable = rt.unavailable, sealMs = now() - t0), policy.reviewMode)
+                    val rt = RedTeam(meter, prompts, patterns).run(draft, RedTeamMode.SUGGEST, settings.redTeamRounds, settings.taskSummary)
+                    finalise(
+                        early.copy(
+                            redTeamPending = false, risks = rt.risks, redTeamUnavailable = rt.unavailable, sealMs = now() - t0,
+                            timings = early.timings.copy(redTeamMs = now() - tRed, redTeamCalls = meter.calls() - callsBefore),
+                        ),
+                        policy.reviewMode,
+                    )
                 }
                 return StagedSeal(finalise(early, policy.reviewMode), later)
             } else {
                 progress(SealProgress.CheckingRisks)
-                val rt = RedTeam(phone, prompts, patterns).run(draft, policy.redTeamMode, settings.redTeamRounds, settings.taskSummary)
+                val tRed = now()
+                val callsBefore = meter.calls()
+                val rt = RedTeam(meter, prompts, patterns).run(draft, policy.redTeamMode, settings.redTeamRounds, settings.taskSummary)
+                timings = timings.copy(redTeamMs = now() - tRed, redTeamCalls = meter.calls() - callsBefore)
                 risks = rt.risks
                 accepted = rt.applied
                 draft = rt.draft
@@ -210,7 +237,7 @@ class SealPipeline(
         return finalise(result.copy(draft = RedTeam.applyRisks(acceptedRisks, base), acceptedRisks = acceptedRisks), policy.reviewMode)
     }
 
-    private suspend fun rewrite(e: Entity, mention: Mention, level: Int, text: String): String? {
+    private suspend fun rewrite(phone: PhoneOnlyEngine, e: Entity, mention: Mention, level: Int, text: String): String? {
         val sentence = text.substring(maxOf(0, mention.span.start - 120), minOf(text.length, mention.span.end + 120))
         val hint = when (level) {
             1 -> "slightly less specific"

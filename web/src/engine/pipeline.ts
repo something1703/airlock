@@ -8,6 +8,7 @@ import { PolicyEngine, DEFAULT_POLICY_SETTINGS, type PolicySettings, type UserOv
 import type { PromptLibrary } from "./prompts";
 import { applyRisks, RedTeam, type Risk } from "./redTeam";
 import { Sealer, type SealDraft } from "./sealer";
+import { CallMeter, emptyTimings, type SealTimings } from "./timing";
 import { ANALYSIS_OPTIONS } from "./engines";
 import { type Candidate, type DialPreset, type Entity, type PlaceholderId, type PrivacyCategory, type ReviewMode, EntityMap, PLACEHOLDER, confidenceRank, compareIds } from "./types";
 import { VaultMatcher, type VaultEntry } from "./vault";
@@ -53,6 +54,8 @@ export interface SealResult {
   detection: LLMDetectionReport;
   rewrites: Map<PlaceholderId, string>;
   sealMs: number;
+  /** Where the seal's time went (FX-02); numbers only. */
+  timings: SealTimings;
   risks: Risk[];
   acceptedRisks: Risk[];
   redTeamUnavailable: boolean;
@@ -84,10 +87,17 @@ export class SealPipeline {
 
   private async prepare(raw: string, existing: EntityMap, overrides: Map<PlaceholderId, UserOverride>, progress: (p: SealProgress) => void, staged: boolean): Promise<{ result: SealResult; later: Promise<SealResult> | null }> {
     const t0 = performance.now();
+    const meter = new CallMeter(this.phone, t0);
+    const timings = emptyTimings();
     const normalised = normalise(raw.slice(0, MAX_INPUT_UTF16));
     const text = normalised.text;
     const candidates = [...new VaultMatcher(this.vault).detect(text), ...this.patterns.detect(text)];
-    const report = await new LLMDetector(this.phone, this.prompts, this.settings.chunkTokens).detect(text, (section, of) => progress({ kind: "detecting", section, of }));
+    const tRules = performance.now();
+    timings.rulesMs = tRules - t0;
+    const report = await new LLMDetector(meter, this.prompts, this.settings.chunkTokens).detect(text, (section, of) => progress({ kind: "detecting", section, of }));
+    timings.detectMs = performance.now() - tRules;
+    timings.detectCalls = meter.calls("detect");
+    timings.repairCalls = meter.calls("detect-repair");
     candidates.push(...report.candidates);
 
     const m = merge(candidates, text, existing, this.vault);
@@ -98,13 +108,17 @@ export class SealPipeline {
       const ids = [...new Set(m.mentions.map((x) => x.entityId))].sort(compareIds);
       const targets = ids.map((id) => m.entities.get(id)).filter((e): e is Entity => !!e && policy.action(e, overrides.get(e.id)).kind === "generalise").slice(0, this.settings.maxRewrites);
       if (targets.length) progress({ kind: "generalising" });
+      const tGen = performance.now();
+      const callsBefore = meter.calls();
       for (const e of targets) {
         const action = policy.action(e, overrides.get(e.id));
         const mention = m.mentions.find((x) => x.entityId === e.id);
         if (action.kind !== "generalise" || !mention) continue;
-        const r = await this.rewrite(e, mention, action.level, text);
+        const r = await this.rewrite(meter, e, mention, action.level, text);
         if (r) rewrites.set(e.id, r);
       }
+      timings.generaliseMs = performance.now() - tGen;
+      timings.generaliseCalls = meter.calls() - callsBefore;
     }
 
     let draft = new Sealer(policy, this.patterns, this.settings.today).draft(normalised, m, overrides, rewrites);
@@ -112,19 +126,31 @@ export class SealPipeline {
     let accepted: Risk[] = [];
     let redTeamUnavailable = false;
     let later: Promise<SealResult> | null = null;
-    const base = (): SealResult => ({ normalised, merge: m, draft, reasons: [], requiresReview: false, detection: report, rewrites, sealMs: performance.now() - t0, risks, acceptedRisks: accepted, redTeamUnavailable, candidates });
+    const base = (): SealResult => {
+      const sealMs = performance.now() - t0;
+      return { normalised, merge: m, draft, reasons: [], requiresReview: false, detection: report, rewrites, sealMs, timings: { ...timings, firstModelOutputMs: meter.firstModelOutputMs, totalMs: sealMs }, risks, acceptedRisks: accepted, redTeamUnavailable, candidates };
+    };
     if (this.settings.redTeamEnabled && policy.redTeamMode !== "off") {
       if (report.unavailable !== null) redTeamUnavailable = true;
       else if (staged && policy.redTeamMode === "suggest") {
         // Suggestions don't change the draft, so the user can start reviewing now; risk cards arrive later.
         const early = { ...base(), redTeamPending: true };
         progress({ kind: "checkingRisks" });
-        later = new RedTeam(this.phone, this.prompts, this.patterns).run(draft, "suggest", this.settings.redTeamRounds, this.settings.taskSummary)
-          .then((rt) => finalise({ ...early, redTeamPending: false, risks: rt.risks, redTeamUnavailable: rt.unavailable, sealMs: performance.now() - t0 }, policy.reviewMode));
+        const tRed = performance.now();
+        const callsBefore = meter.calls();
+        later = new RedTeam(meter, this.prompts, this.patterns).run(draft, "suggest", this.settings.redTeamRounds, this.settings.taskSummary)
+          .then((rt) => finalise({
+            ...early, redTeamPending: false, risks: rt.risks, redTeamUnavailable: rt.unavailable, sealMs: performance.now() - t0,
+            timings: { ...early.timings, redTeamMs: performance.now() - tRed, redTeamCalls: meter.calls() - callsBefore },
+          }, policy.reviewMode));
         return { result: finalise(early, policy.reviewMode), later };
       } else {
         progress({ kind: "checkingRisks" });
-        const rt = await new RedTeam(this.phone, this.prompts, this.patterns).run(draft, policy.redTeamMode, this.settings.redTeamRounds, this.settings.taskSummary);
+        const tRed = performance.now();
+        const callsBefore = meter.calls();
+        const rt = await new RedTeam(meter, this.prompts, this.patterns).run(draft, policy.redTeamMode, this.settings.redTeamRounds, this.settings.taskSummary);
+        timings.redTeamMs = performance.now() - tRed;
+        timings.redTeamCalls = meter.calls() - callsBefore;
         ({ risks, applied: accepted, draft } = rt);
         redTeamUnavailable = rt.unavailable;
       }
@@ -178,12 +204,12 @@ export class SealPipeline {
     return finalise({ ...result, draft: applyRisks(acceptedRisks, base), acceptedRisks }, policy.reviewMode);
   }
 
-  private async rewrite(e: Entity, mention: Mention, level: number, text: string): Promise<string | null> {
+  private async rewrite(phone: PhoneOnlyEngine, e: Entity, mention: Mention, level: number, text: string): Promise<string | null> {
     const sentence = text.slice(Math.max(0, mention.span.start - 120), Math.min(text.length, mention.span.end + 120));
     const hint = level === 1 ? "slightly less specific" : level === 2 ? 'a general kind, no name (e.g. "a large hospital")' : 'very general (e.g. "a healthcare employer")';
     try {
       const prompt = this.prompts.render("gen.v1", { task_summary: this.settings.taskSummary, sentence, phrase: mention.text, type: e.category, level_hint: hint });
-      const out = (await this.phone.respond({ promptId: "gen.v1", text: prompt }, ANALYSIS_OPTIONS)).text;
+      const out = (await phone.respond({ promptId: "gen.v1", text: prompt }, ANALYSIS_OPTIONS)).text;
       const json = firstJsonObject(out);
       const r = json ? (JSON.parse(json) as { rewrite?: unknown }).rewrite : undefined;
       return typeof r === "string" ? r.trim() : null;

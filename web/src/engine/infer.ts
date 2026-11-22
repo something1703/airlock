@@ -37,7 +37,7 @@ export function inferTask(prompts: PromptLibrary): TaskSpec {
   const full = prompts.render("infer.v1", { sealed_text: "" });
   const close = full.lastIndexOf(">>>");
   const instruction = (close >= 0 ? full.slice(close + 3) : full).trim();
-  return { id: "infer.v1", instruction, maxOutputTokens: 700 };
+  return { id: "infer.v1", instruction, maxOutputTokens: 4096 };
 }
 
 /** Lenient parse: JSON anywhere in the reply; drops malformed items and any value that names a placeholder's person. */

@@ -228,6 +228,24 @@ describe("seal pipeline", () => {
     expect(r.requiresReview).toBe(false);
     expect(() => new EgressGate(patterns, vault).seal(r.draft)).not.toThrow();
   });
+  it("FX-02: timings count calls per stage and add up", async () => {
+    const r = await pipe(phone()).run(raw);
+    const t = r.timings;
+    expect([t.detectCalls, t.repairCalls, t.generaliseCalls, t.redTeamCalls]).toEqual([1, 0, 1, 1]);
+    expect(t.firstModelOutputMs).not.toBeNull();
+    for (const ms of [t.rulesMs, t.detectMs, t.generaliseMs, t.redTeamMs]) expect(ms).toBeGreaterThanOrEqual(0);
+    expect(t.rulesMs + t.detectMs + t.generaliseMs + t.redTeamMs).toBeLessThanOrEqual(t.totalMs + 1);
+    expect(t.totalMs).toBe(r.sealMs);
+  });
+  it("FX-02: a broken detect reply counts a repair call; no model → no calls and no first reply", async () => {
+    let n = 0;
+    const p = new MockPhoneEngine((id) => (id === "detect.v1" ? (n++ === 0 ? "not json" : detectAnswer) : id === "detect-repair.v1" ? detectAnswer : id === "gen.v1" ? JSON.stringify({ rewrite: "a large hospital" }) : '{"guesses":[]}'));
+    const r = await pipe(p).run(raw);
+    expect(r.timings.detectCalls).toBe(1);
+    expect(r.timings.repairCalls).toBe(1);
+    const off = await pipe(MockPhoneEngine.answering(detectAnswer, "unavailable"), "open").run(raw);
+    expect(off.timings).toMatchObject({ detectCalls: 0, generaliseCalls: 0, redTeamCalls: 0, firstModelOutputMs: null });
+  });
   it("a leaky rewrite falls back to the ladder default", async () => {
     const r = await pipe(phone("the Mercy General campus")).run(raw);
     expect(r.draft.text).toContain("I work nights at an organisation.");
@@ -257,6 +275,9 @@ describe("seal pipeline", () => {
     release();
     const full = await later!;
     expect(full.redTeamPending).toBe(false);
+    expect(result.timings.redTeamCalls).toBe(0);
+    expect(full.timings.redTeamCalls).toBeGreaterThan(0);
+    expect(full.timings.totalMs).toBe(result.timings.totalMs);
     expect(full.risks).toHaveLength(1);
     expect(full.draft.text).toBe(result.draft.text);
     expect(full.reasons).toContainEqual({ kind: "risks", count: 1 });

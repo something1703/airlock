@@ -5,6 +5,7 @@
     "%@ %@": {
       "shouldTranslate": false
     },
+    "%@ s": {},
     "%@ s · Apple's on-device model is doing this work locally": {},
     "%@ s · Demo mode: scripted on-device steps": {},
     "%@ · %lld characters": {
@@ -17,6 +18,7 @@
         }
       }
     },
+    "%@ · calls: %lld": {},
     "%@%@": {
       "shouldTranslate": false
     },
@@ -101,6 +103,7 @@
     "Change %@": {},
     "Check before sending": {},
     "Checking for Apple's on-device model…": {},
+    "Checking what could be guessed": {},
     "Checking what someone could still guess": {},
     "Checks passed: %@ · Seal %lld ms · Network %lld ms": {
       "localizations": {
@@ -151,6 +154,7 @@
     "Finds and seals private details on this device. Nothing is sent yet.": {},
     "Firebase isn't configured · demo mode": {},
     "Firebase isn't set up on this build, so Gemini can't be reached. Nothing was sent.": {},
+    "First reply from the model": {},
     "Follow-up question": {},
     "Gate bypassed": {},
     "Gate passed": {},
@@ -238,6 +242,7 @@
     "On this device · nothing sent · %@ s": {},
     "On your device · your words never leave": {},
     "On-device AI is ready": {},
+    "On-device model reading": {},
     "Only the sealed text goes out": {},
     "Only the sealed version is sent, after a final check.": {},
     "Open": {},
@@ -287,6 +292,7 @@
         }
       }
     },
+    "Ready to review": {},
     "Real names go back in on your device as the answer arrives. Codes and passwords are never put back.": {},
     "Real names show underlined: Gemini wrote placeholders and your device filled them in.": {},
     "Receipt": {},
@@ -342,6 +348,7 @@
     "Show sealed": {},
     "Show what I wrote": {},
     "Shows AirlockBench results: leak rate, names caught, answer quality and what Airlock still misses": {},
+    "Shows how long each step took on this device": {},
     "Shows the 7 steps from your words to a receipt": {},
     "Skip": {},
     "Some details might be private (amber dot). Decide whether to protect them.": {},
@@ -385,6 +392,7 @@
     "This device can't run Apple's on-device model": {},
     "This is exactly what will leave your device. Tap a protected detail to send it as written instead.": {},
     "This message no longer passes Airlock's check (your Vault changed), so it isn't sent again with follow-ups.": {},
+    "Timing": {},
     "Too much? Next time, use **Protect this** on Review or a stricter dial. The details that give these away will be sealed too. Receipt %@ is in the Ledger.": {},
     "Try a sample (fictional)": {},
     "Try again": {},
@@ -412,6 +420,7 @@
     "You wrote · never sent": {},
     "You wrote · stays here": {},
     "You're offline. Quick tasks still work on this device; Gemini needs a connection.": {},
+    "Your Vault and the rules": {},
     "Your Vault, pattern rules and Apple's on-device model find names, places, contact details and IDs.": {},
     "Your device": {},
     "Your device attacks its own draft: what could a stranger still guess? You can accept a safer rewrite.": {},
@@ -425,6 +434,7 @@
     "a malformed placeholder": {},
     "a message that's too long": {},
     "a name from your Vault": {},
+    "after %@": {},
     "also “%@”": {},
     "an email, phone number, ID or code": {},
     "an explanation that reveals too much": {},
