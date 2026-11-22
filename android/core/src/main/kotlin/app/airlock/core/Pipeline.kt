@@ -33,6 +33,8 @@ sealed interface ReviewReason {
 
 /** Progress of a seal, for the UI. */
 sealed interface SealProgress {
+    /** FX-02: Vault and rule hits, before any model call (local only). */
+    data class RulesReady(val preview: RulesPreview) : SealProgress
     data class Detecting(val section: Int, val of: Int) : SealProgress
     data object Generalising : SealProgress
     data object CheckingRisks : SealProgress
@@ -102,6 +104,7 @@ class SealPipeline(
         candidates.addAll(patterns.detect(text))
         val tRules = now()
         timings = timings.copy(rulesMs = tRules - t0)
+        progress(SealProgress.RulesReady(RulesPreview.of(text, candidates)))
         val report = LLMDetector(meter, prompts, settings.chunkTokens).detect(text) { section, of -> progress(SealProgress.Detecting(section, of)) }
         timings = timings.copy(detectMs = now() - tRules, detectCalls = meter.calls("detect"), repairCalls = meter.calls("detect-repair"))
         candidates.addAll(report.candidates)

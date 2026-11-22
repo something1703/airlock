@@ -55,7 +55,7 @@ export function Ask() {
         <p className="sub">Paste anything. Your device reads it first and seals what identifies you.</p>
       </div>
       <OnDeviceStatus />
-      <textarea className="compose enter" value={text} onChange={(e) => { setText(e.target.value); s.warmUp(); }} placeholder="Paste a tense text thread, a lease clause, a strange message…" aria-label="Your message" />
+      <textarea className="compose enter" value={text} onFocus={() => s.warmUp()} onChange={(e) => { setText(e.target.value); s.warmUp(); }} placeholder="Paste a tense text thread, a lease clause, a strange message…" aria-label="Your message" />
       <div className="row" role="group" aria-label="What do you want?">
         {TASKS.map((t) => (
           <button key={t.label} className="pill" aria-pressed={JSON.stringify(t.task) === JSON.stringify(task)} onClick={() => setTask(t.task)}>{t.label}</button>

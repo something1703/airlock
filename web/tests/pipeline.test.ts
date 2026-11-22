@@ -7,7 +7,8 @@ import {
 } from "../src/engine";
 import { KEEP } from "../src/engine/types";
 import { AppConfig } from "../src/core/appConfig";
-import { sealSettings } from "../src/engine/pipeline";
+import { rulesPreview, sealSettings, type RulesPreview } from "../src/engine/pipeline";
+import type { Candidate, PrivacyCategory } from "../src/engine/types";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { int, pick, repoRoot, rng } from "./support";
@@ -236,6 +237,27 @@ describe("seal pipeline", () => {
     for (const ms of [t.rulesMs, t.detectMs, t.generaliseMs, t.redTeamMs]) expect(ms).toBeGreaterThanOrEqual(0);
     expect(t.rulesMs + t.detectMs + t.generaliseMs + t.redTeamMs).toBeLessThanOrEqual(t.totalMs + 1);
     expect(t.totalMs).toBe(r.sealMs);
+  });
+  it("FX-02: rule hits are reported before the first model call", async () => {
+    const events: string[] = [];
+    let preview: RulesPreview | null = null;
+    const p = new MockPhoneEngine((id) => { events.push(`call:${id}`); return id === "gen.v1" ? JSON.stringify({ rewrite: "a large hospital" }) : id === "attack.v1" ? '{"guesses":[]}' : detectAnswer; });
+    await pipe(p).run(raw, undefined, undefined, (ev) => { events.push(ev.kind); if (ev.kind === "rulesReady") preview = ev.preview; });
+    expect(events[0]).toBe("rulesReady");
+    expect(events.indexOf("rulesReady")).toBeLessThan(events.indexOf("call:detect.v1"));
+    const found = preview as RulesPreview | null;
+    expect(found).not.toBeNull();
+    const texts = found!.spans.map((x) => found!.text.slice(x.start, x.end));
+    expect(texts).toEqual(expect.arrayContaining(["Raj", "14 Elm St, Apt 3B", "Maya Chen"]));
+    expect(texts).not.toContain("Mercy General Hospital");
+  });
+  it("FX-02: rules preview keeps the longest of overlapping spans and counts distinct details", () => {
+    const text = "Raj Patel and raj and Raj";
+    const c = (start: number, end: number, category: PrivacyCategory): Candidate => ({ span: { start, end }, text: text.slice(start, end), category, detector: "vault", confidence: "high" });
+    const r = rulesPreview(text, [c(0, 3, "person"), c(0, 9, "person"), c(14, 17, "person"), c(22, 25, "person")]);
+    expect(r.spans.map((x) => text.slice(x.start, x.end))).toEqual(["Raj Patel", "raj", "Raj"]);
+    expect(r.count).toBe(2);
+    expect(rulesPreview("nothing here", []).count).toBe(0);
   });
   it("FX-02: a broken detect reply counts a repair call; no model → no calls and no first reply", async () => {
     let n = 0;

@@ -234,6 +234,8 @@ struct ReviewState: Sendable {
     var task: TaskOption
     let threadID: String?
     var progress: SealProgress?
+    /// FX-02: Vault and rule hits, known before the model starts (local only).
+    var found: RulesPreview?
     var result: SealResult?
     var overrides: [PlaceholderID: UserOverride] = [:]
     var accepted: [Risk] = []

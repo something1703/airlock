@@ -237,6 +237,35 @@ class PipelineTest {
         assertEquals(null, off.timings.firstModelOutputMs)
     }
 
+    @Test fun rulesReadyComesBeforeTheFirstModelCall() = runTest {
+        val events = ArrayList<String>()
+        var preview: RulesPreview? = null
+        val p = MockPhoneEngine { id, _ ->
+            events.add("call:$id")
+            if (id == "gen.v1") rewriteJson("a large hospital") else if (id == "attack.v1") "{\"guesses\":[]}" else detectAnswer
+        }
+        pipe(p).run(raw, progress = { ev ->
+            events.add(ev::class.simpleName ?: "?")
+            if (ev is SealProgress.RulesReady) preview = ev.preview
+        })
+        assertEquals("RulesReady", events.first())
+        assertTrue(events.indexOf("RulesReady") < events.indexOf("call:detect.v1"))
+        val found = preview!!
+        val texts = found.spans.map { found.text.substring(it.start, it.end) }
+        assertContains(texts, "Raj")
+        assertContains(texts, "Maya Chen")
+        assertFalse(texts.contains("Mercy General Hospital"))
+    }
+
+    @Test fun rulesPreviewKeepsLongestOverlapAndCountsDistinct() {
+        val text = "Raj Patel and raj and Raj"
+        fun c(s: Int, e: Int) = Candidate(TextSpan(s, e), text.substring(s, e), PrivacyCategory.PERSON, detector = DetectorId.VAULT, confidence = Confidence.HIGH)
+        val r = RulesPreview.of(text, listOf(c(0, 3), c(0, 9), c(14, 17), c(22, 25)))
+        assertEquals(listOf("Raj Patel", "raj", "Raj"), r.spans.map { text.substring(it.start, it.end) })
+        assertEquals(2, r.count)
+        assertEquals(0, RulesPreview.of("nothing here", emptyList()).count)
+    }
+
     @Test fun leakyRewriteFallsBack() = runTest {
         val r = pipe(phone("the Mercy General campus")).run(raw)
         assertContains(r.draft.text, "I work nights at an organisation.")

@@ -65,6 +65,8 @@ public enum ReviewReason: Sendable, Hashable {
 
 /// Progress for the inline "Reading on your iPhone · section 2 of 3" line.
 public enum SealProgress: Sendable, Hashable {
+    /// FX-02: Vault and rule hits, before any model call (local only).
+    case rulesReady(RulesPreview)
     case detecting(section: Int, of: Int)
     case generalising
     /// "Checking what someone could still guess…"
@@ -137,6 +139,7 @@ public actor SealPipeline {
         if settings.nlTaggerEnabled { candidates += NLDetector.detect(in: text) }
         let rulesDone = clock.now
         timings.rules = rulesDone - start
+        progress(.rulesReady(RulesPreview(text: text, candidates: candidates)))
         let detector = LLMDetector(engine: meter, prompts: prompts, budgetTokens: settings.chunkTokens)
         let report = await detector.detect(in: text) { section, total in progress(.detecting(section: section, of: total)) }
         timings.detect = clock.now - rulesDone

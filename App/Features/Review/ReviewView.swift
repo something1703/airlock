@@ -1,4 +1,5 @@
 import AirlockCore
+import AirlockDetect
 import AirlockSeal
 import SwiftUI
 
@@ -335,7 +336,7 @@ struct SealingView: View {
 
     private var current: Int {
         switch review.progress {
-        case nil, .detecting?: 0
+        case nil, .detecting?, .rulesReady?: 0
         case .generalising?: 1
         case .checkingRisks?: 2
         case .done?: 3
@@ -353,8 +354,20 @@ struct SealingView: View {
                     Text("On this device · nothing sent yet")
                 }
                 .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.seal)
-                Text(verbatim: review.raw.count > 900 ? String(review.raw.prefix(900)) + "…" : review.raw)
-                    .font(.body).foregroundStyle(Palette.text2).lineSpacing(5)
+                if let found = review.found {
+                    Text(Self.highlighted(found))
+                        .font(.body).foregroundStyle(Palette.text2).lineSpacing(5)
+                    Text(
+                        found.count == 0
+                            ? String(localized: "Nothing found by the rules · the on-device model is still reading")
+                            : String(localized: "\(found.count) details found so far · the on-device model is still reading")
+                    )
+                    .font(.footnote).foregroundStyle(Palette.seal)
+                    .accessibilityAddTraits(.updatesFrequently)
+                } else {
+                    Text(verbatim: review.raw.count > 900 ? String(review.raw.prefix(900)) + "…" : review.raw)
+                        .font(.body).foregroundStyle(Palette.text2).lineSpacing(5)
+                }
             }
             .card()
             .overlay { if !reduceMotion { ScanSweep().clipShape(RoundedRectangle(cornerRadius: Metrics.radius)) } }
@@ -388,6 +401,26 @@ struct SealingView: View {
     }
 
     private func state(_ i: Int) -> StepRow.State { i < current ? .done : i == current ? .active : .waiting }
+
+    /// The user's text (first 900 UTF-16 units) with rule hits tinted in their category colour.
+    static func highlighted(_ found: RulesPreview, limit: Int = 900) -> AttributedString {
+        let ns = found.text as NSString
+        let end = min(ns.length, limit)
+        var out = AttributedString()
+        var at = 0
+        func piece(_ from: Int, _ to: Int) -> String { ns.substring(with: NSRange(location: from, length: to - from)) }
+        for s in found.spans where s.span.start < end && s.span.start >= at {
+            if s.span.start > at { out += AttributedString(piece(at, s.span.start)) }
+            var mark = AttributedString(piece(s.span.start, min(s.span.end, end)))
+            mark.backgroundColor = s.category.tint.opacity(0.22)
+            mark.foregroundColor = Palette.text
+            out += mark
+            at = min(s.span.end, end)
+        }
+        if at < end { out += AttributedString(piece(at, end)) }
+        if end < ns.length { out += AttributedString("…") }
+        return out
+    }
 }
 
 private struct StepRow: View {
@@ -452,4 +485,12 @@ private struct ScanSweep: View {
 
 #Preview("Sealing") {
     SealingView(review: ReviewState(raw: AirlockSession.sample, task: .reply, threadID: nil, progress: .generalising, startedAt: Date()), demo: true)
+}
+
+#Preview("Sealing · rule hits") {
+    let text = AirlockSession.sample
+    let candidates = ((try? PatternDetector.bundled())?.detect(in: text)) ?? []
+    var state = ReviewState(raw: text, task: .reply, threadID: nil, progress: .detecting(section: 1, of: 1), startedAt: Date())
+    state.found = RulesPreview(text: text, candidates: candidates)
+    return SealingView(review: state, demo: true)
 }

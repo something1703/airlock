@@ -3,7 +3,7 @@ import { answer, type AnswerOutcome, type AnswerPreference, type TaskKind } from
 import { ANALYSIS_OPTIONS, EngineError, type PhoneAvailability, type SealedHistory } from "../engine/engines";
 import { EgressGate, GateBlocked, type GateHit } from "../engine/gate";
 import { ReceiptLedger, type LedgerStats } from "../engine/ledger";
-import { pendingRisks, SealPipeline, sealSettings, type SealProgress, type SealResult } from "../engine/pipeline";
+import { pendingRisks, SealPipeline, sealSettings, type RulesPreview, type SealProgress, type SealResult } from "../engine/pipeline";
 import type { SealTimings } from "../engine/timing";
 import type { UserOverride } from "../engine/policy";
 import { applyRisks, type Risk } from "../engine/redTeam";
@@ -93,6 +93,8 @@ export interface Review {
   task: TaskKind;
   threadId: string | null;
   progress: SealProgress | null;
+  /** FX-02: Vault and rule hits, known before the model starts (local only). */
+  found: RulesPreview | null;
   result: SealResult | null;
   overrides: Map<PlaceholderId, UserOverride>;
   accepted: Risk[];
@@ -349,12 +351,12 @@ export class AirlockSession {
   async startReview(raw: string, task: TaskKind, threadId: string | null = null): Promise<void> {
     const text = raw.trim();
     if (!text) return;
-    this.set({ screen: "review", review: { raw: text, task, threadId, progress: null, result: null, overrides: new Map(), accepted: [], dismissed: new Set(), blocked: null, error: null, startedAt: performance.now() } });
+    this.set({ screen: "review", review: { raw: text, task, threadId, progress: null, found: null, result: null, overrides: new Map(), accepted: [], dismissed: new Set(), blocked: null, error: null, startedAt: performance.now() } });
     await this.services.stores.saveCapture(text, threadId ? "followUp" : "paste", threadId);
     const existing = threadId ? this.state.threads.find((t) => t.id === threadId)?.entities : undefined;
     let staged: Awaited<ReturnType<SealPipeline["runStaged"]>>;
     try {
-      staged = await this.pipeline().runStaged(text, existing ?? new EntityMapClass(), new Map(), (p) => this.setReview({ progress: p }));
+      staged = await this.pipeline().runStaged(text, existing ?? new EntityMapClass(), new Map(), (p) => this.setReview(p.kind === "rulesReady" ? { found: p.preview } : { progress: p }));
     } catch {
       this.setReview({ error: "Airlock couldn't read this on your device. Nothing was sent." });
       return;
@@ -374,13 +376,13 @@ export class AirlockSession {
   private warmed = false;
   /**
    * Loads Chrome's on-device model ahead of the first seal (the first long prompt after page load is ~2×
-   * slower). Uses a fixed, fictional sentence — never user text. Once per page; errors are ignored.
+   * slower). A tiny fixed prompt — never user text — so a seal started straight after doesn't queue behind a
+   * long warm-up on the GPU (FX-02). Once per page; errors are ignored.
    */
   warmUp(): void {
     if (this.warmed || this.state.availability !== "available" || this.services.mode !== "live") return;
     this.warmed = true;
-    const text = this.services.prompts.render("detect.v1", { chunk: "The weekly meeting moved to the small room upstairs. Bring the printed agenda and a pen." });
-    void this.services.engines.phone.respond({ promptId: "detect.v1", text }, ANALYSIS_OPTIONS).catch(() => {});
+    void this.services.engines.phone.respond({ promptId: "warmup", text: WARMUP_PROMPT }, ANALYSIS_OPTIONS).catch(() => {});
   }
 
   private reseal(overrides: Map<PlaceholderId, UserOverride>, accepted: Risk[]): void {
@@ -765,6 +767,9 @@ export function titleFrom(sealed: string): string {
 }
 
 /** The follow-up sent when an answer was cut off. Contains nothing private; still gate-checked. */
+/** Fixed, content-free prompt that only makes Chrome load its on-device model. */
+export const WARMUP_PROMPT = "Reply with the single word OK.";
+
 export const CONTINUE_REQUEST = "Please continue your previous answer exactly where it stopped. Do not repeat what you already wrote.";
 
 function historyOf(thread: Thread | undefined): SealedHistory {

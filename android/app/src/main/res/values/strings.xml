@@ -205,6 +205,11 @@
     <string name="summary_protected">protected</string>
     <string name="summary_general">made less specific</string>
     <string name="summary_kept">sent as written</string>
+    <string name="sealing_found_none">Nothing found by the rules · the on-device model is still reading</string>
+    <plurals name="sealing_found">
+        <item quantity="one">%1$d detail found so far · the on-device model is still reading</item>
+        <item quantity="other">%1$d details found so far · the on-device model is still reading</item>
+    </plurals>
     <string name="timing_title">Timing</string>
     <string name="timing_shown">Shown</string>
     <string name="timing_hidden">Hidden</string>

@@ -36,6 +36,7 @@ import app.airlock.core.Restorer
 import app.airlock.core.Risk
 import app.airlock.core.SealDraft
 import app.airlock.core.SealPipeline
+import app.airlock.core.RulesPreview
 import app.airlock.core.SealProgress
 import app.airlock.core.SealResult
 import app.airlock.core.SealSettings
@@ -90,6 +91,8 @@ data class Review(
     val task: TaskKind,
     val threadId: String?,
     val progress: SealProgress?,
+    /** FX-02: Vault and rule hits, known before the model starts (local only). */
+    val found: RulesPreview?,
     val result: SealResult?,
     val overrides: Map<PlaceholderId, UserOverride>,
     val accepted: List<Risk>,
@@ -239,13 +242,13 @@ class AirlockSession(val services: Services, private val scope: CoroutineScope) 
         set {
             it.copy(
                 screen = Screen.REVIEW,
-                review = Review(text, task, threadId, null, null, emptyMap(), emptyList(), emptySet(), null, false, System.nanoTime()),
+                review = Review(text, task, threadId, null, null, null, emptyMap(), emptyList(), emptySet(), null, false, System.nanoTime()),
             )
         }
         runCatching { services.stores.saveCapture(text, source, threadId) }
         val existing = threadId?.let { id -> current.threads.firstOrNull { it.id == id }?.entities }
         val staged = try {
-            pipeline().runStaged(scope, text, existing ?: EntityMap(), emptyMap()) { p -> setReview { r -> r.copy(progress = p) } }
+            pipeline().runStaged(scope, text, existing ?: EntityMap(), emptyMap()) { p -> setReview { r -> if (p is SealProgress.RulesReady) r.copy(found = p.preview) else r.copy(progress = p) } }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

@@ -204,7 +204,8 @@ final class AirlockSession {
         reviewPipeline = pipeline
         let result = await pipeline.run(rawText, existing: existing) { [weak self] p in
             Task { @MainActor in
-                if self?.review?.id == reviewID { self?.review?.progress = p }
+                guard self?.review?.id == reviewID else { return }
+                if case .rulesReady(let preview) = p { self?.review?.found = preview } else { self?.review?.progress = p }
             }
         }
         guard review?.id == reviewID else { return }
