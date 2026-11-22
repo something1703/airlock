@@ -176,6 +176,7 @@ struct ReviewView: View {
                 }
                 .font(.footnote).foregroundStyle(Palette.text2)
             }
+            TimingDetails(timings: result.timings)
         }
         .card()
         .enter()

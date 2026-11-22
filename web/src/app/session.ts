@@ -4,6 +4,7 @@ import { ANALYSIS_OPTIONS, EngineError, type PhoneAvailability, type SealedHisto
 import { EgressGate, GateBlocked, type GateHit } from "../engine/gate";
 import { ReceiptLedger, type LedgerStats } from "../engine/ledger";
 import { pendingRisks, SealPipeline, sealSettings, type SealProgress, type SealResult } from "../engine/pipeline";
+import type { SealTimings } from "../engine/timing";
 import type { UserOverride } from "../engine/policy";
 import { applyRisks, type Risk } from "../engine/redTeam";
 import type { RestoredSegment } from "../engine/restore";
@@ -60,6 +61,8 @@ export interface UserTurn {
   /** Gate-checked sealed text for follow-up history; null if a reloaded turn no longer passes the gate. */
   sealed: SealedText | null;
   stored: StoredSealed;
+  /** FX-02: where this turn's seal time went (memory only, not saved or synced). */
+  timings?: SealTimings;
 }
 export interface AssistantTurn {
   kind: "assistant";
@@ -443,6 +446,7 @@ export class AirlockSession {
       throw e;
     }
     const entities = r.result.draft.entities;
+    const timings = r.result.timings;
     let threadId = r.threadId;
     const isNew = !threadId;
     if (!threadId) {
@@ -453,7 +457,7 @@ export class AirlockSession {
     await this.services.stores.saveEntities(threadId, entities);
     const history = historyOf(this.state.threads.find((t) => t.id === threadId));
     const stored: StoredSealed = { text: draft.text, legend: [...draft.legend], revealedVaultIds: [...draft.revealedVaultIds], keptValues: [...draft.keptValues] };
-    this.setThread(threadId, (t) => ({ ...t, entities, turns: [...t.turns, { kind: "user", raw: r.raw, display: sealed.value, sealed, stored }, { kind: "assistant", task: r.task, status: "streaming", text: "", segments: [], outcome: null, error: null, tools: [] }] }));
+    this.setThread(threadId, (t) => ({ ...t, entities, turns: [...t.turns, { kind: "user", raw: r.raw, display: sealed.value, sealed, stored, timings }, { kind: "assistant", task: r.task, status: "streaming", text: "", segments: [], outcome: null, error: null, tools: [] }] }));
     this.set({ review: null, currentThreadId: threadId, screen: "thread" });
     await this.stream(threadId, sealed, r.task, entities, history, r.result.sealMs);
     if (isNew) await this.nameThread(threadId, sealed);

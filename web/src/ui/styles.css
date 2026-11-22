@@ -459,3 +459,11 @@ input.field, select.field { border: 1px solid var(--stroke); border-radius: 12px
   ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
 }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+
+/* FX-02 timing disclosure */
+.timing { font-size: 13px; color: var(--text-2); }
+.timing summary { cursor: pointer; display: inline-flex; align-items: center; min-height: 32px; }
+.timing dl { margin: 6px 0 0; display: grid; gap: 4px; }
+.timing dl > div { display: flex; justify-content: space-between; gap: 12px; }
+.timing dt, .timing dd { margin: 0; }
+.timing dd { font-variant-numeric: tabular-nums; }

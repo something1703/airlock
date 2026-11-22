@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAirlock, useSession } from "../../app/context";
 import type { AssistantTurn, UserTurn } from "../../app/session";
-import { Banner, RestoredAnswer, RouteBadge, SealedText, WithChips } from "../components";
+import { Banner, RestoredAnswer, RouteBadge, SealedText, TimingDetails, WithChips } from "../components";
 import { IconDevice, IconEye, IconLedger, IconShield, IconSparkle, IconTrash } from "../icons";
 import type { Entity } from "../../engine/types";
 import type { Inference } from "../../engine/infer";
@@ -83,6 +83,7 @@ function UserBubble({ turn, entities }: { turn: UserTurn; entities: { get(id: st
         <button className="btn btn-ghost" style={{ minHeight: 32, padding: "4px 10px" }} aria-pressed={showRaw} onClick={() => setShowRaw(!showRaw)}>{showRaw ? "Show sealed" : "Show what I wrote"}</button>
       </div>
       {showRaw ? <div className="prose">{turn.raw}</div> : <SealedText text={turn.display} entities={entities} />}
+      {turn.timings && <TimingDetails timings={turn.timings} />}
     </div>
   );
 }

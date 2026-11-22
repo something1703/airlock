@@ -3,6 +3,7 @@ import { CHROME_ON_DEVICE_MODEL } from "../engine/engines";
 import type { AnswerOutcome } from "../engine/answer";
 import type { Replacement, SealDraft } from "../engine/sealer";
 import type { RestoredSegment } from "../engine/restore";
+import type { SealTimings } from "../engine/timing";
 import { parseMarkdown, type Inline, type ListBlock } from "./markdown";
 import { type Entity, type PrivacyCategory, idCategory } from "../engine/types";
 import { CATEGORY_ICON, IconAlert, IconCheck, IconCloud, IconDevice, IconQuestion, IconSecret, IconShield, IconSparkle } from "./icons";
@@ -184,4 +185,25 @@ export function WithChips({ text, entities }: { text: string; entities: { get(id
   }
   parts.push(text.slice(cursor));
   return <>{parts}</>;
+}
+
+const secs = (ms: number): string => `${(ms / 1000).toFixed(1)} s`;
+const calls = (n: number): string => (n === 1 ? "1 call" : `${n} calls`);
+
+/** FX-02: where the seal's time went, on this device. Numbers only. */
+export function TimingDetails({ timings }: { timings: SealTimings }) {
+  const rows: [string, string][] = [
+    ["Your Vault and the rules", secs(timings.rulesMs)],
+    ["On-device model reading", `${secs(timings.detectMs)} · ${calls(timings.detectCalls)}${timings.repairCalls ? ` + ${timings.repairCalls} repair` : ""}`],
+  ];
+  if (timings.generaliseCalls) rows.push(["Making details less specific", `${secs(timings.generaliseMs)} · ${calls(timings.generaliseCalls)}`]);
+  if (timings.redTeamCalls) rows.push(["Checking what could be guessed", `${secs(timings.redTeamMs)} · ${calls(timings.redTeamCalls)}`]);
+  if (timings.firstModelOutputMs !== null) rows.push(["First reply from the model", `after ${secs(timings.firstModelOutputMs)}`]);
+  rows.push(["Ready to review", `after ${secs(timings.totalMs)}`]);
+  return (
+    <details className="timing">
+      <summary>Timing</summary>
+      <dl>{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+    </details>
+  );
 }

@@ -4,7 +4,7 @@ import { GATE_CHECK_NAMES } from "../../app/session";
 import { useAirlock, useSession } from "../../app/context";
 import type { ReviewReason, SealProgress } from "../../engine/pipeline";
 import type { Entity } from "../../engine/types";
-import { Banner, chipLabel, SealedPreview, useElapsed, WithChips } from "../components";
+import { Banner, chipLabel, SealedPreview, TimingDetails, useElapsed, WithChips } from "../components";
 import { CATEGORY_ICON, IconCheck, IconDevice, IconEye, IconShield, Logo } from "../icons";
 import { TASKS } from "./Ask";
 
@@ -157,6 +157,7 @@ export function ReviewScreen() {
           <span className="spacer" />
           <span><IconDevice size={14} /> Sealed on this device in {(result.sealMs / 1000).toFixed(1)} s</span>
         </div>
+        <TimingDetails timings={result.timings} />
       </div>
 
       {result.redTeamPending && (

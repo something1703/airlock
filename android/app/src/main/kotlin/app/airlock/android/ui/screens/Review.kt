@@ -317,6 +317,7 @@ private fun Checked(session: AirlockSession, s: State, review: Review, onSeal: (
                 else FlowText(sealedPreviewSegs(draft, labels) { e -> toggle(session, e, haptics) }, popIn = true)
             }
             SummaryBar(sealedCount, generalised, kept, result.sealMs)
+            TimingDetails(result.timings)
         }
 
         AnimatedVisibility(pending, enter = revealIn(), exit = revealOut()) {

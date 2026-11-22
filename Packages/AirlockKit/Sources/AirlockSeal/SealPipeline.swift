@@ -2,6 +2,7 @@ import AirlockCore
 import AirlockDetect
 import AirlockPrompts
 import Foundation
+import OSLog
 
 /// Settings for one seal run (from `AppConfig` + Settings).
 public struct SealSettings: Sendable, Hashable {
@@ -82,6 +83,8 @@ public struct SealResult: Sendable {
     public let detection: LLMDetectionReport
     public let rewrites: [PlaceholderID: String]
     public let sealDuration: Duration
+    /// Where the seal's time went (FX-02); numbers only.
+    public let timings: SealTimings
     /// Every risk the red-team raised (Risk cards).
     public let risks: [Risk]
     /// Risks whose suggestion is in the draft (auto-applied in Strict, or accepted in Review).
@@ -124,14 +127,21 @@ public actor SealPipeline {
     ) async -> SealResult {
         let clock = ContinuousClock()
         let start = clock.now
+        let meter = CallMeter(phone, start: start)
+        var timings = SealTimings()
         let normalised = Normaliser.normalise(String(raw.value.prefix(Normaliser.maxInputUTF16)))
         let text = normalised.text
 
         // D1–D3 (deterministic), then D4 on device.
         var candidates = VaultMatcher(entries: vault).detect(in: text) + patterns.detect(in: text)
         if settings.nlTaggerEnabled { candidates += NLDetector.detect(in: text) }
-        let detector = LLMDetector(engine: phone, prompts: prompts, budgetTokens: settings.chunkTokens)
+        let rulesDone = clock.now
+        timings.rules = rulesDone - start
+        let detector = LLMDetector(engine: meter, prompts: prompts, budgetTokens: settings.chunkTokens)
         let report = await detector.detect(in: text) { section, total in progress(.detecting(section: section, of: total)) }
+        timings.detect = clock.now - rulesDone
+        timings.detectCalls = await meter.calls("detect")
+        timings.repairCalls = await meter.calls("detect-repair")
         candidates += report.candidates
 
         let merge = Merger.merge(candidates, in: text, existing: existing, vault: vault)
@@ -145,12 +155,16 @@ public actor SealPipeline {
                 .sorted { $0.id < $1.id }
                 .prefix(settings.maxRewrites)
             if !targets.isEmpty { progress(.generalising) }
+            let genStart = clock.now
+            let callsBefore = await meter.calls()
             for e in targets {
                 guard case .generalise(let level) = policy.action(for: e, override: overrides[e.id]),
                     let mention = merge.mentions.first(where: { $0.entityID == e.id })
                 else { continue }
-                if let r = await rewrite(e, mention: mention, level: level, in: text) { rewrites[e.id] = r }
+                if let r = await rewrite(e, mention: mention, level: level, in: text, using: meter) { rewrites[e.id] = r }
             }
+            timings.generalise = clock.now - genStart
+            timings.generaliseCalls = await meter.calls() - callsBefore
         }
 
         var draft = Sealer(policy: policy, patterns: patterns, today: settings.today).draft(
@@ -163,8 +177,12 @@ public actor SealPipeline {
         if settings.redTeamEnabled, policy.redTeamMode != .off {
             if report.unavailable == nil {
                 progress(.checkingRisks)
-                let rt = await RedTeam(phone: phone, prompts: prompts, patterns: patterns)
+                let redStart = clock.now
+                let callsBefore = await meter.calls()
+                let rt = await RedTeam(phone: meter, prompts: prompts, patterns: patterns)
                     .run(draft, mode: policy.redTeamMode, maxRounds: settings.redTeamRounds, taskSummary: settings.taskSummary)
+                timings.redTeam = clock.now - redStart
+                timings.redTeamCalls = await meter.calls() - callsBefore
                 risks = rt.risks
                 accepted = rt.applied
                 draft = rt.draft
@@ -174,9 +192,13 @@ public actor SealPipeline {
             }
         }
 
+        let sealDuration = clock.now - start
+        timings.total = sealDuration
+        timings.firstModelOutput = await meter.firstModelOutput
+        Self.log(timings)
         var result = SealResult(
             normalised: normalised, merge: merge, draft: draft, reasons: [], requiresReview: false, detection: report, rewrites: rewrites,
-            sealDuration: clock.now - start, risks: risks, acceptedRisks: accepted, redTeamUnavailable: redTeamUnavailable)
+            sealDuration: sealDuration, timings: timings, risks: risks, acceptedRisks: accepted, redTeamUnavailable: redTeamUnavailable)
         result = Self.finalised(result, mode: policy.reviewMode)
         progress(.done)
         return result
@@ -188,7 +210,8 @@ public actor SealPipeline {
         if r.redTeamUnavailable && r.detection.unavailable == nil { reasons.append(.redTeamUnavailable) }
         return SealResult(
             normalised: r.normalised, merge: r.merge, draft: r.draft, reasons: reasons, requiresReview: requiresReview(reasons, mode: mode),
-            detection: r.detection, rewrites: r.rewrites, sealDuration: r.sealDuration, risks: r.risks, acceptedRisks: r.acceptedRisks,
+            detection: r.detection, rewrites: r.rewrites, sealDuration: r.sealDuration, timings: r.timings, risks: r.risks,
+            acceptedRisks: r.acceptedRisks,
             redTeamUnavailable: r.redTeamUnavailable)
     }
 
@@ -203,14 +226,15 @@ public actor SealPipeline {
         return Self.finalised(
             SealResult(
                 normalised: result.normalised, merge: result.merge, draft: draft, reasons: [], requiresReview: false,
-                detection: result.detection, rewrites: result.rewrites, sealDuration: result.sealDuration, risks: result.risks,
+                detection: result.detection, rewrites: result.rewrites, sealDuration: result.sealDuration, timings: result.timings,
+                risks: result.risks,
                 acceptedRisks: accepted, redTeamUnavailable: result.redTeamUnavailable),
             mode: policy.reviewMode)
     }
 
     // MARK: - Internals
 
-    private func rewrite(_ e: Entity, mention: Mention, level: Int, in text: String) async -> String? {
+    private func rewrite(_ e: Entity, mention: Mention, level: Int, in text: String, using phone: any PhoneOnlyEngine) async -> String? {
         let ns = text as NSString
         let from = max(0, mention.span.start - 120)
         let to = min(ns.length, mention.span.end + 120)
@@ -234,6 +258,20 @@ public actor SealPipeline {
             let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let r = obj["rewrite"] as? String
         else { return nil }
         return r.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static let logger = Logger(subsystem: "app.airlock", category: "seal")
+
+    /// Numbers only (INV-8): milliseconds and call counts, never content.
+    private static func log(_ t: SealTimings) {
+        func ms(_ d: Duration) -> Int { Int(d / .milliseconds(1)) }
+        logger.info(
+            """
+            seal ms total=\(ms(t.total), privacy: .public) rules=\(ms(t.rules), privacy: .public) \
+            detect=\(ms(t.detect), privacy: .public)/\(t.detectCalls, privacy: .public)+\(t.repairCalls, privacy: .public) \
+            generalise=\(ms(t.generalise), privacy: .public)/\(t.generaliseCalls, privacy: .public) \
+            redTeam=\(ms(t.redTeam), privacy: .public)/\(t.redTeamCalls, privacy: .public)
+            """)
     }
 
     static func reasons(report: LLMDetectionReport, merge: MergeResult, draft: SealDraft) -> [ReviewReason] {
