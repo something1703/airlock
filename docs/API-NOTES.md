@@ -173,3 +173,19 @@ Model availability on the **Agent Platform (formerly Vertex AI) backend** under 
 | 16 Nov | Xcode 27.2 SDK | Apple errors: `LanguageModelSession.GenerationError` (iOS 26; deprecated in 27: `exceededContextWindowSize`, `assetsUnavailable`, `guardrailViolation`, `unsupportedGuide`, `unsupportedLanguageOrLocale`, `decodingFailure`, `rateLimited`, `concurrentRequests`, `refusal`) and `LanguageModelError` (iOS 27: `contextSizeExceeded`, `rateLimited`, `guardrailViolation`, `refusal`, `unsupported…`, `timeout`) | `FoundationModels.swiftinterface` | Both mapped in `ErrorMapper` |
 | 16 Nov | 12.19.0 | Built and linked against Xcode 27.2 / Swift 6.4.2 for macOS without errors | `swift build` | Resolves the "does 12.19 compile with Xcode 27" risk |
 | 16 Nov | 13.2.0 | `FirebaseAI.geminiLanguageModel(name:) -> GeminiLanguageModel` (iOS/macOS 27, `compiler(>=6.4)`, `canImport(FoundationModels)`) | `Extensions/Public/FirebaseAI+GeminiLanguageModel.swift` | The 13.x replacement for the hybrid API; `GeminiLanguageModel` is its own SwiftPM target in the same repo |
+
+## FX-02 timing notes (22 Nov)
+
+What the seal's time is made of, and where the numbers stand. **Nothing here is a live measurement on a real on-device model yet** — that run is still to do (protocol below); the figures marked *estimate* are arithmetic on the measured Chrome rate, not timings.
+
+| What | Value | Basis |
+|------|-------|-------|
+| Vault + pattern rules (`rulesMs`) | under 10 ms (shows as 0.0 s) | Measured in the web demo engine, where the rules are the real ones. Highlights appear on the sealing screen at once (about 0.3 s including page render), against a target of 300 ms |
+| Chrome on-device output rate | about 18 tokens/s | 17 Nov measurement above (`detect.v1`, Nano v3 GPU) |
+| `detect.v1` reply for the 77-word fictional heater message (9 items) | about 297 output tokens ≈ 16.5 s, plus 3 sequential `gen.v1` calls (~1.4 s each, measured 17 Nov) | *Estimate*: reply built by hand in the exact `detect.v1` format, tokens at chars/3.2 (the app's own estimate) |
+| `detect.v2` reply for the same message | about 94 output tokens ≈ 5.2 s, including the 3 general phrases; the phone and email hits are masked in the prompt, so they are not written back; no `gen.v1` calls | *Estimate*, same method |
+| Net | ≈ 22 s → ≈ 5 s of output-bound time for detection and generalising, before the red-team check and prompt-processing time | *Estimate*. The new prompt is longer (rules and an example), so prompt processing rises a little; Nano prefill is fast but unmeasured |
+
+Two things that do **not** help, measured on 17 Nov: running prompts in parallel (the GPU serialises them) and `responseConstraint` (no speed-up).
+
+**Live check still to do** (needs desktop Chrome with Gemini Nano; fictional data only). Run `npm run dev` in `web/`, open `http://localhost:5173/?detect=v1` and then `?detect=v2` (the switch exists in dev builds only), pick **Help me with this**, seal the 77-word message, and read the **Timing** disclosure on Review. Do it twice per prompt (the first run after page load is cold). Record: time to Review, rows per stage, details protected, any name `detect.v2` misses that `detect.v1` finds, and the phrases it writes. Also try **Summarise**: the button should read "Answer on this device" and the answer should arrive with no Review screen. `detect_prompt_id` stays `detect.v1` until this is recorded here.
