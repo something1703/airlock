@@ -55,3 +55,37 @@ actor CallMeter: PhoneOnlyEngine {
         return counts[family] ?? 0
     }
 }
+
+/// FX-02: what the Vault and the rules found, before any model call — shown at once on the sealing screen
+/// (local only; it holds raw text and never leaves the device).
+public struct RulesPreview: Sendable, Hashable {
+    public struct Span: Sendable, Hashable {
+        public let span: TextSpan
+        public let category: PrivacyCategory
+    }
+
+    /// The normalised text the spans point into (UTF-16 offsets).
+    public let text: String
+    /// Non-overlapping, in order; the longest wins where two overlap.
+    public let spans: [Span]
+    /// Distinct details (same text, any case, counted once).
+    public let count: Int
+
+    public init(text: String, candidates: [Candidate]) {
+        let sorted = candidates.sorted {
+            $0.span.start != $1.span.start ? $0.span.start < $1.span.start : ($0.span.end - $0.span.start) > ($1.span.end - $1.span.start)
+        }
+        var spans: [Span] = []
+        for c in sorted {
+            if let last = spans.last, c.span.start < last.span.end {
+                if c.span.end - c.span.start > last.span.end - last.span.start { spans[spans.count - 1] = Span(span: c.span, category: c.category) }
+                continue
+            }
+            spans.append(Span(span: c.span, category: c.category))
+        }
+        let ns = text as NSString
+        self.text = text
+        self.spans = spans
+        self.count = Set(spans.map { ns.substring(with: NSRange(location: $0.span.start, length: $0.span.end - $0.span.start)).lowercased() }).count
+    }
+}

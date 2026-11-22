@@ -36,6 +36,7 @@
       }
     },
     "%lld characters sent": {},
+    "%lld details found so far · the on-device model is still reading": {},
     "(hidden code)": {},
     "(not kept)": {},
     "**%lld** answered on this device": {},
@@ -232,6 +233,7 @@
     "No real AI calls are made. Launch without “-demo” to use Apple's on-device model and Gemini.": {},
     "No receipts yet.": {},
     "Not answered": {},
+    "Nothing found by the rules · the on-device model is still reading": {},
     "Nothing has left this device. You'll see exactly what will be sent before it goes.": {},
     "Nothing here yet.": {},
     "Nothing is ever sent. Answers may be shorter.": {},

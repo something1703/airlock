@@ -76,6 +76,33 @@ final class ProgressLog: @unchecked Sendable {
         #expect(off.timings.firstModelOutput == nil)
     }
 
+    /// FX-02: rule hits are reported before the first model call, longest span wins, distinct details counted once.
+    @Test func rulesReadyComesBeforeTheFirstModelCall() async throws {
+        let phone = Self.phone()
+        let events = ProgressLog()
+        _ = await try pipeline(phone).run(RawText(raw, source: .paste)) { events.add($0) }
+        guard case .rulesReady(let preview)? = events.all.first else {
+            Issue.record("rulesReady must be the first progress event")
+            return
+        }
+        let ns = preview.text as NSString
+        let found = preview.spans.map { ns.substring(with: NSRange(location: $0.span.start, length: $0.span.end - $0.span.start)) }
+        #expect(found.contains("Raj") && found.contains("Maya Chen"))
+        #expect(!found.contains("Mercy General Hospital"), "only the model finds the hospital")
+    }
+
+    @Test func rulesPreviewKeepsLongestOverlapAndCountsDistinct() {
+        let text = "Raj Patel and raj and Raj"
+        func c(_ s: Int, _ e: Int) -> Candidate {
+            Candidate(span: TextSpan(start: s, end: e), text: "", category: .person, detector: .vault, confidence: .high)
+        }
+        let p = RulesPreview(text: text, candidates: [c(0, 3), c(0, 9), c(14, 17), c(22, 25)])
+        let ns = text as NSString
+        #expect(p.spans.map { ns.substring(with: NSRange(location: $0.span.start, length: $0.span.end - $0.span.start)) } == ["Raj Patel", "raj", "Raj"])
+        #expect(p.count == 2)
+        #expect(RulesPreview(text: "nothing here", candidates: []).count == 0)
+    }
+
     @Test func leakyRewriteFallsBackToLadder() async throws {
         let phone = Self.phone(rewrite: "the Mercy General campus")
         let r = await try pipeline(phone).run(RawText(raw, source: .paste))

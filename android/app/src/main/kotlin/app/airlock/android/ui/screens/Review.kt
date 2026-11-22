@@ -66,6 +66,9 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -114,6 +117,7 @@ import app.airlock.core.PhoneAvailability
 import app.airlock.core.PrivacyCategory
 import app.airlock.core.ReplacementKind
 import app.airlock.core.ReviewReason
+import app.airlock.core.RulesPreview
 import app.airlock.core.SealProgress
 import androidx.compose.ui.platform.LocalConfiguration
 
@@ -141,7 +145,7 @@ private fun Sealing(review: Review, rulesOnly: Boolean) {
     val still = reduceMotion()
     val elapsed = elapsedSeconds(review.startedAtNanos)
     val at = when (val p = review.progress) {
-        null, is SealProgress.Detecting -> 0
+        null, is SealProgress.Detecting, is SealProgress.RulesReady -> 0
         SealProgress.Generalising -> 1
         SealProgress.CheckingRisks -> 2
         SealProgress.Done -> 3
@@ -176,7 +180,19 @@ private fun Sealing(review: Review, rulesOnly: Boolean) {
                 Icon(AirlockIcons.Phone, null, Modifier.size(16.dp), tint = c.seal)
                 Text(stringResource(R.string.sealing_lock), style = Type.small.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold), color = c.seal)
             }
-            Text(if (review.raw.length > 900) review.raw.take(900) + "…" else review.raw, style = Type.body, color = c.text2)
+            val found = review.found
+            if (found != null) {
+                Text(highlightedPreview(found, c), style = Type.body, color = c.text2)
+                Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
+                    Small(
+                        if (found.count == 0) stringResource(R.string.sealing_found_none)
+                        else pluralStringResource(R.plurals.sealing_found, found.count, found.count),
+                        color = c.seal,
+                    )
+                }
+            } else {
+                Text(if (review.raw.length > 900) review.raw.take(900) + "…" else review.raw, style = Type.body, color = c.text2)
+            }
         }
         Column(Modifier.enter(1).fillMaxWidth().card(c), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -193,6 +209,20 @@ private fun Sealing(review: Review, rulesOnly: Boolean) {
             )
         }
     }
+}
+
+/** The user's text (first 900 chars) with rule hits tinted in their category colour. */
+private fun highlightedPreview(found: RulesPreview, c: app.airlock.android.AirlockColors, limit: Int = 900) = buildAnnotatedString {
+    val end = minOf(found.text.length, limit)
+    var at = 0
+    for (s in found.spans) {
+        if (s.start >= end || s.start < at) continue
+        if (s.start > at) append(found.text.substring(at, s.start))
+        withStyle(SpanStyle(background = c.category(s.category).copy(alpha = 0.22f), color = c.text)) { append(found.text.substring(s.start, minOf(s.end, end))) }
+        at = minOf(s.end, end)
+    }
+    if (at < end) append(found.text.substring(at, end))
+    if (end < found.text.length) append("…")
 }
 
 @Composable

@@ -67,7 +67,8 @@ function demoEngines(): EngineProvider {
         const m = text.match(re);
         if (m) items.push({ text: m[0], type, role });
       }
-      return JSON.stringify({ items });
+      // A short pause so the demo shows the rule hits first, then the model's findings (FX-02).
+      return new Promise<string>((resolve) => setTimeout(() => resolve(JSON.stringify({ items })), 1200));
     }
     if (id === "gen.v1") return JSON.stringify({ rewrite: "a large hospital" });
     if (id === "attack.v1") return JSON.stringify({ guesses: [] });

@@ -467,3 +467,18 @@ input.field, select.field { border: 1px solid var(--stroke); border-radius: 12px
 .timing dl > div { display: flex; justify-content: space-between; gap: 12px; }
 .timing dt, .timing dd { margin: 0; }
 .timing dd { font-variant-numeric: tabular-nums; }
+
+/* FX-02: rule hits shown while the on-device model reads */
+mark.found { color: inherit; border-radius: 4px; padding: 0 2px; animation: found-in var(--t-med) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
+mark.found.person { background: color-mix(in srgb, var(--c-person) 22%, transparent); }
+mark.found.org { background: color-mix(in srgb, var(--c-org) 22%, transparent); }
+mark.found.location { background: color-mix(in srgb, var(--c-location) 22%, transparent); }
+mark.found.contact { background: color-mix(in srgb, var(--c-contact) 22%, transparent); }
+mark.found.id { background: color-mix(in srgb, var(--c-id) 22%, transparent); }
+mark.found.date { background: color-mix(in srgb, var(--c-date) 22%, transparent); }
+mark.found.health { background: color-mix(in srgb, var(--c-health) 22%, transparent); }
+mark.found.secret { background: var(--risk-tint); }
+mark.found.quasi { background: var(--review-tint); }
+.found-line { margin-top: 10px; color: var(--seal); }
+@keyframes found-in { from { background-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { mark.found { animation: none; } }

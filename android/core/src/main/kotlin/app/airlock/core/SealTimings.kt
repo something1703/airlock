@@ -51,3 +51,37 @@ internal class CallMeter(
 
     fun calls(family: String? = null): Int = synchronized(this) { if (family == null) total else counts[family] ?: 0 }
 }
+
+/**
+ * FX-02: what the Vault and the rules found, before any model call — shown at once on the sealing screen (local
+ * only; it holds raw text and never leaves the device).
+ */
+data class RulesPreview(
+    /** The normalised text the spans point into. */
+    val text: String,
+    /** Non-overlapping, in order; the longest wins where two overlap. */
+    val spans: List<Span>,
+    /** Distinct details (same text, any case, counted once). */
+    val count: Int,
+) {
+    data class Span(val start: Int, val end: Int, val category: PrivacyCategory)
+
+    override fun toString(): String = "RulesPreview(${spans.size} spans)"
+
+    companion object {
+        fun of(text: String, candidates: List<Candidate>): RulesPreview {
+            val sorted = candidates.sortedWith(compareBy<Candidate> { it.span.start }.thenByDescending { it.span.end - it.span.start })
+            val spans = ArrayList<Span>()
+            for (c in sorted) {
+                val last = spans.lastOrNull()
+                if (last != null && c.span.start < last.end) {
+                    if (c.span.end - c.span.start > last.end - last.start) spans[spans.size - 1] = Span(c.span.start, c.span.end, c.category)
+                    continue
+                }
+                spans.add(Span(c.span.start, c.span.end, c.category))
+            }
+            val count = spans.mapTo(HashSet()) { text.substring(it.start, it.end).lowercase() }.size
+            return RulesPreview(text, spans, count)
+        }
+    }
+}

@@ -43,7 +43,34 @@ export type ReviewReason =
   | { kind: "risks"; count: number }
   | { kind: "redTeamUnavailable" };
 
-export type SealProgress = { kind: "detecting"; section: number; of: number } | { kind: "generalising" } | { kind: "checkingRisks" } | { kind: "done" };
+export type SealProgress =
+  | { kind: "rulesReady"; preview: RulesPreview }
+  | { kind: "detecting"; section: number; of: number } | { kind: "generalising" } | { kind: "checkingRisks" } | { kind: "done" };
+
+/** FX-02: what the Vault and the rules found, before any model call — shown at once on the sealing screen (local only). */
+export interface RulesPreview {
+  /** The normalised text the spans point into. */
+  text: string;
+  /** Non-overlapping, in order; the longest wins where two overlap. */
+  spans: { start: number; end: number; category: PrivacyCategory }[];
+  /** Distinct details (same text, any case, counted once). */
+  count: number;
+}
+
+export function rulesPreview(text: string, candidates: readonly Candidate[]): RulesPreview {
+  const sorted = [...candidates].sort((a, b) => a.span.start - b.span.start || (b.span.end - b.span.start) - (a.span.end - a.span.start));
+  const spans: RulesPreview["spans"] = [];
+  for (const c of sorted) {
+    const last = spans[spans.length - 1];
+    if (last && c.span.start < last.end) {
+      if (c.span.end - c.span.start > last.end - last.start) spans[spans.length - 1] = { start: c.span.start, end: c.span.end, category: c.category };
+      continue;
+    }
+    spans.push({ start: c.span.start, end: c.span.end, category: c.category });
+  }
+  const count = new Set(spans.map((x) => text.slice(x.start, x.end).toLowerCase())).size;
+  return { text, spans, count };
+}
 
 export interface SealResult {
   normalised: NormalisedText;
@@ -94,6 +121,7 @@ export class SealPipeline {
     const candidates = [...new VaultMatcher(this.vault).detect(text), ...this.patterns.detect(text)];
     const tRules = performance.now();
     timings.rulesMs = tRules - t0;
+    progress({ kind: "rulesReady", preview: rulesPreview(text, candidates) });
     const report = await new LLMDetector(meter, this.prompts, this.settings.chunkTokens).detect(text, (section, of) => progress({ kind: "detecting", section, of }));
     timings.detectMs = performance.now() - tRules;
     timings.detectCalls = meter.calls("detect");

@@ -1,8 +1,8 @@
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { PrivacyCategory } from "../../engine/types";
 import { GATE_CHECK_NAMES } from "../../app/session";
 import { useAirlock, useSession } from "../../app/context";
-import type { ReviewReason, SealProgress } from "../../engine/pipeline";
+import type { ReviewReason, RulesPreview, SealProgress } from "../../engine/pipeline";
 import type { Entity } from "../../engine/types";
 import { Banner, chipLabel, SealedPreview, TimingDetails, useElapsed, WithChips } from "../components";
 import { CATEGORY_ICON, IconCheck, IconDevice, IconEye, IconShield, Logo } from "../icons";
@@ -14,8 +14,26 @@ const STEPS: { kind: SealProgress["kind"]; label: string }[] = [
   { kind: "checkingRisks", label: "Checking what someone could still guess" },
 ];
 
-/** The wait, made legible: the user's own text (local), a scanning beam, and the steps ticking off. */
-function Sealing({ raw, progress, startedAt }: { raw: string; progress: SealProgress | null; startedAt: number }) {
+const PREVIEW_CHARS = 900;
+
+/** The user's text with what the Vault and the rules already found highlighted in category colours (FX-02). */
+function FoundText({ found }: { found: RulesPreview }) {
+  const { text, spans } = found;
+  const end = Math.min(text.length, PREVIEW_CHARS);
+  const out: ReactNode[] = [];
+  let at = 0;
+  spans.filter((x) => x.start < end).forEach((x, i) => {
+    if (x.start > at) out.push(text.slice(at, x.start));
+    out.push(<mark key={x.start} className={`found ${x.category}`} style={{ "--i": i } as CSSProperties}>{text.slice(x.start, Math.min(x.end, end))}</mark>);
+    at = Math.min(x.end, end);
+  });
+  if (at < end) out.push(text.slice(at, end));
+  if (end < text.length) out.push("…");
+  return <div className="prose raw">{out}</div>;
+}
+
+/** The wait, made legible: the user's own text (local) with rule hits marked at once, a scanning beam, and the steps ticking off. */
+function Sealing({ raw, progress, found, startedAt }: { raw: string; progress: SealProgress | null; found: RulesPreview | null; startedAt: number }) {
   const elapsed = useElapsed(startedAt);
   const at = progress ? STEPS.findIndex((x) => x.kind === progress.kind) : 0;
   const current = progress?.kind === "done" ? STEPS.length : Math.max(0, at);
@@ -27,7 +45,13 @@ function Sealing({ raw, progress, startedAt }: { raw: string; progress: SealProg
       </div>
       <div className="card scan enter">
         <div className="lock-line"><IconDevice size={16} /> On this device · offline-safe</div>
-        <div className="prose raw">{raw.length > 900 ? `${raw.slice(0, 900)}…` : raw}</div>
+        {found ? <FoundText found={found} /> : <div className="prose raw">{raw.length > PREVIEW_CHARS ? `${raw.slice(0, PREVIEW_CHARS)}…` : raw}</div>}
+        {found && (
+          <div className="small found-line" role="status">
+            {found.count === 0 ? "Nothing found by the rules · the on-device model is still reading"
+              : `${found.count === 1 ? "1 detail" : `${found.count} details`} found so far · the on-device model is still reading`}
+          </div>
+        )}
       </div>
       <div className="card enter" style={{ "--i": 1 } as CSSProperties}>
         <ol className="steps" role="status" aria-live="polite">
@@ -119,7 +143,7 @@ export function ReviewScreen() {
 
   if (review.error) return <div className="stack"><h1>Check before sending</h1><Banner tone="risk" title={review.error} /><div><button className="btn" onClick={() => s.go("ask")}>Back</button></div></div>;
 
-  if (!result) return <Sealing raw={review.raw} progress={review.progress} startedAt={review.startedAt} />;
+  if (!result) return <Sealing raw={review.raw} progress={review.progress} found={review.found} startedAt={review.startedAt} />;
 
   const entities = result.draft.entities.sorted();
   const sealed = entities.filter((e) => e.action.kind !== "keep");
