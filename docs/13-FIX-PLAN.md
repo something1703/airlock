@@ -62,6 +62,8 @@ The red-team scripts that produced the review's findings may be on this Mac at `
 
 ## FX-02 — Cut the wait and fill it 🔒
 
+> **Status (22 Nov):** built on web, iOS and Android and merged — timings, rules shown at once, `detect.v2` (off by default), red-team never blocks Review, quick tasks answered on the device. Not yet done: the live timing run that decides whether `detect_prompt_id` flips to `detect.v2` and confirms the targets below. Deviations from this brief are in `docs/11-RISKS-AND-DECISIONS.md` (22 Nov rows).
+
 **Fixes:** UX-01, UX-02, UX-09.
 
 **1. Measure first.**

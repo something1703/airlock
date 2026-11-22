@@ -234,3 +234,12 @@ Every privacy fix needs a fixture in `spec/fixtures` first, so all three engines
 - Turn the red-team scripts in `.preview/redteam/` into tests in the repo.
 - Re-run §3.2 on the live site after the fixes and record new timings.
 - Run the same walkthrough on a real iPhone or the Simulator with Apple Intelligence on, and on a Nano-capable Android phone.
+
+## 7. Fix log
+
+| IDs | Status | Commit / note |
+|-----|--------|---------------|
+| UX-01 sealing too slow | **Partly fixed, not yet measured live.** Timings are measured and shown (`1cd45f6`); `detect.v2` (about a third of the output, no per-detail `gen.v1` calls) is built but off until a live check on a real model (`e41e0ab`, `docs/API-NOTES.md` "FX-02 timing notes"); Review no longer waits for the red-team in any dial (`d83073b`) | Target not yet confirmed: p50 ≤ 4 s |
+| UX-02 the wait shows nothing | **Fixed** | `5bd4041`: rule hits highlighted at once with "N details found so far" |
+| UX-09 on-device tasks go through Review | **Fixed** | `026fe35`: quick tasks and "This device only" are answered from the raw message with no seal, Review or receipt; failures fall back to the normal flow. Cost: a cloud follow-up in such a thread does not see the earlier local exchange |
+| UX-03, UX-04, UX-05 | Fixed on the web earlier | `99d0c88` |
